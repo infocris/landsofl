@@ -13,6 +13,10 @@
   const DIR_ANGLE = [-Math.PI / 2, 0, Math.PI / 2, Math.PI]; // N, E, S, O (y vers le sud)
   const DIR_INDEX = { N: 0, E: 1, S: 2, O: 3 };
 
+  // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
+  // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
+  const EMBED = new URLSearchParams(location.search).get("embed") === "1";
+  let dirty = true;
   const view = document.getElementById("view");
   const ctx = view.getContext("2d");
   const mapCanvas = document.getElementById("map");
@@ -37,7 +41,8 @@
 
   function resize() {
     const aspect = innerWidth / Math.max(1, innerHeight);
-    W = 400; H = Math.max(160, Math.min(400, Math.round(W / aspect)));
+    if (aspect > 1.6) { H = 250; W = Math.min(900, Math.round(H * aspect)); }   // vue large (sous le jeu)
+    else { W = 400; H = Math.max(160, Math.min(400, Math.round(W / aspect))); }
     view.width = W; view.height = H;
     proj = (W / 2) / Math.tan(FOV / 2);
     zbuf = new Float32Array(W);
@@ -98,7 +103,8 @@
     if (keepPos && saved && saved.level === n) Object.assign(player, saved);
     else { player.x = L.start.x; player.y = L.start.y; player.a = DIR_ANGLE[L.start.dir]; }
     levelSel.value = n;
-    store.set("level", n);
+    if (!EMBED) store.set("level", n);
+    dirty = true;
     drawMapBase();
   }
 
@@ -131,7 +137,8 @@
     const planeX = -dirY * Math.tan(FOV / 2), planeY = dirX * Math.tan(FOV / 2);
     castFloorCeiling(dirX, dirY, planeX, planeY);
     const cols = L.atlasCols, fw = L.faceW, fh = L.faceH;
-    const sprites = projectSprites(dirX, dirY, planeX, planeY);
+    // en mode intégré, pas de monstres : on ne connaît que leurs positions de départ
+    const sprites = EMBED ? [] : projectSprites(dirX, dirY, planeX, planeY);
     const items = [];   // éléments de la colonne : [distance, type, …]
 
     for (let x = 0; x < W; x++) {
@@ -345,7 +352,7 @@
 
   // --- Entrées ----------------------------------------------------------------
   addEventListener("keydown", (e) => {
-    if (e.target === levelSel) return;
+    if (EMBED || e.target === levelSel) return;
     keys.add(e.code);
     if (e.code === "Space") { toggleDoor(); e.preventDefault(); }
     if (e.code === "KeyN") noclip = !noclip;
@@ -359,17 +366,33 @@
   });
   addEventListener("keyup", (e) => keys.delete(e.code));
   addEventListener("blur", () => keys.clear());
-  view.addEventListener("click", () => { if (view.requestPointerLock) view.requestPointerLock(); });
+  view.addEventListener("click", () => { if (!EMBED && view.requestPointerLock) view.requestPointerLock(); });
   addEventListener("mousemove", (e) => {
     if (document.pointerLockElement === view) player.a += e.movementX * 0.0035;
   });
   levelSel.addEventListener("change", () => { loadLevel(+levelSel.value, false); levelSel.blur(); });
-  addEventListener("resize", resize);
+  addEventListener("resize", () => { resize(); dirty = true; });
+
+  // Mode intégré : position du groupe envoyée par la page du jeu (case entière + direction).
+  let loadingLevel = null;
+  addEventListener("message", async (e) => {
+    if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-pos") return;
+    const { level, x, y, dir } = e.data;
+    if (!L || L.level !== level) {
+      if (loadingLevel === level) return;
+      loadingLevel = level;
+      try { await loadLevel(level, false); } finally { loadingLevel = null; }
+    }
+    player.x = x + 0.5; player.y = y + 0.5; player.a = DIR_ANGLE[dir & 3];
+    dirty = true;
+  });
 
   let last = performance.now(), saveAt = 0;
   function frame(t) {
     const dt = Math.min(0.05, (t - last) / 1000); last = t;
-    if (L) {
+    if (L && EMBED) {
+      if (dirty) { render(); updateHud(); dirty = false; }
+    } else if (L) {
       update(dt); render(); drawMap(); updateHud();
       if (t > saveAt) { store.set("pos", { level: L.level, x: player.x, y: player.y, a: player.a }); saveAt = t + 1000; }
     }
@@ -391,6 +414,10 @@
     if (q.has("y")) player.y = +q.get("y");
     if (q.has("a")) player.a = +q.get("a") * Math.PI / 180;   // degrés, 0 = est, 90 = sud
     if (q.has("hud")) { helpEl.classList.add("hidden"); }
+    if (EMBED) {
+      for (const id of ["top", "help", "map"]) document.getElementById(id).style.display = "none";
+      view.style.cursor = "default";
+    }
     requestAnimationFrame(frame);
   })();
 })();

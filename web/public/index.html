@@ -10,14 +10,26 @@
 <style>
   html, body { margin: 0; height: 100%; background: #000; }
   body { display: flex; }
-  #dos { flex: 1; min-width: 0; height: 100vh; }
-  #mm { width: 300px; flex: none; box-sizing: border-box; padding: 12px; background: #0f0d0a;
+  /* colonne de gauche : jeu, puis vue 3D synchronisée */
+  #left { flex: 1; min-width: 0; height: 100vh; display: flex; flex-direction: column; }
+  #dos { flex: 3; min-height: 0; }
+  #v3d { flex: 2; min-height: 160px; border-top: 1px solid #3a3226; background: #000; }
+  #v3d.hidden { display: none; }
+  #v3d iframe { width: 100%; height: 100%; border: 0; display: block; }
+  #mm { width: 420px; flex: none; box-sizing: border-box; padding: 12px; background: #0f0d0a;
     border-left: 1px solid #3a3226; color: #e8dcc0; font: 13px/1.4 system-ui, sans-serif;
-    display: flex; flex-direction: column; gap: 8px; }
+    display: flex; flex-direction: column; gap: 8px; height: 100vh; overflow: hidden; }
+  #mm-items { margin: 0; padding: 0; list-style: none; overflow-y: auto; flex: 1; min-height: 60px;
+    border-top: 1px solid #3a3226; padding-top: 6px; font-size: 12px; }
+  #mm-items li { display: flex; gap: 6px; padding: 2px 0; color: #cfc3a6; }
+  #mm-items li.near { color: #fff; background: rgba(40, 220, 230, .12); }
+  #mm-items b { flex: none; min-width: 1.8em; text-align: right; color: #28dce6; }
+  #mm-items span.pos { margin-left: auto; color: #7d7058; flex: none; }
+  #mm-items-title { color: #a39578; font-size: 12px; }
   #mm.hidden { display: none; }
   #mm-title { font-weight: 600; color: #c9a227; }
   #mm-info { color: #a39578; min-height: 1.4em; }
-  #mm-canvas { width: 276px; height: 276px; image-rendering: pixelated; border: 1px solid #3a3226; }
+  #mm-canvas { width: 384px; height: 384px; border: 1px solid #3a3226; flex: none; }
   #mm-label { color: #c9a227; font-weight: 600; letter-spacing: .04em; min-height: 1.4em; }
   #mm-legend { color: #a39578; font-size: 11px; }
   #mm-legend i { display: inline-block; width: 9px; height: 9px; margin: 0 3px 0 8px; vertical-align: -1px; }
@@ -31,8 +43,11 @@
   #qload[hidden] { display: none; }
   /* boutons à gauche du panneau quand il est ouvert */
   body:has(#mm:not(.hidden)) #zqsd, body:has(#mm:not(.hidden)) #mmtoggle,
-  body:has(#mm:not(.hidden)) #qload { right: 312px; }
-  @media (max-width: 700px) { #mm { display: none; } #zqsd, #mmtoggle { right: 12px !important; } }
+  body:has(#mm:not(.hidden)) #qload, body:has(#mm:not(.hidden)) #v3dtoggle { right: 432px; }
+  #v3dtoggle { position: fixed; right: 12px; bottom: 120px; z-index: 1000;
+    font: 12px/1 system-ui, sans-serif; padding: 6px 10px; border: 1px solid #555; border-radius: 6px;
+    background: rgba(0,0,0,.6); color: #aaa; cursor: pointer; }
+  @media (max-width: 800px) { #mm { display: none; } #zqsd, #mmtoggle, #qload, #v3dtoggle { right: 12px !important; } }
   #zqsd {
     position: fixed; right: 12px; bottom: 12px; z-index: 1000;
     font: 12px/1 system-ui, sans-serif; padding: 6px 10px;
@@ -44,14 +59,20 @@
 </style>
 </head>
 <body>
-<div id="dos"></div>
+<div id="left">
+  <div id="dos"></div>
+  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1" title="Vue 3D synchronisée"></iframe></div>
+</div>
 <aside id="mm" aria-label="Mini-carte">
   <div id="mm-title">Mini-carte</div>
   <div id="mm-info">chargement…</div>
   <canvas id="mm-canvas"></canvas>
   <div id="mm-label"></div>
-  <div id="mm-legend"><i style="background:#8a7f68"></i>sol<i style="background:#2b2b2b;outline:1px solid #555"></i>mur<i style="background:#a0522d"></i>porte fermée<i style="background:#d08a4a"></i>ouverte<i style="background:#d22"></i>lieu</div>
+  <div id="mm-legend"><i style="background:#8a7f68"></i>sol<i style="background:#2b2b2b;outline:1px solid #555"></i>mur<i style="background:#a0522d"></i>porte fermée<i style="background:#d08a4a"></i>ouverte<i style="background:#d22"></i>lieu<i style="background:#28dce6"></i>objets</div>
+  <div id="mm-items-title">Objets du niveau (positions de départ)</div>
+  <ol id="mm-items"></ol>
 </aside>
+<button id="v3dtoggle" type="button" title="Afficher/masquer la vue 3D (F10)">3D</button>
 <button id="mmtoggle" type="button" title="Afficher/masquer la mini-carte (F9)">Carte</button>
 <button id="qload" type="button" title="Recharger l'état enregistré avec F6 (QUICK.SAV)" hidden>F7 · charger l'état</button>
 <button id="zqsd" type="button" title="Activer/désactiver les touches ZQSD (F8)"></button>
@@ -90,6 +111,7 @@
     const down = e.type === "keydown";
     if (down && e.code === "F8") { setRemap(!remapOn); e.preventDefault(); e.stopPropagation(); return; }
     if (down && e.code === "F9") { toggleMap(); e.preventDefault(); e.stopPropagation(); return; }
+    if (down && e.code === "F10") { toggle3d(); e.preventDefault(); e.stopPropagation(); return; }
     // Relâcher toujours une touche remappée, même si on a désactivé entre-temps.
     if (!down && held.has(e.code)) {
       if (emu) emu.sendKeyEvent(held.get(e.code), false);
@@ -121,6 +143,17 @@
   }
   try { if (localStorage.getItem("minimap") === "off") mm.classList.add("hidden"); } catch (e) {}
   document.getElementById("mmtoggle").addEventListener("click", (e) => { toggleMap(); e.currentTarget.blur(); });
+
+  // Vue 3D sous le jeu : affichage mémorisé
+  const v3d = document.getElementById("v3d");
+  function toggle3d(force) {
+    const show = force !== undefined ? force : v3d.classList.contains("hidden");
+    v3d.classList.toggle("hidden", !show);
+    try { localStorage.setItem("view3d", show ? "on" : "off"); } catch (e) {}
+    window.dispatchEvent(new Event("resize"));
+  }
+  try { if (localStorage.getItem("view3d") === "off") v3d.classList.add("hidden"); } catch (e) {}
+  document.getElementById("v3dtoggle").addEventListener("click", (e) => { toggle3d(); e.currentTarget.blur(); });
 
   // --- Conservation des sauvegardes du jeu ---------------------------------
   // js-dos ne garde les fichiers modifiés du disque C: (dont les sauvegardes faites

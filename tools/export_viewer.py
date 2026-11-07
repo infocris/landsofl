@@ -354,6 +354,8 @@ def main(game_dir, maps_dir, out_dir):
             "monsters": [{k: m[k] for k in ("x", "y", "xOffs", "yOffs", "direction", "sprites", "spawn")}
                          for m in level["monsters"]],
             "labels": [{k: l[k] for k in ("x", "y", "text")} for l in level["labels"]],
+            "items": [{k: it.get(k) for k in ("x", "y", "xOffs", "yOffs", "type", "name", "spawn", "container", "face")}
+                      for it in level.get("items", [])],
             "start": {"x": sx_ + 0.5, "y": sy_ + 0.5, "dir": sa_},
         }
         with open(os.path.join(out_dir, f"level{n:02d}.json"), "w", encoding="utf-8") as fh:
