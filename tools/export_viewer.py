@@ -106,6 +106,16 @@ def frame_image(frame, pal):
     return img
 
 
+def mirrored(src):
+    out = Image(src.w, src.h)
+    for y in range(src.h):
+        for x in range(src.w):
+            o = (y * src.w + x) * 4
+            if src.px[o + 3]:
+                out.put(src.w - 1 - x, y, src.px[o:o + 3])
+    return out
+
+
 def wall_set_face(ts, set_index, pal):
     img = Image(FACE_W, FACE_H)
     base = 330 + set_index * 431 + FRONT_START
@@ -208,7 +218,12 @@ def face_texture(ts, wt, pal):
         dec = ts.decor[d]
         si = dec["shape"][1]
         if si != 0xFFFF and si < len(ts.decor_shapes) and ts.decor_shapes[si]:
-            img.blit(frame_image(ts.decor_shapes[si], pal), dec["x"][1], dec["y"][1])
+            shape_img = frame_image(ts.decor_shapes[si], pal)
+            img.blit(shape_img, dec["x"][1], dec["y"][1])
+            if dec["flags"] & 1:
+                # drapeau 1 : motif symétrique, seule une moitié est stockée ; on dessine aussi
+                # l'image retournée, en miroir par rapport au centre du mur
+                img.blit(mirrored(shape_img), FACE_W - dec["x"][1] - shape_img.w, dec["y"][1])
         d = dec["next"]
     return img
 

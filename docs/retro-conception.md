@@ -291,8 +291,13 @@ u16 n ; puis n entrées de 72 octets :
   u8  échelle[10]
   s16 x[10], s16 y[10]   position de l'image
   s8  suivante    décoration chaînée (dessinée en plus)
-  u8  drapeaux
+  u8  drapeaux    bit 0 : motif symétrique (voir ci-dessous)
 ```
+
+**Drapeau bit 0 — vérifié.** Seule la moitié gauche du motif est stockée. Il faut aussi
+dessiner l'image retournée horizontalement, en miroir par rapport au centre du mur, en
+`x' = 128 − x − largeur`. Sans cela, les blasons et bannières du château apparaissent
+coupés en deux. Au château, cela concerne les décorations 6 à 9, 16 et 18.
 
 Position 1 = mur proche de face, avec `x/y` relatifs au mur de 128×96 (**vérifié**
 visuellement : bannières, blasons, portraits, fontaine). Les positions 2–3 sont plus
