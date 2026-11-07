@@ -80,7 +80,14 @@ Repère : un `.SHP` est compressé quand son mot à l'offset 2 vaut 4.
 Fichiers `LANDS.FRE` (dans `STARTUP.PAK`) et `LEVELnn.FRE` :
 
 - une table de `u16` d'offsets, dont le nombre vaut le premier offset divisé par 2 ;
-- puis des chaînes terminées par `\0`, encodées en **CP850**.
+- puis des chaînes terminées par `\0`, encodées en **CP850** et **compressées** :
+  - un octet ≥ 0x80 code deux lettres fréquentes : `T1[c>>3] + T2[c]` avec `c = octet & 0x7F`,
+    `T1 = " etainosrlhcdupm"` et une table `T2` de 128 caractères ;
+  - `0x1B` suivi de `c` code le caractère CP850 `c + 0x7F` (é, è, à, ô…).
+
+  Décodeur : `tools/pak.py`, fonctions `decode_text` et `read_strings`. Les majuscules
+  (« FONTAINE ») passent sans compression, ce qui explique que les premières annotations
+  étaient lisibles sans décodage.
 
 Dans les scripts et les fichiers `.XXX`, un numéro de texte `0x4000 + i` désigne
 l'entrée `i` de `LANDS.xxx`.
@@ -161,7 +168,7 @@ Fonctions du moteur identifiées :
 | `0x38` | placer un monstre | case, dx, dy (0–255, 128 = centre), direction (0 N, 1 E, 2 S, 3 O), type, ?, mode, équipement ×0–4 | vérifié : 0 monstre dans un mur sur 28 niveaux |
 | `0x0B` | charger un sprite de monstre | texte (fichier .SHP), emplacement, anim | déduit |
 | `0x3F` | caractéristiques d'un type de monstre | type, emplacement de sprite, puis 40 valeurs | déduit (valeurs non décodées) |
-| `0x11` | placer un objet au sol (probable) | 8 arguments | inconnu |
+| `0x11` | placer un objet | type d'objet, image, drapeaux, **niveau**, case, dx, dy (0–255), hauteur | vérifié (niveau = celui du script sauf 1 cas ; noms cohérents) |
 
 - `.INI` est exécuté au chargement du niveau (monstres présents dès le départ).
 - `.INF` contient les événements (monstres qui apparaissent sur un déclencheur).
@@ -171,6 +178,35 @@ Fonctions du moteur identifiées :
   monstres tombent dans des murs. C'est probablement un niveau inutilisé.
 - Le premier texte de `TEXT` qui n'est pas un `.PAL` donne le nom du décor (`KEEP`,
   `FOREST1`…). Un `.PAL` cité est une palette alternative.
+
+### 8.1 Objets placés — vérifié
+
+- **Total** : 223 objets placés par les scripts. 197 sont posés au chargement (`.INI`),
+  27 apparaissent sur un événement (`.INF`).
+- **Niveau visé** : l'argument « niveau » vaut celui du script, sauf au niveau 24, qui
+  pose un objet (type 198) au niveau 29. L'extracteur ne reporte pas encore cet objet.
+- **Objets dans les murs** : 51 objets sont placés dans un bloc de mur, avec un décalage
+  de 0 ou 255 sur un axe et une hauteur de 8. Ce sont des objets rangés dans des **niches
+  murales** ; c'est ce qui tient lieu de coffre dans ce jeu, où aucun autre contenant n'a
+  été trouvé. Le décalage indique la face (0 = Ouest/Nord, 255 = Est/Sud), donc la case
+  depuis laquelle on voit la niche. Souvent, le mur porte une décoration de type spécial 6
+  avec le drapeau 0x87 (**déduit** : niche).
+- **Niveau 1** : aucun objet placé par script. L'équipement de départ vient
+  d'ailleurs (inconnu).
+
+### 8.2 Table des objets — vérifié (en RAM)
+
+- **Emplacement** : en RAM à l'adresse physique 0x8AA05 (version CD FR). Elle compte 285
+  entrées de 13 octets, et son index est le type d'objet utilisé par la fonction `0x11`.
+- **Contenu d'une entrée** : octets 0–1 = numéro de texte du nom (0x4000 + index dans
+  `LANDS.FRE`) ; octet 2 = numéro d'image (**déduit**) ; le reste est inconnu.
+- **Contrôle** : l'entrée 0 vaut « Objet illégal ».
+- **Pas dans les exécutables** : la table n'apparaît telle quelle ni dans `LANDS.EXE` ni
+  dans `MAIN.EXE`. Elle est extraite d'un vidage de la RAM par
+  `tools/item_table_from_ram.py`, et le résultat est versionné dans
+  `tools/data/items_fr.json`.
+- **Nom douteux** : le type 267, « Essaim », revient souvent dans les forêts. Son sens
+  reste à vérifier en jeu.
 
 ## 9. Graphismes des décors — vérifié
 
@@ -418,3 +454,5 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
   - sauvegardes : F6/F7 rendus persistants (`savefile`), conservation automatique des
     sauvegardes du jeu, bouton F7 ajouté à la page ;
   - clic droit : premiers constats.
+- **2026-11-08** : compression des textes, table des objets (en RAM), objets placés et
+  niches murales.

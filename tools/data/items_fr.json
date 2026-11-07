@@ -1,0 +1,1716 @@
+{
+ "ramAddress": 567813,
+ "entrySize": 13,
+ "items": [
+  {
+   "type": 0,
+   "name": "Objet illégal",
+   "shape": 0,
+   "raw": "85400000000000ff0000000000"
+  },
+  {
+   "type": 1,
+   "name": "Fléchette empoisonnée",
+   "shape": 6,
+   "raw": "f6400600100000190801000000"
+  },
+  {
+   "type": 2,
+   "name": "Flèche",
+   "shape": 6,
+   "raw": "86400600100000020a01000000"
+  },
+  {
+   "type": 3,
+   "name": "Flèche",
+   "shape": 12,
+   "raw": "86400c00100000020f04000000"
+  },
+  {
+   "type": 4,
+   "name": "Carreau",
+   "shape": 9,
+   "raw": "87400900100000020f01000000"
+  },
+  {
+   "type": 5,
+   "name": "Shuriken",
+   "shape": 8,
+   "raw": "43420800100000020a01000000"
+  },
+  {
+   "type": 6,
+   "name": "Shuriken",
+   "shape": 8,
+   "raw": "43420800100000020a01000000"
+  },
+  {
+   "type": 7,
+   "name": "Ordures",
+   "shape": 10,
+   "raw": "46420a00100000020a01000000"
+  },
+  {
+   "type": 8,
+   "name": "Crachat",
+   "shape": 11,
+   "raw": "47420b00100000021601000000"
+  },
+  {
+   "type": 9,
+   "name": "temp object",
+   "shape": 0,
+   "raw": "68410000500000052304000000"
+  },
+  {
+   "type": 10,
+   "name": "Boule de Glace",
+   "shape": 1,
+   "raw": "bc4101005000001b1903000000"
+  },
+  {
+   "type": 11,
+   "name": "Lance",
+   "shape": 2,
+   "raw": "bd410200100000020f01000000"
+  },
+  {
+   "type": 12,
+   "name": "Douleur",
+   "shape": 5,
+   "raw": "2e420500100000171980000000"
+  },
+  {
+   "type": 13,
+   "name": "Dispersion",
+   "shape": 4,
+   "raw": "314204005000001a0080000000"
+  },
+  {
+   "type": 14,
+   "name": "Poison",
+   "shape": 3,
+   "raw": "32420300100000190a80000000"
+  },
+  {
+   "type": 15,
+   "name": "Dispersion",
+   "shape": 4,
+   "raw": "31420400500000020f80000000"
+  },
+  {
+   "type": 16,
+   "name": "Fer à cheval des Nains",
+   "shape": 38,
+   "raw": "d5402602000000ff0000000800"
+  },
+  {
+   "type": 17,
+   "name": "Heaume de nain",
+   "shape": 22,
+   "raw": "28411612001000010000080f00"
+  },
+  {
+   "type": 18,
+   "name": "Sabre \"Cougar\"",
+   "shape": 4,
+   "raw": "f440040a000500001000037d00"
+  },
+  {
+   "type": 19,
+   "name": "Baguette de la Mort",
+   "shape": 27,
+   "raw": "c8411b0500000014050000e803"
+  },
+  {
+   "type": 20,
+   "name": "Figurine Cobra",
+   "shape": 121,
+   "raw": "34427904000000ff0000000000"
+  },
+  {
+   "type": 21,
+   "name": "Figurine Dragon",
+   "shape": 123,
+   "raw": "36427b04000000ff0000000000"
+  },
+  {
+   "type": 22,
+   "name": "Figurine Humanoïde",
+   "shape": 122,
+   "raw": "35427a04000000ff0000000000"
+  },
+  {
+   "type": 23,
+   "name": "Figurine Licorne",
+   "shape": 124,
+   "raw": "37427c04000000ff0000000000"
+  },
+  {
+   "type": 24,
+   "name": "Arbalète",
+   "shape": 23,
+   "raw": "884017080405000b0428002c01"
+  },
+  {
+   "type": 25,
+   "name": "Arbalète \"Equaliseur\"",
+   "shape": 23,
+   "raw": "894017080405000b0400001e00"
+  },
+  {
+   "type": 26,
+   "name": "Arbalète \"Rédemption\"",
+   "shape": 23,
+   "raw": "8d4017080405000b043800f401"
+  },
+  {
+   "type": 27,
+   "name": "Arbalète \"Eternité\"",
+   "shape": 23,
+   "raw": "8e4017080405000b043c003002"
+  },
+  {
+   "type": 28,
+   "name": "Pioche",
+   "shape": 9,
+   "raw": "9040090a000500000700001e00"
+  },
+  {
+   "type": 29,
+   "name": "Hache",
+   "shape": 1,
+   "raw": "9140010a000500000a00003200"
+  },
+  {
+   "type": 30,
+   "name": "Hache \"Domination\"",
+   "shape": 1,
+   "raw": "9240010a000500000a00002c01"
+  },
+  {
+   "type": 31,
+   "name": "Hache \"Tranchoir\"",
+   "shape": 1,
+   "raw": "9340010a000500000b00004b00"
+  },
+  {
+   "type": 32,
+   "name": "Hache \"Fendoir\"",
+   "shape": 1,
+   "raw": "9440010a000500000b00004b00"
+  },
+  {
+   "type": 33,
+   "name": "Hache \"Vixen\"",
+   "shape": 1,
+   "raw": "9740010a000500001000005000"
+  },
+  {
+   "type": 34,
+   "name": "Hache \"Massacre\"",
+   "shape": 1,
+   "raw": "9840010a000500000f00005a00"
+  },
+  {
+   "type": 35,
+   "name": "Arc",
+   "shape": 25,
+   "raw": "994019080405000b020a006400"
+  },
+  {
+   "type": 36,
+   "name": "Arc \"Gemini\"",
+   "shape": 25,
+   "raw": "9a4019080405000b020a00c800"
+  },
+  {
+   "type": 37,
+   "name": "Arc \"Scout\"",
+   "shape": 25,
+   "raw": "9b4019080405000b020b007800"
+  },
+  {
+   "type": 38,
+   "name": "Arc \"Tempête\"",
+   "shape": 25,
+   "raw": "9f4019080405000b020f00a000"
+  },
+  {
+   "type": 39,
+   "name": "Arbalète",
+   "shape": 23,
+   "raw": "a04017080405000b040f00fa00"
+  },
+  {
+   "type": 40,
+   "name": "Arbalète \"Valkyrie\"",
+   "shape": 23,
+   "raw": "a14017080405000b030f00f401"
+  },
+  {
+   "type": 41,
+   "name": "Arbalète \"Rapide\"",
+   "shape": 23,
+   "raw": "a24017080405000b0411002c01"
+  },
+  {
+   "type": 42,
+   "name": "Arbalète \"Elayna\"",
+   "shape": 23,
+   "raw": "a64017080405000b041700f401"
+  },
+  {
+   "type": 43,
+   "name": "Poignard abîmé",
+   "shape": 7,
+   "raw": "a740070a180500000401000500"
+  },
+  {
+   "type": 44,
+   "name": "Poignard",
+   "shape": 7,
+   "raw": "a840070a180500000a01000a00"
+  },
+  {
+   "type": 45,
+   "name": "Poignard \"Riposte\"",
+   "shape": 7,
+   "raw": "a940070a180500000501193200"
+  },
+  {
+   "type": 46,
+   "name": "Poignard \"Stylet\"",
+   "shape": 7,
+   "raw": "aa40070a180500000601000f00"
+  },
+  {
+   "type": 47,
+   "name": "Poignard \"Mordant\"",
+   "shape": 7,
+   "raw": "ab40070a180500000701001400"
+  },
+  {
+   "type": 48,
+   "name": "Poignard \"Crochet\"",
+   "shape": 7,
+   "raw": "ac40070a180500000801001900"
+  },
+  {
+   "type": 49,
+   "name": "Poignard \"Rasoir\"",
+   "shape": 7,
+   "raw": "ad40070a180500000901002300"
+  },
+  {
+   "type": 50,
+   "name": "Poignard \"Assassin\"",
+   "shape": 7,
+   "raw": "ae40070a180500000c01003200"
+  },
+  {
+   "type": 51,
+   "name": "Poignard Incrusté",
+   "shape": 53,
+   "raw": "af40350e180500002d0100b80b"
+  },
+  {
+   "type": 52,
+   "name": "Grande Hache",
+   "shape": 8,
+   "raw": "b040080a000500001e0000af00"
+  },
+  {
+   "type": 53,
+   "name": "Grande Hache \"Master\"",
+   "shape": 8,
+   "raw": "b140080a000500001e00005e01"
+  },
+  {
+   "type": 54,
+   "name": "Grande hache \"Meister\"",
+   "shape": 8,
+   "raw": "b240080a000500001e00006400"
+  },
+  {
+   "type": 55,
+   "name": "Grande hache \"Moissonneuse\"",
+   "shape": 8,
+   "raw": "b440080a00050000240000e100"
+  },
+  {
+   "type": 56,
+   "name": "Grande hache \"Mort\"",
+   "shape": 8,
+   "raw": "b540080a000500002700001301"
+  },
+  {
+   "type": 57,
+   "name": "Grande hache \"Soufre\"",
+   "shape": 8,
+   "raw": "b640080a000500002a00004501"
+  },
+  {
+   "type": 58,
+   "name": "Grande hache \"Bourreau\"",
+   "shape": 8,
+   "raw": "b740080a000500002d00007701"
+  },
+  {
+   "type": 59,
+   "name": "Marteau",
+   "shape": 56,
+   "raw": "b840380a000500000f02001900"
+  },
+  {
+   "type": 60,
+   "name": "Grand maillet",
+   "shape": 56,
+   "raw": "b940380a000500002802006400"
+  },
+  {
+   "type": 61,
+   "name": "Grand maillet \"Marteau\"",
+   "shape": 56,
+   "raw": "ba40380a000500002c02007d00"
+  },
+  {
+   "type": 62,
+   "name": "Grand maillet \"Pillage\"",
+   "shape": 56,
+   "raw": "bb40380a000500003002009600"
+  },
+  {
+   "type": 63,
+   "name": "Grand maillet \"Poing de Thor\"",
+   "shape": 56,
+   "raw": "bc40380a00050000340200c800"
+  },
+  {
+   "type": 64,
+   "name": "Grand maillet \"Tonnerre\"",
+   "shape": 56,
+   "raw": "bd40380a000500003802002c01"
+  },
+  {
+   "type": 65,
+   "name": "Grand maillet \"Apocalypse\"",
+   "shape": 56,
+   "raw": "be40380a000500003c02002c01"
+  },
+  {
+   "type": 66,
+   "name": "Grand arc",
+   "shape": 25,
+   "raw": "bf4019080405000b021400af00"
+  },
+  {
+   "type": 67,
+   "name": "Grand arc \"Pisteur\"",
+   "shape": 25,
+   "raw": "c04019080405000b021600c800"
+  },
+  {
+   "type": 68,
+   "name": "Grand arc de pèlerin",
+   "shape": 25,
+   "raw": "c14019080405000b021800e100"
+  },
+  {
+   "type": 69,
+   "name": "Grand arc \"Ténèbres\"",
+   "shape": 25,
+   "raw": "c44019080405000b021e002c01"
+  },
+  {
+   "type": 70,
+   "name": "Grande épée",
+   "shape": 6,
+   "raw": "c540060a000500002801002c01"
+  },
+  {
+   "type": 71,
+   "name": "Grande épée \"Trouble\"",
+   "shape": 6,
+   "raw": "c840060a000500003001005e01"
+  },
+  {
+   "type": 72,
+   "name": "Grande épée de l'Aigle",
+   "shape": 6,
+   "raw": "c940060a00050000340100a901"
+  },
+  {
+   "type": 73,
+   "name": "Grande épée \"Destin\"",
+   "shape": 6,
+   "raw": "ca40060a00050000380100db01"
+  },
+  {
+   "type": 74,
+   "name": "Grande épée \"Justice\"",
+   "shape": 6,
+   "raw": "cb40060a000500003c01002602"
+  },
+  {
+   "type": 75,
+   "name": "Hallebarde",
+   "shape": 13,
+   "raw": "cc400d0a00050000280000fa00"
+  },
+  {
+   "type": 76,
+   "name": "Hallebarde \"Sévère\"",
+   "shape": 13,
+   "raw": "cd400d0a000500002c00002c01"
+  },
+  {
+   "type": 77,
+   "name": "Hallebarde \"Veuve\"",
+   "shape": 13,
+   "raw": "cf400d0a000500003400007d00"
+  },
+  {
+   "type": 78,
+   "name": "Hallebarde \"Main de la Mort\"",
+   "shape": 13,
+   "raw": "d1400d0a000500003c0000c201"
+  },
+  {
+   "type": 79,
+   "name": "Fer à cheval",
+   "shape": 38,
+   "raw": "d2402602000000ff0000000000"
+  },
+  {
+   "type": 80,
+   "name": "Fer à cheval de bronze",
+   "shape": 38,
+   "raw": "d3402602000000ff0000000500"
+  },
+  {
+   "type": 81,
+   "name": "Épée longue",
+   "shape": 5,
+   "raw": "d640050a000500001401007d00"
+  },
+  {
+   "type": 82,
+   "name": "Épée longue \"Entropie\"",
+   "shape": 45,
+   "raw": "d7402d0a00050000140100fa00"
+  },
+  {
+   "type": 83,
+   "name": "Épée longue \"Protector\"",
+   "shape": 44,
+   "raw": "d8402c0a000500001401059600"
+  },
+  {
+   "type": 84,
+   "name": "Épée longue \"Ecorcheuse\"",
+   "shape": 47,
+   "raw": "d9402f0a00050000160100af00"
+  },
+  {
+   "type": 85,
+   "name": "Épée longue \"Noueuse\"",
+   "shape": 46,
+   "raw": "da402e0a000500001b0100af00"
+  },
+  {
+   "type": 86,
+   "name": "Épée longue \"Grinçante\"",
+   "shape": 44,
+   "raw": "db402c0a000500001b0100af00"
+  },
+  {
+   "type": 87,
+   "name": "Épée longue \"Grondeuse\"",
+   "shape": 45,
+   "raw": "dc402d0a000500001801002c01"
+  },
+  {
+   "type": 88,
+   "name": "Épée longue \"Souffle d'Arès\"",
+   "shape": 46,
+   "raw": "dd402e0a000500001a0100fa00"
+  },
+  {
+   "type": 89,
+   "name": "Épée longue \"Mange Vie\"",
+   "shape": 44,
+   "raw": "df402c0a000500001e01002c01"
+  },
+  {
+   "type": 90,
+   "name": "Masse",
+   "shape": 2,
+   "raw": "e040020a000500000d02002800"
+  },
+  {
+   "type": 91,
+   "name": "Masse \"Videur\"",
+   "shape": 2,
+   "raw": "e140020a000500001002013700"
+  },
+  {
+   "type": 92,
+   "name": "Masse \"Puma\"",
+   "shape": 2,
+   "raw": "e240020a000500001102003200"
+  },
+  {
+   "type": 93,
+   "name": "Rapière",
+   "shape": 3,
+   "raw": "e440030a000500001001033c00"
+  },
+  {
+   "type": 94,
+   "name": "Rapière \"Coup De Grâce\"",
+   "shape": 3,
+   "raw": "e540030a000500001001039600"
+  },
+  {
+   "type": 95,
+   "name": "Rapière \"Déchireuse\"",
+   "shape": 3,
+   "raw": "e640030a000500001201034b00"
+  },
+  {
+   "type": 96,
+   "name": "Rapière \"Tranchante\"",
+   "shape": 3,
+   "raw": "e740030a000500001401035a00"
+  },
+  {
+   "type": 97,
+   "name": "Rapière \"Talisman\"",
+   "shape": 3,
+   "raw": "e840030a000500001701036900"
+  },
+  {
+   "type": 98,
+   "name": "Morceau de charbon",
+   "shape": 55,
+   "raw": "e9403708000500020202000a00"
+  },
+  {
+   "type": 99,
+   "name": "Pierre",
+   "shape": 35,
+   "raw": "ea402308000500020202000000"
+  },
+  {
+   "type": 100,
+   "name": "Pierre de granite",
+   "shape": 35,
+   "raw": "eb402308000500020302000100"
+  },
+  {
+   "type": 101,
+   "name": "Pierre polie",
+   "shape": 35,
+   "raw": "ed402308000500020302000000"
+  },
+  {
+   "type": 102,
+   "name": "Sabre",
+   "shape": 4,
+   "raw": "ee40040a000500000c0000c800"
+  },
+  {
+   "type": 103,
+   "name": "Sabre \"Découpeur\"",
+   "shape": 4,
+   "raw": "f140040a000500000d000d9600"
+  },
+  {
+   "type": 104,
+   "name": "Sabre \"Boyau\"",
+   "shape": 4,
+   "raw": "f240040a000500000d00039600"
+  },
+  {
+   "type": 105,
+   "name": "Sabre \"Loup\"",
+   "shape": 4,
+   "raw": "f340040a000500000e00036400"
+  },
+  {
+   "type": 106,
+   "name": "Sabre \"Dent du Dragon\"",
+   "shape": 4,
+   "raw": "f540040a000500001100039600"
+  },
+  {
+   "type": 107,
+   "name": "Faucille",
+   "shape": 4,
+   "raw": "f740040a000500000f00001400"
+  },
+  {
+   "type": 108,
+   "name": "Bâton",
+   "shape": 11,
+   "raw": "f9400b08000500000a02051900"
+  },
+  {
+   "type": 109,
+   "name": "Bâton \"Gustave\"",
+   "shape": 11,
+   "raw": "fb400b08000500000a02050500"
+  },
+  {
+   "type": 110,
+   "name": "Bâton \"Batteur\"",
+   "shape": 11,
+   "raw": "fc400b08000500000b02052300"
+  },
+  {
+   "type": 111,
+   "name": "Bâton \"Profitable\"",
+   "shape": 11,
+   "raw": "fd400b08000500000c02052d00"
+  },
+  {
+   "type": 112,
+   "name": "Bâton \"Tarsal\"",
+   "shape": 11,
+   "raw": "fe400b08000500000d02053700"
+  },
+  {
+   "type": 113,
+   "name": "Bâton sanglant",
+   "shape": 11,
+   "raw": "ff400b08000500000e02054100"
+  },
+  {
+   "type": 114,
+   "name": "Bâton de la Mort",
+   "shape": 11,
+   "raw": "00410b08000500000f02059600"
+  },
+  {
+   "type": 115,
+   "name": "Étoile",
+   "shape": 10,
+   "raw": "01410a0a0005000b0507000f00"
+  },
+  {
+   "type": 116,
+   "name": "Étoile \"Brillante\"",
+   "shape": 10,
+   "raw": "02410a0a0005000b0508001400"
+  },
+  {
+   "type": 117,
+   "name": "Étoile \"Filante\"",
+   "shape": 10,
+   "raw": "03410a0a0005000b0509001900"
+  },
+  {
+   "type": 118,
+   "name": "Étoile de Feu",
+   "shape": 10,
+   "raw": "04410a0a0005000b050a001e00"
+  },
+  {
+   "type": 119,
+   "name": "Étoile \"Polaris\"",
+   "shape": 10,
+   "raw": "05410a0a0005000b050b002300"
+  },
+  {
+   "type": 120,
+   "name": "Étoile \"Vega\"",
+   "shape": 10,
+   "raw": "06410a0a0005000b050c004b00"
+  },
+  {
+   "type": 121,
+   "name": "Baguette",
+   "shape": 36,
+   "raw": "08412408000500000202000000"
+  },
+  {
+   "type": 122,
+   "name": "Baguette de Treant",
+   "shape": 36,
+   "raw": "09412408000500000502001900"
+  },
+  {
+   "type": 123,
+   "name": "Baguette de Westwood",
+   "shape": 36,
+   "raw": "0a412408000500000a0200e803"
+  },
+  {
+   "type": 124,
+   "name": "Trident",
+   "shape": 12,
+   "raw": "0b410c0a000500001e0000c800"
+  },
+  {
+   "type": 125,
+   "name": "Trident \"Mante Religieuse\"",
+   "shape": 12,
+   "raw": "0d410c0a000500002400002c01"
+  },
+  {
+   "type": 126,
+   "name": "Trident \"Mandibule\"",
+   "shape": 12,
+   "raw": "0e410c0a00050000270003c201"
+  },
+  {
+   "type": 127,
+   "name": "Trident \"Peste\"",
+   "shape": 12,
+   "raw": "0f410c0a000500002a00007d00"
+  },
+  {
+   "type": 128,
+   "name": "Trident \"Pestilence\"",
+   "shape": 12,
+   "raw": "10410c0a000500002d0000f401"
+  },
+  {
+   "type": 129,
+   "name": "Bottes",
+   "shape": 32,
+   "raw": "11412010000001010000050a00"
+  },
+  {
+   "type": 130,
+   "name": "Bottes de Nain",
+   "shape": 32,
+   "raw": "13412010000001010000074b00"
+  },
+  {
+   "type": 131,
+   "name": "Ecu",
+   "shape": 19,
+   "raw": "15411310000a00010000050a00"
+  },
+  {
+   "type": 132,
+   "name": "Bouclier Furtif",
+   "shape": 19,
+   "raw": "17411310000a00010000066400"
+  },
+  {
+   "type": 133,
+   "name": "Ecu de Nain",
+   "shape": 19,
+   "raw": "18411310000a00010000070f00"
+  },
+  {
+   "type": 134,
+   "name": "Cottes de mailles enchaînées",
+   "shape": 17,
+   "raw": "1a4111120020000100001e6400"
+  },
+  {
+   "type": 135,
+   "name": "Cotte de mailles enchaînées de Nain",
+   "shape": 78,
+   "raw": "1c414e12002000010000287d00"
+  },
+  {
+   "type": 136,
+   "name": "Cotte de mailles enchaînées \"Protector\"",
+   "shape": 78,
+   "raw": "1d414e120020000100002d6400"
+  },
+  {
+   "type": 137,
+   "name": "Chemise déchirée",
+   "shape": 14,
+   "raw": "1f410e10002000010000040500"
+  },
+  {
+   "type": 138,
+   "name": "Chemise",
+   "shape": 14,
+   "raw": "20410e10002000010000050a00"
+  },
+  {
+   "type": 139,
+   "name": "Cape des Murmures",
+   "shape": 14,
+   "raw": "21410e10002000010000076400"
+  },
+  {
+   "type": 140,
+   "name": "Grand heaume",
+   "shape": 22,
+   "raw": "224116120010000100000a0a00"
+  },
+  {
+   "type": 141,
+   "name": "Grand heaume de Mesmer",
+   "shape": 22,
+   "raw": "234116120010000100000ac800"
+  },
+  {
+   "type": 142,
+   "name": "Grand heaume \"Nestor\"",
+   "shape": 22,
+   "raw": "244116120010000100000a0500"
+  },
+  {
+   "type": 143,
+   "name": "Grand heaume de Nain",
+   "shape": 22,
+   "raw": "254116120010000100000f1900"
+  },
+  {
+   "type": 144,
+   "name": "Grand heaume de l'Egide",
+   "shape": 22,
+   "raw": "26411612001000010000143200"
+  },
+  {
+   "type": 145,
+   "name": "Heaume",
+   "shape": 22,
+   "raw": "27411612001000010000050a00"
+  },
+  {
+   "type": 146,
+   "name": "Heaume \"Talamar\"",
+   "shape": 22,
+   "raw": "29411612001000010000079600"
+  },
+  {
+   "type": 147,
+   "name": "Heaume \"Prentis\"",
+   "shape": 22,
+   "raw": "2a4116120010000100000c0a00"
+  },
+  {
+   "type": 148,
+   "name": "Heaume de l'Egide",
+   "shape": 22,
+   "raw": "2b4116120010000100000b1e00"
+  },
+  {
+   "type": 149,
+   "name": "Bouclier",
+   "shape": 39,
+   "raw": "2c412712000a000100000c2300"
+  },
+  {
+   "type": 150,
+   "name": "Bouclier de George",
+   "shape": 39,
+   "raw": "2d412712000a000100000ef401"
+  },
+  {
+   "type": 151,
+   "name": "Bouclier de Nain",
+   "shape": 20,
+   "raw": "2e411412000a000100000f3200"
+  },
+  {
+   "type": 152,
+   "name": "Bouclier de l'Egide",
+   "shape": 20,
+   "raw": "2f411412000a00010000194b00"
+  },
+  {
+   "type": 153,
+   "name": "Blouson de cuir",
+   "shape": 15,
+   "raw": "30410f100020000100000a1400"
+  },
+  {
+   "type": 154,
+   "name": "Blouson de cuir robuste",
+   "shape": 110,
+   "raw": "31416e100020000100000d7d00"
+  },
+  {
+   "type": 155,
+   "name": "Blouson de cuir de Kane",
+   "shape": 15,
+   "raw": "32410f100020000100000f1900"
+  },
+  {
+   "type": 156,
+   "name": "Cotte de mailles plaquées",
+   "shape": 18,
+   "raw": "3541121200200001000028c800"
+  },
+  {
+   "type": 157,
+   "name": "Cotte de mailles plaquées de Galenia",
+   "shape": 79,
+   "raw": "36414f12002000010000289001"
+  },
+  {
+   "type": 158,
+   "name": "Cotte de mailles plaquées de Nain",
+   "shape": 79,
+   "raw": "37414f12002000010000322c01"
+  },
+  {
+   "type": 159,
+   "name": "Cotte de mailles plaquées du bastion",
+   "shape": 79,
+   "raw": "38414f12002000010000322c01"
+  },
+  {
+   "type": 160,
+   "name": "Cotte de mailles plaquées de l'Egide",
+   "shape": 79,
+   "raw": "39414f120020000100003c9001"
+  },
+  {
+   "type": 161,
+   "name": "Sandales de silence",
+   "shape": 33,
+   "raw": "3a412110000001010000006400"
+  },
+  {
+   "type": 162,
+   "name": "Sandales",
+   "shape": 33,
+   "raw": "3b412110000001010000010500"
+  },
+  {
+   "type": 163,
+   "name": "Cotte de mailles éclissées",
+   "shape": 16,
+   "raw": "3d411012002000010000143200"
+  },
+  {
+   "type": 164,
+   "name": "Cotte de mailles étincelante",
+   "shape": 77,
+   "raw": "3e414d12002000010000173c00"
+  },
+  {
+   "type": 165,
+   "name": "Cotte de mailles éclissées de Nain",
+   "shape": 77,
+   "raw": "3f414d120020000100001c4b00"
+  },
+  {
+   "type": 166,
+   "name": "Clef de Roland",
+   "shape": 59,
+   "raw": "46413b04010000ff0100000000"
+  },
+  {
+   "type": 167,
+   "name": "Clef des Brigands",
+   "shape": 58,
+   "raw": "47413a04010000ff0100000000"
+  },
+  {
+   "type": 168,
+   "name": "Clef de bronze",
+   "shape": 60,
+   "raw": "48413c04010000ff0100000000"
+  },
+  {
+   "type": 169,
+   "name": "Clef usée",
+   "shape": 62,
+   "raw": "49413e04010000ff0100000000"
+  },
+  {
+   "type": 170,
+   "name": "Clef rouge",
+   "shape": 61,
+   "raw": "4a413d04010000ff0100000000"
+  },
+  {
+   "type": 171,
+   "name": "Clef de fer",
+   "shape": 63,
+   "raw": "4b413f04010000ff0100000000"
+  },
+  {
+   "type": 172,
+   "name": "Corne de Minotaure",
+   "shape": 85,
+   "raw": "4c415504010000ff0100000000"
+  },
+  {
+   "type": 173,
+   "name": "Clef d'argent",
+   "shape": 62,
+   "raw": "4d413e04010000ff0100000000"
+  },
+  {
+   "type": 174,
+   "name": "Clef de la mine 2",
+   "shape": 62,
+   "raw": "4e413e04010000ff0100000000"
+  },
+  {
+   "type": 175,
+   "name": "Clef de la mine 3",
+   "shape": 62,
+   "raw": "4f413e04010000ff0100000000"
+  },
+  {
+   "type": 176,
+   "name": "Clef de la mine 4",
+   "shape": 62,
+   "raw": "50413e04010000ff0100000000"
+  },
+  {
+   "type": 177,
+   "name": "Clef de la mine 5",
+   "shape": 62,
+   "raw": "51413e04010000ff0100000000"
+  },
+  {
+   "type": 178,
+   "name": "Clef d'Ebène",
+   "shape": 115,
+   "raw": "97417304010000ff0100000000"
+  },
+  {
+   "type": 179,
+   "name": "Clef d'Or",
+   "shape": 101,
+   "raw": "98416504010000ff0100000000"
+  },
+  {
+   "type": 180,
+   "name": "Clef Xeob",
+   "shape": 99,
+   "raw": "99416304010000ff0100000000"
+  },
+  {
+   "type": 181,
+   "name": "Clef Knowle",
+   "shape": 100,
+   "raw": "9a416404010000ff0100000000"
+  },
+  {
+   "type": 182,
+   "name": "Clef d'argent",
+   "shape": 117,
+   "raw": "9b417504010000ff0100000000"
+  },
+  {
+   "type": 183,
+   "name": "Clef de cuivre",
+   "shape": 75,
+   "raw": "9c414b04010000ff0100000000"
+  },
+  {
+   "type": 184,
+   "name": "Clef d'Ivoire",
+   "shape": 74,
+   "raw": "9d414a04010000ff0100000000"
+  },
+  {
+   "type": 185,
+   "name": "Clef de la bibliothèque",
+   "shape": 29,
+   "raw": "45411d04010000ff0100000000"
+  },
+  {
+   "type": 186,
+   "name": "Clef usée",
+   "shape": 64,
+   "raw": "49414004010000ff0100000000"
+  },
+  {
+   "type": 187,
+   "name": "Clef Bleue",
+   "shape": 65,
+   "raw": "be414104010000ff0100000000"
+  },
+  {
+   "type": 188,
+   "name": "Clef Jaune",
+   "shape": 101,
+   "raw": "bf416504010000ff0100000000"
+  },
+  {
+   "type": 189,
+   "name": "Petite Clef",
+   "shape": 102,
+   "raw": "c0416604010000ff0100000000"
+  },
+  {
+   "type": 190,
+   "name": "Clef Tachetée",
+   "shape": 119,
+   "raw": "c1417704010000ff0100000000"
+  },
+  {
+   "type": 191,
+   "name": "Clef de Jade",
+   "shape": 120,
+   "raw": "c2417804010000ff0100000000"
+  },
+  {
+   "type": 192,
+   "name": "Clef Mystique",
+   "shape": 86,
+   "raw": "b8415604010000ff0100000000"
+  },
+  {
+   "type": 193,
+   "name": "Clef Mystique",
+   "shape": 87,
+   "raw": "b8415704010000ff0100000000"
+  },
+  {
+   "type": 194,
+   "name": "Clef Mystique",
+   "shape": 88,
+   "raw": "b8415804010000ff0100000000"
+  },
+  {
+   "type": 195,
+   "name": "Clef Mystique",
+   "shape": 89,
+   "raw": "b8415904010000ff0100000000"
+  },
+  {
+   "type": 196,
+   "name": "Clef Mystique",
+   "shape": 90,
+   "raw": "b8415a04010000ff0100000000"
+  },
+  {
+   "type": 197,
+   "name": "Clef Mystique",
+   "shape": 91,
+   "raw": "b8415b04010000ff0100000000"
+  },
+  {
+   "type": 198,
+   "name": "Clef de Dawn",
+   "shape": 41,
+   "raw": "9f412904010000ff0100000000"
+  },
+  {
+   "type": 199,
+   "name": "Clef de Nathaniel",
+   "shape": 41,
+   "raw": "b4412904010000ff0100000000"
+  },
+  {
+   "type": 200,
+   "name": "Clef de Paulson",
+   "shape": 41,
+   "raw": "b3412904010000ff0100000000"
+  },
+  {
+   "type": 201,
+   "name": "Clef de Geron",
+   "shape": 41,
+   "raw": "b2412904010000ff0100000000"
+  },
+  {
+   "type": 202,
+   "name": "Clef de la Mort",
+   "shape": 83,
+   "raw": "33425304010000ff0100000000"
+  },
+  {
+   "type": 203,
+   "name": "Clef Noire",
+   "shape": 125,
+   "raw": "38427d04010000ff0100000000"
+  },
+  {
+   "type": 204,
+   "name": "Clef Emoussée",
+   "shape": 126,
+   "raw": "39427e04010000ff0100000000"
+  },
+  {
+   "type": 205,
+   "name": "Clef Huileuse",
+   "shape": 127,
+   "raw": "3a427f04010000ff0100000000"
+  },
+  {
+   "type": 206,
+   "name": "Clef Charogne",
+   "shape": 61,
+   "raw": "3c423d04010000ff0100000000"
+  },
+  {
+   "type": 207,
+   "name": "Clef de Sang",
+   "shape": 61,
+   "raw": "3f423d04010000ff0100000000"
+  },
+  {
+   "type": 208,
+   "name": "Clef Vipère",
+   "shape": 118,
+   "raw": "3b427604010000ff0100000000"
+  },
+  {
+   "type": 209,
+   "name": "Clef Brillante",
+   "shape": 74,
+   "raw": "44424a04010000ff0100000000"
+  },
+  {
+   "type": 210,
+   "name": "Clef Rouillée",
+   "shape": 75,
+   "raw": "45424b04010000ff0100000000"
+  },
+  {
+   "type": 211,
+   "name": "Flasque vide",
+   "shape": 106,
+   "raw": "71416a04000000ff0000000000"
+  },
+  {
+   "type": 212,
+   "name": "Fiole du Marécage",
+   "shape": 107,
+   "raw": "a7416b05000000200410000000"
+  },
+  {
+   "type": 213,
+   "name": "Fiole de l'Ennemi",
+   "shape": 108,
+   "raw": "a8416c05000000200410000000"
+  },
+  {
+   "type": 214,
+   "name": "Fiole de la Terre",
+   "shape": 109,
+   "raw": "a9416d05000000200410000000"
+  },
+  {
+   "type": 215,
+   "name": "Réserve de Bannon",
+   "shape": 114,
+   "raw": "b54172010000001e0000000000"
+  },
+  {
+   "type": 216,
+   "name": "Onguent",
+   "shape": 30,
+   "raw": "52411e21000000040410001400"
+  },
+  {
+   "type": 217,
+   "name": "Aloès",
+   "shape": 43,
+   "raw": "54412b21000000040106000500"
+  },
+  {
+   "type": 218,
+   "name": "Ginseng",
+   "shape": 42,
+   "raw": "55412a21000000040206000a00"
+  },
+  {
+   "type": 219,
+   "name": "Collier de Jade",
+   "shape": 104,
+   "raw": "a44168010040001f0000000000"
+  },
+  {
+   "type": 220,
+   "name": "Rubis de Vérité",
+   "shape": 105,
+   "raw": "674169050040001f0000000000"
+  },
+  {
+   "type": 221,
+   "name": "Diamant",
+   "shape": 103,
+   "raw": "a5416704000000ff0000000000"
+  },
+  {
+   "type": 222,
+   "name": "Oeil d'Emeraude",
+   "shape": 49,
+   "raw": "60413104000000ff0000000000"
+  },
+  {
+   "type": 223,
+   "name": "Oeil de Saphir",
+   "shape": 48,
+   "raw": "61413004000000ff0000000000"
+  },
+  {
+   "type": 224,
+   "name": "Joyau d'Or",
+   "shape": 81,
+   "raw": "74415104000000ff0000000000"
+  },
+  {
+   "type": 225,
+   "name": "Anneau Bezel",
+   "shape": 116,
+   "raw": "65417404000006ff0000006400"
+  },
+  {
+   "type": 226,
+   "name": "Anneau d'Ambre",
+   "shape": 82,
+   "raw": "a2415204000006010000050000"
+  },
+  {
+   "type": 227,
+   "name": "Anneau Talba",
+   "shape": 82,
+   "raw": "bb415204000006ff0000003200"
+  },
+  {
+   "type": 228,
+   "name": "Anneau Duble",
+   "shape": 82,
+   "raw": "66415204000006ff000000c800"
+  },
+  {
+   "type": 229,
+   "name": "Anneau de Nuage",
+   "shape": 129,
+   "raw": "3d428104000006ff000000c800"
+  },
+  {
+   "type": 230,
+   "name": "Anneau de Zéphyr",
+   "shape": 129,
+   "raw": "3e428104000006ff000000c800"
+  },
+  {
+   "type": 231,
+   "name": "Bâton d'ébène",
+   "shape": 84,
+   "raw": "fa405405000000140900009600"
+  },
+  {
+   "type": 232,
+   "name": "Baguette des Boules de Feu",
+   "shape": 28,
+   "raw": "c6411c01000000140300002c01"
+  },
+  {
+   "type": 233,
+   "name": "Baguette de la Foudre",
+   "shape": 28,
+   "raw": "c7411c0100050014060000e803"
+  },
+  {
+   "type": 234,
+   "name": "Parchemin du Gel",
+   "shape": 34,
+   "raw": "584122050000000e020000e803"
+  },
+  {
+   "type": 235,
+   "name": "Parchemin de la Foudre",
+   "shape": 34,
+   "raw": "594122050000000e060000e803"
+  },
+  {
+   "type": 236,
+   "name": "Parchemin des Boules de Feu",
+   "shape": 34,
+   "raw": "5a4122050000000e030000e803"
+  },
+  {
+   "type": 237,
+   "name": "Parchemin du Poing Mortel",
+   "shape": 34,
+   "raw": "5b4122050000000e040000e803"
+  },
+  {
+   "type": 238,
+   "name": "Parchemin de la Brume Fatale",
+   "shape": 34,
+   "raw": "5c4122050000000e050000e803"
+  },
+  {
+   "type": 239,
+   "name": "Parchemin du Vortex",
+   "shape": 34,
+   "raw": "5d4122050000000e070000e803"
+  },
+  {
+   "type": 240,
+   "name": "Parchemin brûlé",
+   "shape": 34,
+   "raw": "6b4122010000000c6640000000"
+  },
+  {
+   "type": 241,
+   "name": "Parchemin de l'Enigme",
+   "shape": 34,
+   "raw": "72412205000000110000000000"
+  },
+  {
+   "type": 242,
+   "name": "Message",
+   "shape": 67,
+   "raw": "6f4143010000000c7641000000"
+  },
+  {
+   "type": 243,
+   "name": "Bourse",
+   "shape": 45,
+   "raw": "62412dc0000000090000000000"
+  },
+  {
+   "type": 244,
+   "name": "Mandat du Roi",
+   "shape": 40,
+   "raw": "564128050000000c7841000000"
+  },
+  {
+   "type": 245,
+   "name": "Jeu de clefs",
+   "shape": 37,
+   "raw": "5f412504000000ff0000003200"
+  },
+  {
+   "type": 246,
+   "name": "Gobelet d'argent",
+   "shape": 54,
+   "raw": "634136250000000fff0100b80b"
+  },
+  {
+   "type": 247,
+   "name": "Verre cassé",
+   "shape": 0,
+   "raw": "644100840000000d0000000000"
+  },
+  {
+   "type": 248,
+   "name": "Flasque d'huile",
+   "shape": 31,
+   "raw": "69411f01000000080000000a00"
+  },
+  {
+   "type": 249,
+   "name": "Lanterne",
+   "shape": 44,
+   "raw": "6a412cc40000000a0000000000"
+  },
+  {
+   "type": 250,
+   "name": "Os d'humanoïde",
+   "shape": 50,
+   "raw": "42413208000500020202000000"
+  },
+  {
+   "type": 251,
+   "name": "Os d'humanoïde",
+   "shape": 51,
+   "raw": "43413308000500020202000000"
+  },
+  {
+   "type": 252,
+   "name": "Os d'humanoïde",
+   "shape": 52,
+   "raw": "44413408000500020202000000"
+  },
+  {
+   "type": 253,
+   "name": "Engrenage",
+   "shape": 24,
+   "raw": "7341180c000f00020202000000"
+  },
+  {
+   "type": 254,
+   "name": "Gantelet des Ténèbres",
+   "shape": 98,
+   "raw": "ab41620c0005001c0000050000"
+  },
+  {
+   "type": 255,
+   "name": "Statuette",
+   "shape": 96,
+   "raw": "ac416004000500ff0000000000"
+  },
+  {
+   "type": 256,
+   "name": "Message",
+   "shape": 67,
+   "raw": "6f4143010000000c7641000000"
+  },
+  {
+   "type": 257,
+   "name": "Message",
+   "shape": 67,
+   "raw": "6f4143010000000c7440000000"
+  },
+  {
+   "type": 258,
+   "name": "Message",
+   "shape": 67,
+   "raw": "704143010000000c7e40000000"
+  },
+  {
+   "type": 259,
+   "name": "Masque de Cérémonie",
+   "shape": 69,
+   "raw": "b9414514001000010000050000"
+  },
+  {
+   "type": 260,
+   "name": "Creuset de la Foi",
+   "shape": 80,
+   "raw": "ba415004000000ff0000000000"
+  },
+  {
+   "type": 261,
+   "name": "Message",
+   "shape": 67,
+   "raw": "6f41430100000013c341000000"
+  },
+  {
+   "type": 262,
+   "name": "Coupe Bezel",
+   "shape": 92,
+   "raw": "94415c21020000120000000100"
+  },
+  {
+   "type": 263,
+   "name": "Cube de Vaelan",
+   "shape": 71,
+   "raw": "c9414705000000150000000000"
+  },
+  {
+   "type": 264,
+   "name": "Cube de Vaelan",
+   "shape": 70,
+   "raw": "ca414605000000150000000000"
+  },
+  {
+   "type": 265,
+   "name": "Bracelets de Défense",
+   "shape": 137,
+   "raw": "624289100080000100000f1e00"
+  },
+  {
+   "type": 266,
+   "name": "Crâne Vert",
+   "shape": 68,
+   "raw": "cc4144050005001d0800000000"
+  },
+  {
+   "type": 267,
+   "name": "Essaim",
+   "shape": 72,
+   "raw": "cd414801000000180900003200"
+  },
+  {
+   "type": 268,
+   "name": "Message",
+   "shape": 67,
+   "raw": "594243010000000cce42000000"
+  },
+  {
+   "type": 269,
+   "name": "Gardien",
+   "shape": 76,
+   "raw": "cf414c0100000018100000c800"
+  },
+  {
+   "type": 270,
+   "name": "As de l'Infini",
+   "shape": 132,
+   "raw": "404284010000001e0000003200"
+  },
+  {
+   "type": 271,
+   "name": "As de la Domination",
+   "shape": 131,
+   "raw": "42428301000000180404003200"
+  },
+  {
+   "type": 272,
+   "name": "As de l'Oubli",
+   "shape": 130,
+   "raw": "41428201000000180503003200"
+  },
+  {
+   "type": 273,
+   "name": "Sang de Pierre",
+   "shape": 134,
+   "raw": "52428604000000ff0000000000"
+  },
+  {
+   "type": 274,
+   "name": "Lame d'Emeraude",
+   "shape": 26,
+   "raw": "55421a0e000500001981000000"
+  },
+  {
+   "type": 275,
+   "name": "Message",
+   "shape": 67,
+   "raw": "6f4143010000000c5642000000"
+  },
+  {
+   "type": 276,
+   "name": "Message",
+   "shape": 67,
+   "raw": "594243010000000c5a42000000"
+  },
+  {
+   "type": 277,
+   "name": "Bracelets",
+   "shape": 136,
+   "raw": "60428810008000010000050a00"
+  },
+  {
+   "type": 278,
+   "name": "Bracelets d'Acier",
+   "shape": 136,
+   "raw": "614288100080000100000a1400"
+  },
+  {
+   "type": 279,
+   "name": "Bracelets de Défense",
+   "shape": 137,
+   "raw": "624289100080000100000f1e00"
+  },
+  {
+   "type": 280,
+   "name": "La Vérité Vraie",
+   "shape": 73,
+   "raw": "c94249050000001f0000000000"
+  },
+  {
+   "type": 281,
+   "name": "Fragment de Vérité",
+   "shape": 57,
+   "raw": "5f423905000006ff0000000000"
+  },
+  {
+   "type": 282,
+   "name": "Message",
+   "shape": 67,
+   "raw": "594243010000000c5a42000000"
+  },
+  {
+   "type": 283,
+   "name": "Message",
+   "shape": 67,
+   "raw": "594243010000000c0000000000"
+  },
+  {
+   "type": 284,
+   "name": "Message",
+   "shape": 67,
+   "raw": "594243010000000c0000000000"
+  }
+ ]
+}

@@ -44,6 +44,30 @@ DIRECTIONS = ["N", "E", "S", "O"]
 FN_LOAD_SHAPES = 0x0B      # (texte fichier .SHP, emplacement, anim)
 FN_MONSTER_PROPS = 0x3F    # (type, emplacement de forme, caractéristiques…)
 FN_INIT_MONSTER = 0x38     # (case, dx, dy, direction, type, ?, mode, équipements…)
+FN_CREATE_ITEM = 0x11      # (type d'objet, image, drapeaux, niveau, case, dx, dy, hauteur)
+ITEM_COLOR = (40, 220, 230)
+ITEM_TABLE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "items_fr.json")
+ITEM_NAMES = ({i["type"]: i["name"] for i in json.load(open(ITEM_TABLE, encoding="utf-8"))["items"]}
+              if os.path.exists(ITEM_TABLE) else {})
+
+
+def level_items(files, n):
+    """Objets posés par les scripts (au chargement : .INI ; sur événement : .INF)."""
+    out = []
+    for kind in ("INI", "INF"):
+        ck = emc.chunks(files[f"LEVEL{n}.{kind}"])
+        for _, a in emc.resolved_calls(ck, FN_CREATE_ITEM):
+            a = a + [None] * (8 - len(a))
+            typ, _, _, lvl, block, dx, dy, height = a[:8]
+            if block is None or not 0 <= block < 1024:
+                continue
+            out.append({
+                "x": block % 32, "y": block // 32, "block": block, "xOffs": dx, "yOffs": dy,
+                "type": typ, "name": ITEM_NAMES.get(typ), "level": lvl if lvl is not None else n,
+                "height": height, "spawn": "initial" if kind == "INI" else "event",
+            })
+    return out
+
 
 
 def level_monsters(files, n):
@@ -127,7 +151,7 @@ def write_png(path, w, h, pixels):
     open(path, "wb").write(png)
 
 
-def render(grid_cls, labels, W, H, path, monsters=()):
+def render(grid_cls, labels, W, H, path, monsters=(), items=()):
     pw, ph = W * CELL, H * CELL
     px = bytearray(pw * ph * 3)
     def put(x, y, c):
@@ -148,6 +172,15 @@ def render(grid_cls, labels, W, H, path, monsters=()):
             for x in range(3, CELL - 2):
                 if (x - 6.5) ** 2 + (y - 6.5) ** 2 <= 9:
                     put(cx * CELL + x, cy * CELL + y, MARK)
+    for it in items:                       # objets : petit carré cyan
+        dx = it["xOffs"] if it["xOffs"] is not None else 128
+        dy = it["yOffs"] if it["yOffs"] is not None else 128
+        ix = it["x"] * CELL + 1 + round(dx / 256 * (CELL - 2))
+        iy = it["y"] * CELL + 1 + round(dy / 256 * (CELL - 2))
+        for y in range(iy - 1, iy + 2):
+            for x in range(ix - 1, ix + 2):
+                if 0 <= x < pw and 0 <= y < ph:
+                    put(x, y, ITEM_COLOR)
     for m in monsters:
         dx = m["xOffs"] if m["xOffs"] is not None else 128
         dy = m["yOffs"] if m["yOffs"] is not None else 128
@@ -230,6 +263,18 @@ def main(game_dir, out_dir):
                            "stringId": sid, "text": gstr[i] if i < len(gstr) else None})
 
         monsters = level_monsters(files, n)
+        # objets : ceux que ce niveau pose ailleurs (niveau 24 -> 29) sont rattachés au bon niveau
+        items_here = [i for i in level_items(files, n) if i["level"] == n]
+        # objet dans un bloc de mur, collé contre une face (décalage 0 ou 255) : rangé
+        # dans une niche murale, visible depuis la case voisine de cette face
+        for it in items_here:
+            if cls[it["y"]][it["x"]] not in ("wall", "wall_special"):
+                continue
+            face = {(0, None): "O", (255, None): "E", (None, 0): "N", (None, 255): "S"}
+            fx = it["xOffs"] if it["xOffs"] in (0, 255) else None
+            fy = it["yOffs"] if it["yOffs"] in (0, 255) else None
+            it["container"] = "niche"
+            it["face"] = face.get((fx, None)) or face.get((None, fy))
         level = {
             "level": n, "tileset": tileset, "width": W, "height": H, "bytesPerBlock": B,
             "faceOrder": ["N", "E", "S", "W"],
@@ -239,12 +284,13 @@ def main(game_dir, out_dir):
             "wallTypesBorrowedFrom": borrowed,  # id de mur -> niveau d'où vient sa définition
             "labels": labels,
             "monsters": monsters,
+            "items": items_here,
         }
         if B > 4:
             level["extraBlockBytes"] = extra
         with open(os.path.join(out_dir, f"level{n:02d}.json"), "w", encoding="utf-8") as f:
             json.dump(level, f, ensure_ascii=False, separators=(",", ":"))
-        render(cls, labels, W, H, os.path.join(out_dir, f"level{n:02d}.png"), monsters)
+        render(cls, labels, W, H, os.path.join(out_dir, f"level{n:02d}.png"), monsters, items_here)
         counts = {c: sum(r.count(c) for r in cls) for c in COLORS}
         kinds = {}
         for m in monsters:
@@ -252,9 +298,16 @@ def main(game_dir, out_dir):
             kinds.setdefault(k, {"initial": 0, "event": 0})[m["spawn"]] += 1
         on_wall = sum(1 for m in monsters if cls[m["y"]][m["x"]] in ("wall",))
         summary.append({"level": n, "tileset": tileset, "labels": [l["text"] for l in labels],
-                        "monsters": kinds, "monstersOnWallCells": on_wall, **counts})
+                        "monsters": kinds, "monstersOnWallCells": on_wall,
+                        "items": [f"{i['name']} ({i['x']},{i['y']})"
+                                  + (f" [niche face {i['face'] or '?'}]" if i.get("container") else "")
+                                  + (" [événement]" if i["spawn"] == "event" else "")
+                                  for i in items_here],
+                        "itemsOnWallCells": sum(1 for i in items_here if cls[i["y"]][i["x"]] == "wall"),
+                        **counts})
         print(f"niveau {n:2d} {tileset or '':10s} sol={counts['floor']:4d} portes={counts['door']:3d} "
-              f"inconnu={counts['unknown']:2d} annotations={len(labels)} monstres={len(monsters)} (sur mur: {on_wall})")
+              f"inconnu={counts['unknown']:2d} monstres={len(monsters)} objets={len(items_here)} "
+              f"(sur mur: {sum(1 for i in items_here if cls[i['y']][i['x']] == 'wall')})")
     with open(os.path.join(out_dir, "levels.json"), "w", encoding="utf-8") as f:
         json.dump(summary, f, ensure_ascii=False, indent=1)
 
