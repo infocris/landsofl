@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lands of Lore 3D</title>
+<style>
+  :root { --fg: #e8dcc0; --muted: #a39578; --gold: #c9a227; --panel: rgba(12, 10, 8, .78); }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--fg);
+    font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
+  #view { position: fixed; inset: 0; width: 100vw; height: 100vh;
+    image-rendering: pixelated; image-rendering: crisp-edges; cursor: crosshair; }
+  #map { position: fixed; top: 12px; right: 12px; image-rendering: pixelated;
+    border: 1px solid #554a36; background: #000; }
+  .panel { position: fixed; background: var(--panel); border: 1px solid #554a36;
+    border-radius: 6px; padding: 8px 10px; }
+  #top { top: 12px; left: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    max-width: calc(100vw - 200px); }
+  #top select, #top button { background: #1d1912; color: var(--fg); border: 1px solid #554a36;
+    border-radius: 4px; padding: 3px 6px; font: inherit; }
+  #top select { max-width: min(340px, 60vw); text-overflow: ellipsis; }
+  #where { color: var(--muted); }
+  #label { left: 50%; transform: translateX(-50%); bottom: 64px; color: var(--gold);
+    font-weight: 600; letter-spacing: .05em; display: none; }
+  #help { left: 12px; bottom: 12px; color: var(--muted); font-size: 12px; }
+  #help b { color: var(--fg); font-weight: 600; }
+  #help.hidden { display: none; }
+  @media (max-width: 600px) { #map { width: 128px; height: 128px; } #help { display: none; } }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<canvas id="map" width="160" height="160"></canvas>
+<div id="top" class="panel">
+  <select id="level" aria-label="Niveau"></select>
+  <span id="where"></span>
+</div>
+<div id="label" class="panel"></div>
+<div id="help" class="panel">
+  <b>Z/S</b> avancer/reculer · <b>Q/D</b> tourner · <b>A/E</b> pas de côté · flèches aussi ·
+  <b>Maj</b> courir · clic = souris pour regarder (Échap pour libérer) ·
+  <b>Espace</b> ouvrir/fermer une porte · <b>N</b> traverser les murs · <b>M</b> carte · <b>H</b> aide
+</div>
+<script src="viewer.js"></script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lands of Lore</title>
+<link rel="stylesheet" href="js-dos.css">
+<script src="js-dos.js"></script>
+<script src="memscan.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; }
+  body { display: flex; }
+  #dos { flex: 1; min-width: 0; height: 100vh; }
+  #mm { width: 300px; flex: none; box-sizing: border-box; padding: 12px; background: #0f0d0a;
+    border-left: 1px solid #3a3226; color: #e8dcc0; font: 13px/1.4 system-ui, sans-serif;
+    display: flex; flex-direction: column; gap: 8px; }
+  #mm.hidden { display: none; }
+  #mm-title { font-weight: 600; color: #c9a227; }
+  #mm-info { color: #a39578; min-height: 1.4em; }
+  #mm-canvas { width: 276px; height: 276px; image-rendering: pixelated; border: 1px solid #3a3226; }
+  #mm-label { color: #c9a227; font-weight: 600; letter-spacing: .04em; min-height: 1.4em; }
+  #mm-legend { color: #a39578; font-size: 11px; }
+  #mm-legend i { display: inline-block; width: 9px; height: 9px; margin: 0 3px 0 8px; vertical-align: -1px; }
+  #mm-legend i:first-child { margin-left: 0; }
+  #mmtoggle { position: fixed; right: 12px; bottom: 48px; z-index: 1000;
+    font: 12px/1 system-ui, sans-serif; padding: 6px 10px; border: 1px solid #555; border-radius: 6px;
+    background: rgba(0,0,0,.6); color: #aaa; cursor: pointer; }
+  #qload { position: fixed; right: 12px; bottom: 84px; z-index: 1000;
+    font: 12px/1 system-ui, sans-serif; padding: 6px 10px; border: 1px solid #c9a227; border-radius: 6px;
+    background: rgba(0,0,0,.6); color: #fff; cursor: pointer; }
+  #qload[hidden] { display: none; }
+  /* boutons à gauche du panneau quand il est ouvert */
+  body:has(#mm:not(.hidden)) #zqsd, body:has(#mm:not(.hidden)) #mmtoggle,
+  body:has(#mm:not(.hidden)) #qload { right: 312px; }
+  @media (max-width: 700px) { #mm { display: none; } #zqsd, #mmtoggle { right: 12px !important; } }
+  #zqsd {
+    position: fixed; right: 12px; bottom: 12px; z-index: 1000;
+    font: 12px/1 system-ui, sans-serif; padding: 6px 10px;
+    border: 1px solid #555; border-radius: 6px;
+    background: rgba(0,0,0,.6); color: #aaa; cursor: pointer; opacity: .6;
+  }
+  #zqsd:hover { opacity: 1; }
+  #zqsd[data-on="true"] { color: #fff; border-color: #c9a227; }
+</style>
+</head>
+<body>
+<div id="dos"></div>
+<aside id="mm" aria-label="Mini-carte">
+  <div id="mm-title">Mini-carte</div>
+  <div id="mm-info">chargement…</div>
+  <canvas id="mm-canvas"></canvas>
+  <div id="mm-label"></div>
+  <div id="mm-legend"><i style="background:#8a7f68"></i>sol<i style="background:#2b2b2b;outline:1px solid #555"></i>mur<i style="background:#a0522d"></i>porte fermée<i style="background:#d08a4a"></i>ouverte<i style="background:#d22"></i>lieu</div>
+</aside>
+<button id="mmtoggle" type="button" title="Afficher/masquer la mini-carte (F9)">Carte</button>
+<button id="qload" type="button" title="Recharger l'état enregistré avec F6 (QUICK.SAV)" hidden>F7 · charger l'état</button>
+<button id="zqsd" type="button" title="Activer/désactiver les touches ZQSD (F8)"></button>
+<script>
+(() => {
+  // --- Déplacement ZQSD (clavier AZERTY) -----------------------------------
+  // On se base sur la position physique (event.code), donc ça marche aussi
+  // en WASD sur un clavier QWERTY.
+  //   Z = avancer      S = reculer
+  //   Q = pas à gauche D = pas à droite   (pavé 7/9 : pas de côté, vérifié en jeu)
+  //   A = tourner à g. E = tourner à d.   (pavé 4/6)
+  const KEY_MAP = {
+    KeyW: 265, // Z -> flèche haut (avancer)
+    KeyS: 264, // S -> flèche bas (reculer)
+    KeyA: 327, // Q -> pavé num. 7 (pas de côté à gauche)
+    KeyD: 329, // D -> pavé num. 9 (pas de côté à droite)
+    KeyQ: 324, // A -> pavé num. 4 (tourner à gauche)
+    KeyE: 326, // E -> pavé num. 6 (tourner à droite)
+  };
+  let emu = null; // interface js-dos, prête après "ci-ready"
+  let remapOn = true;
+  try { remapOn = localStorage.getItem("zqsd") !== "off"; } catch (e) {}
+  const held = new Map(); // event.code -> code DOS envoyé
+
+  const btn = document.getElementById("zqsd");
+  function renderBtn() { btn.textContent = "ZQSD : " + (remapOn ? "oui" : "non"); btn.dataset.on = remapOn; }
+  function setRemap(on) {
+    remapOn = on;
+    try { localStorage.setItem("zqsd", on ? "on" : "off"); } catch (e) {}
+    renderBtn();
+  }
+  btn.addEventListener("click", () => { setRemap(!remapOn); btn.blur(); });
+  renderBtn();
+
+  function onKey(e) {
+    const down = e.type === "keydown";
+    if (down && e.code === "F8") { setRemap(!remapOn); e.preventDefault(); e.stopPropagation(); return; }
+    if (down && e.code === "F9") { toggleMap(); e.preventDefault(); e.stopPropagation(); return; }
+    // Relâcher toujours une touche remappée, même si on a désactivé entre-temps.
+    if (!down && held.has(e.code)) {
+      if (emu) emu.sendKeyEvent(held.get(e.code), false);
+      held.delete(e.code);
+      e.preventDefault(); e.stopPropagation();
+      return;
+    }
+    if (!remapOn || !emu || e.ctrlKey || e.metaKey || e.altKey) return;
+    const dos = KEY_MAP[e.code];
+    if (dos === undefined) return;
+    if (down) { emu.sendKeyEvent(dos, true); held.set(e.code, dos); }
+    e.preventDefault(); e.stopPropagation();
+  }
+  // Phase de capture sur window : on passe avant les écouteurs de js-dos.
+  window.addEventListener("keydown", onKey, true);
+  window.addEventListener("keyup", onKey, true);
+  window.addEventListener("blur", () => {
+    if (emu) held.forEach((dos) => emu.sendKeyEvent(dos, false));
+    held.clear();
+  });
+
+  // Mini-carte : affichage mémorisé
+  const mm = document.getElementById("mm");
+  function toggleMap(force) {
+    const show = force !== undefined ? force : mm.classList.contains("hidden");
+    mm.classList.toggle("hidden", !show);
+    try { localStorage.setItem("minimap", show ? "on" : "off"); } catch (e) {}
+    window.dispatchEvent(new Event("resize"));     // js-dos recalcule la taille du jeu
+  }
+  try { if (localStorage.getItem("minimap") === "off") mm.classList.add("hidden"); } catch (e) {}
+  document.getElementById("mmtoggle").addEventListener("click", (e) => { toggleMap(); e.currentTarget.blur(); });
+
+  // --- Conservation des sauvegardes du jeu ---------------------------------
+  // js-dos ne garde les fichiers modifiés du disque C: (dont les sauvegardes faites
+  // depuis le menu du jeu) que si l'on clique sur sa disquette « save ». On surveille
+  // donc les changements toutes les 5 s et on déclenche ce même enregistrement.
+  // (F6/F7 = état de l'émulateur en mémoire seulement : perdu au rechargement.)
+  const params = new URLSearchParams(location.search);
+  function startAutoSave(ci) {
+    if (params.get("autosave") === "0") return;
+    let last = null, busy = false;
+    const digest = (d) => { let h = d.length; for (let i = 0; i < d.length; i += 7) h = (h * 31 + d[i]) | 0; return h; };
+    setInterval(async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const changes = await ci.persist(true);
+        if (!changes) return;
+        const h = digest(changes);
+        if (last === null) { last = h; return; }      // état au démarrage (sauvegardes déjà conservées)
+        if (h === last) return;
+        const btn = document.querySelector("#dos .save-button");
+        if (btn) { btn.click(); last = h; }
+      } catch (e) { /* émulateur en cours d'arrêt */ }
+      finally { busy = false; }
+    }, 5000);
+  }
+
+  // --- Bouton F7 --------------------------------------------------------------
+  // La barre de js-dos n'affiche son bouton F7 qu'après un F6 dans la même session,
+  // alors que QUICK.SAV (dosbox.conf : savefile=) survit au rechargement. On affiche
+  // donc notre propre bouton dès que ce fichier existe.
+  const qload = document.getElementById("qload");
+  function watchQuickSave(ci) {
+    const check = async () => {
+      try {
+        const tree = await ci.fsTree();
+        qload.hidden = !(tree.nodes || []).some((n) => n.name.toUpperCase() === "QUICK.SAV");
+      } catch (e) { /* émulateur pas prêt */ }
+    };
+    setTimeout(check, 1500);
+    window.addEventListener("keydown", (e) => { if (e.code === "F6") setTimeout(check, 2500); }, true);
+    qload.addEventListener("click", () => {
+      ci.sendBackendEvent({ type: "wc-trigger-event", event: "hand_loadstate" });
+      qload.blur();
+    });
+  }
+
+  // --- Version du jeu ---------------------------------------------------------
+  // js-dos garde une copie du bundle dans le stockage privé du navigateur
+  // (OPFS : jsdos/caches/bundles/<url>) et ne le retélécharge plus. Quand le bundle
+  // change (ex. dosbox.conf), on efface cette copie une fois. Les sauvegardes
+  // (jsdos/saves/<url>.changes) ne sont pas touchées.
+  const BUNDLE = params.get("bundle") || "lands-cd-v2.jsdos";
+  const BUNDLE_VERSION = "2026-11-07-savefile";
+  const SCRIPTS_VERSION = "2026-11-07-lolmem2";   // à changer après tools/patch_jsdos.py
+  async function dropStaleBundleCache() {
+    const key = "bundleVersion:" + BUNDLE;
+    try { if (localStorage.getItem(key) === BUNDLE_VERSION) return; } catch (e) { return; }
+    try {
+      const root = await navigator.storage.getDirectory();
+      const dir = await (await (await root.getDirectoryHandle("jsdos")).getDirectoryHandle("caches")).getDirectoryHandle("bundles");
+      const needle = BUNDLE.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const stale = [];
+      for await (const [name] of dir.entries()) if (name.endsWith(needle)) stale.push(name);
+      for (const name of stale) await dir.removeEntry(name);
+    } catch (e) {
+      if (e.name !== "NotFoundError") { console.warn("cache js-dos non vidé", e); return; }
+    }
+    try { localStorage.setItem(key, BUNDLE_VERSION); } catch (e) {}
+  }
+
+  dropStaleBundleCache().finally(() => Dos(document.getElementById("dos"), {
+    onEvent: (event, arg) => {
+      if (event !== "ci-ready") return;
+      emu = arg;
+      window.lolCi = arg;   // accès depuis la console (débogage)
+      if (window.LoLMinimap) window.LoLMinimap.attach(arg);
+      startAutoSave(arg);
+      watchQuickSave(arg);
+    },
+    // émulateur dans son worker (par défaut) ; ?worker=0 pour le mode direct (plus lourd).
+    // La mini-carte lit la mémoire via le canal ajouté à emulators/wdosbox-x.js.
+    workerThread: params.has("worker") ? params.get("worker") === "1" : true,
+    // ?souris=libre : pas de capture du pointeur (clics directs, utile pour les tests automatisés)
+    ...(new URLSearchParams(location.search).get("souris") === "libre" ? { mouseCapture: false } : {}),
+    url: BUNDLE,   // ?bundle= : autre fichier de jeu (tests)
+    pathPrefix: "emulators/",
+    pathSuffix: "?v=" + SCRIPTS_VERSION,  // évite un ancien wdosbox*.js (sans canal « lol-mem ») en cache
+    autoStart: true,
+    // DOSBox-X par défaut ; ?emu=dosbox pour l'ancien émulateur
+    backend: new URLSearchParams(location.search).get("emu") === "dosbox" ? "dosbox" : "dosboxX",
+    kiosk: false,
+  }));
+})();
+</script>
+<script src="minimap.js"></script>
+</body>
+</html>

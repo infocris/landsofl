@@ -1,0 +1,18 @@
+# Fichiers du jeu (installateurs, extractions, bundles) : non versionnés
+*.exe
+extracted/
+extracted-cd/
+*.jsdos
+web/archive/
+
+# Données générées par tools/ (voir docs/retro-conception.md, § 11)
+maps/
+web/public/viewer/data/
+
+# Dépendances et fichiers de débogage
+web/node_modules/
+*.map
+*.symbols
+__pycache__/
+web/server.log
+.DS_Store
