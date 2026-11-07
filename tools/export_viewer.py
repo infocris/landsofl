@@ -371,9 +371,19 @@ def main(game_dir, maps_dir, out_dir):
     # noms des types d'objets (inventaire de la page du jeu)
     table = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "items_fr.json")
     if os.path.exists(table):
-        names = [i["name"] for i in json.load(open(table, encoding="utf-8"))["items"]]
+        items = json.load(open(table, encoding="utf-8"))["items"]
         with open(os.path.join(out_dir, "items.json"), "w", encoding="utf-8") as fh:
-            json.dump(names, fh, ensure_ascii=False)
+            json.dump([{"name": i["name"], "icon": i["shape"]} for i in items], fh, ensure_ascii=False)
+    # icônes d'inventaire (ITEMICN.SHP, 20x20) en planche de 16 colonnes ; couleurs : palette
+    # de l'interface (PLAYFLD) + couleurs 0-127 du château (les icônes n'en dépendent pas)
+    icons = lolgfx.shp_frames(read_pak(os.path.join(game_dir, "STARTUP.PAK"))["ITEMICN.SHP"])
+    pal = bytearray(playfld)
+    pal[0:384] = Tileset(game_dir, "KEEP", playfld).vcn.palette
+    sheet = Image(16 * 20, ((len(icons) + 15) // 16) * 20)
+    for k, f in enumerate(icons):
+        if f:
+            sheet.blit(frame_image(f, pal), (k % 16) * 20, (k // 16) * 20)
+    sheet.save(os.path.join(out_dir, "item_icons.png"))
 
 
 if __name__ == "__main__":

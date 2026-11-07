@@ -28,8 +28,15 @@
   #mm-items-title { color: #a39578; font-size: 12px; }
   #inv { border-top: 1px solid #3a3226; padding-top: 6px; font-size: 12px; color: #cfc3a6; }
   #inv .inv-title { color: #c9a227; font-weight: 600; margin-bottom: 2px; }
-  #inv-hand:empty, #inv-chars:empty { display: none; }
-  #inv b { color: #a39578; font-weight: 600; }
+  #inv .inv-head { display: flex; align-items: baseline; gap: 8px; }
+  #inv-count, #inv .inv-sub { color: #a39578; font-size: 11px; }
+  #inv .inv-sub { margin-top: 6px; }
+  .inv-grid { display: grid; grid-template-columns: repeat(12, 30px); gap: 2px; margin-top: 3px; }
+  #inv-handrow { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: #a39578; font-size: 11px; }
+  .slot { width: 30px; height: 30px; box-sizing: border-box; border: 1px solid #3a3226; background-color: #17130e;
+    image-rendering: pixelated; }
+  .slot.full { background-color: #2a2217; border-color: #6d5a3a;
+    background-image: url("viewer/data/item_icons.png"); background-size: 480px auto; background-repeat: no-repeat; }
   #mm.hidden { display: none; }
   #mm-title { font-weight: 600; color: #c9a227; }
   #mm-info { color: #a39578; min-height: 1.4em; }
@@ -74,9 +81,9 @@
   <div id="mm-label"></div>
   <div id="mm-legend"><i style="background:#8a7f68"></i>sol<i style="background:#2b2b2b;outline:1px solid #555"></i>mur<i style="background:#a0522d"></i>porte fermée<i style="background:#d08a4a"></i>ouverte<i style="background:#d22"></i>lieu<i style="background:#28dce6"></i>objets</div>
   <div id="inv">
-    <div class="inv-title">Inventaire</div>
-    <div id="inv-bar">—</div>
-    <div id="inv-hand"></div>
+    <div class="inv-head"><span class="inv-title">Inventaire</span><span id="inv-count">en attente du jeu…</span></div>
+    <div id="inv-bar" class="inv-grid"></div>
+    <div id="inv-handrow">En main <span id="inv-hand"></span></div>
     <div id="inv-chars"></div>
   </div>
   <div id="mm-items-title">Objets du niveau (positions de départ)</div>

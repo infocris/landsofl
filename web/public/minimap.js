@@ -225,37 +225,56 @@
       draw(y * 32 + x, dir);
     }
   }
-  // --- Inventaire -------------------------------------------------------------
-  let itemNames = null;
+  // --- Inventaire (grille d'icônes du jeu) ------------------------------------
+  let itemInfo = null;                  // [{name, icon}] par type d'objet
+  const ICON = 20, ICON_COLS = 16, SCALE = 1.5;
   const invBar = document.getElementById("inv-bar"), invHand = document.getElementById("inv-hand"),
-    invChars = document.getElementById("inv-chars");
-  getJSON("viewer/data/items.json").then((d) => { itemNames = d; }, () => {});
+    invChars = document.getElementById("inv-chars"), invCount = document.getElementById("inv-count");
+  getJSON("viewer/data/items.json").then((d) => { itemInfo = d; }, () => {});
 
+  function slot(type, label) {
+    const d = document.createElement("div");
+    d.className = "slot";
+    if (type >= 0 && itemInfo) {
+      const it = itemInfo[type] || { name: `objet ${type}`, icon: -1 };
+      d.classList.add("full");
+      d.title = label ? `${label} : ${it.name}` : it.name;
+      if (it.icon >= 0) {
+        const s = ICON * SCALE;
+        d.style.backgroundPosition = `-${(it.icon % ICON_COLS) * s}px -${Math.floor(it.icon / ICON_COLS) * s}px`;
+      }
+    } else if (label) d.title = `${label} : vide`;
+    return d;
+  }
+
+  let lastInv = "";
   async function updateInventory() {
-    if (!itemNames || previewing) return;
+    if (!itemInfo || previewing) return;
     const r = await mem.read([[INV.bar, INV.barSlots * 2], [INV.hand, 2], [INV.items, INV.itemSize * INV.maxItems],
       [INV.char0, INV.equipOffset + INV.equipSlots * 2]]);
     if (!r) return;
     const [bar, hand, table, ch] = r;
     const typeOf = (id) => (id > 0 && id < INV.maxItems ? table[id * INV.itemSize] | table[id * INV.itemSize + 1] << 8 : -1);
-    const nameOf = (id) => { const t = typeOf(id); return itemNames[t] || `objet ${t}`; };
-    const list = [];
-    for (let k = 0; k < INV.barSlots; k++) { const id = bar[k * 2] | bar[k * 2 + 1] << 8; if (id) list.push(nameOf(id)); }
-    invBar.textContent = list.length ? list.join(", ") : "vide";
-    const h = hand[0] | hand[1] << 8;
-    invHand.innerHTML = "";
-    if (h) { const b = document.createElement("b"); b.textContent = "En main : "; invHand.append(b, nameOf(h)); }
+    const barTypes = [];
+    for (let k = 0; k < INV.barSlots; k++) barTypes.push(typeOf(bar[k * 2] | bar[k * 2 + 1] << 8));
+    const handType = typeOf(hand[0] | hand[1] << 8);
     let name = "";
     for (let k = 0; k < INV.nameLen && ch[k]; k++) name += String.fromCharCode(ch[k]);
-    invChars.innerHTML = "";
+    const eqTypes = [];
+    for (let k = 0; k < INV.equipSlots; k++) { const o = INV.equipOffset + k * 2; eqTypes.push(typeOf(ch[o] | ch[o + 1] << 8)); }
+    const key = JSON.stringify([barTypes, handType, name, eqTypes]);
+    if (key === lastInv) return;          // on ne reconstruit la grille que si elle a changé
+    lastInv = key;
+
+    invBar.replaceChildren(...barTypes.map((t, k) => slot(t, `case ${k + 1}`)));
+    invCount.textContent = `${barTypes.filter((t) => t >= 0).length} / ${INV.barSlots} cases occupées`;
+    invHand.replaceChildren(slot(handType, "en main"));
+    invChars.replaceChildren();
     if (/^[A-Za-z' -]{2,}$/.test(name)) {
-      const eq = [];
-      for (let k = 0; k < INV.equipSlots; k++) {
-        const o = INV.equipOffset + k * 2, id = ch[o] | ch[o + 1] << 8;
-        if (id) eq.push(nameOf(id));
-      }
-      const b = document.createElement("b"); b.textContent = name + " : ";
-      invChars.append(b, eq.length ? eq.join(", ") : "rien d'équipé");
+      const b = document.createElement("div"); b.className = "inv-sub"; b.textContent = `${name} — équipement`;
+      const row = document.createElement("div"); row.className = "inv-grid";
+      row.append(...eqTypes.map((t, k) => slot(t, `emplacement ${k + 1}`)));
+      invChars.append(b, row);
     }
   }
 

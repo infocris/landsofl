@@ -199,7 +199,11 @@ Fonctions du moteur identifiées :
 - **Emplacement** : en RAM à l'adresse physique 0x8AA05 (version CD FR). Elle compte 285
   entrées de 13 octets, et son index est le type d'objet utilisé par la fonction `0x11`.
 - **Contenu d'une entrée** : octets 0–1 = numéro de texte du nom (0x4000 + index dans
-  `LANDS.FRE`) ; octet 2 = numéro d'image (**déduit**) ; le reste est inconnu.
+  `LANDS.FRE`) ; octet 2 = numéro d'**icône** dans `ITEMICN.SHP` (`STARTUP.PAK`,
+  138 icônes de 20×20, palette de l'interface) ; le reste est inconnu.
+  - **Vérification de l'octet 2** : Onguent = 30, Ginseng = 42, Aloès = 43 donnent bien la
+    potion, la feuille et l'herbe affichées dans la barre du jeu. La page du jeu s'en sert
+    pour l'aperçu graphique de l'inventaire.
 - **Contrôle** : l'entrée 0 vaut « Objet illégal ».
 - **Pas dans les exécutables** : la table n'apparaît telle quelle ni dans `LANDS.EXE` ni
   dans `MAIN.EXE`. Elle est extraite d'un vidage de la RAM par
