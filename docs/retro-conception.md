@@ -389,6 +389,22 @@ identiques.
   - **Scripts de l'émulateur** : `pathSuffix: "?v=" + BUNDLE_VERSION` les force à se
     recharger aussi.
 
+### 12.6 Clic droit — observé (test automatisé, 2026-11-07)
+
+js-dos transmet bien le bouton droit au jeu. Comportements constatés en exploration au
+niveau 1 :
+
+| Élément | Clic droit | Clic gauche (pour comparer) |
+|---|---|---|
+| objet de l'inventaire | prend l'objet en main (« Onguent pris(e) ») ; échange avec l'objet tenu | — |
+| vue 3D, objet en main | lance l'objet devant le groupe | — |
+| flèche de déplacement | déplace le groupe | idem |
+| portrait du personnage | rien de visible | ouvre la fiche (force, protection, équipement) |
+| bouton d'attaque (épée) | rien de visible (aucun ennemi présent) | non testé |
+
+Le clic droit n'est donc pas un simple double du clic gauche. Son rôle exact (au combat,
+sur les sorts, sur la carte automatique) reste **inconnu**.
+
 ## Journal
 
 - **2026-11-07** :
@@ -399,4 +415,6 @@ identiques.
   - visualiseur 3D ;
   - perspective de la vue d'origine, sol et plafond reconstitués vus de dessus ;
   - mémoire du jeu en cours (case, direction, grille vivante), mini-carte en direct ;
-  - sauvegardes : F6/F7 non persistants, conservation automatique des sauvegardes du jeu.
+  - sauvegardes : F6/F7 rendus persistants (`savefile`), conservation automatique des
+    sauvegardes du jeu, bouton F7 ajouté à la page ;
+  - clic droit : premiers constats.
