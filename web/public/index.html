@@ -26,6 +26,10 @@
   #mm-items b { flex: none; min-width: 1.8em; text-align: right; color: #28dce6; }
   #mm-items span.pos { margin-left: auto; color: #7d7058; flex: none; }
   #mm-items-title { color: #a39578; font-size: 12px; }
+  #inv { border-top: 1px solid #3a3226; padding-top: 6px; font-size: 12px; color: #cfc3a6; }
+  #inv .inv-title { color: #c9a227; font-weight: 600; margin-bottom: 2px; }
+  #inv-hand:empty, #inv-chars:empty { display: none; }
+  #inv b { color: #a39578; font-weight: 600; }
   #mm.hidden { display: none; }
   #mm-title { font-weight: 600; color: #c9a227; }
   #mm-info { color: #a39578; min-height: 1.4em; }
@@ -69,6 +73,12 @@
   <canvas id="mm-canvas"></canvas>
   <div id="mm-label"></div>
   <div id="mm-legend"><i style="background:#8a7f68"></i>sol<i style="background:#2b2b2b;outline:1px solid #555"></i>mur<i style="background:#a0522d"></i>porte fermée<i style="background:#d08a4a"></i>ouverte<i style="background:#d22"></i>lieu<i style="background:#28dce6"></i>objets</div>
+  <div id="inv">
+    <div class="inv-title">Inventaire</div>
+    <div id="inv-bar">—</div>
+    <div id="inv-hand"></div>
+    <div id="inv-chars"></div>
+  </div>
   <div id="mm-items-title">Objets du niveau (positions de départ)</div>
   <ol id="mm-items"></ol>
 </aside>

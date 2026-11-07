@@ -368,6 +368,12 @@ def main(game_dir, maps_dir, out_dir):
         print(f"niveau {n:2d} {tsname:9s} textures={len(textures):3d} sprites={len(sprite_imgs)}")
     with open(os.path.join(out_dir, "levels.json"), "w", encoding="utf-8") as fh:
         json.dump(index, fh, ensure_ascii=False)
+    # noms des types d'objets (inventaire de la page du jeu)
+    table = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "items_fr.json")
+    if os.path.exists(table):
+        names = [i["name"] for i in json.load(open(table, encoding="utf-8"))["items"]]
+        with open(os.path.join(out_dir, "items.json"), "w", encoding="utf-8") as fh:
+            json.dump(names, fh, ensure_ascii=False)
 
 
 if __name__ == "__main__":

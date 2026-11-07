@@ -369,6 +369,12 @@ La RAM fait 16 Mo (`memsize=16`).
 | `0x3E4EF` | u16 | direction : 0 N, 1 E, 2 S, 3 O |
 | `0x3E713` | 1024 × 10 octets | grille vivante du niveau ; octets 0–3 = murs N, E, S, O (identifiants de `.CMZ`, modifiés quand une porte s'ouvre) ; octets 4–9 inconnus |
 
+| `0x3E4F6` | 48 × u16 | barre d'inventaire commune : n° d'objet du jeu (0 = vide) |
+| `0x3E558` | u16 | objet tenu en main (curseur) |
+| `0x31F79` | 400 × 16 octets | objets du jeu : l'entrée n commence par le **type** d'objet (u16, index de la table des objets § 8.2) ; le reste est inconnu (case, niveau…) |
+| `0x3389F` | fiche de personnage | premier personnage : nom (ASCII, 11 octets), puis à +78 l'équipement (11 × u16, n° d'objet du jeu ; ordre des emplacements inconnu) |
+| `0x8AA05` | 285 × 13 octets | table des types d'objets (§ 8.2) |
+
 Les adresses dépendent de l'endroit où DOS charge `MAIN.EXE`. Elles sont stables tant que
 le bundle, la configuration DOSBox et l'`autoexec` ne changent pas.
 
@@ -387,6 +393,14 @@ identiques.
 - **Direction** : séquence N→E→S→E→N ; une seule adresse dans les 16 Mo suit 0,1,2,1,0.
 - **Grille** : on cherche 12 cases consécutives du niveau 1 avec un pas de 4 à 32 octets ;
   un seul résultat (pas de 10).
+
+**Inventaire** (trouvé par différences). On prend la potion de la barre en main, puis on
+la repose. Un seul mot passe de n à 0 puis revient à n (la case de la barre, 0x3E4F6), et
+un seul fait l'inverse, 0 puis n puis 0 (l'objet en main, 0x3E558). La table des objets
+du jeu est celle où les objets n° 1, 2 et 3 ont pour types Onguent, Aloès et Ginseng.
+Les n° 4 à 6 y valent Poignard, Chemise et Sandales, ce qui correspond à la fiche de
+Michael. Les fiches des personnages 2 à 4 n'ont pas encore été localisées : il faudrait
+qu'un personnage rejoigne le groupe pour mesurer l'écart entre deux fiches.
 
 ### 12.4 Touches du jeu (vérifiées par captures)
 
@@ -455,4 +469,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
     sauvegardes du jeu, bouton F7 ajouté à la page ;
   - clic droit : premiers constats.
 - **2026-11-08** : compression des textes, table des objets (en RAM), objets placés et
-  niches murales.
+  niches murales ; inventaire, objet en main et équipement du premier personnage en RAM.
