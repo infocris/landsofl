@@ -295,7 +295,10 @@ def main(game_dir, maps_dir, out_dir):
         pal = ts.palette(level_alt_palette(ts, files.get(f"LEVEL{n}.INI", b"")))
 
         # textures des faces utilisées
-        used = sorted({w for row in level["blocks"] for cell in row for w in cell})
+        # tous les types de mur du niveau, pas seulement ceux de la grille de départ : en jeu,
+        # une porte qui s'ouvre change d'identifiant (étapes d'ouverture, porte ouverte)
+        used = sorted({w for row in level["blocks"] for cell in row for w in cell}
+                      | {int(k) for k in level["wallTypes"]})
         textures, walls = [], {}
         for wid in used:
             wt = level["wallTypes"].get(str(wid))

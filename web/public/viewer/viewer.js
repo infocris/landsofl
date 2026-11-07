@@ -6,7 +6,10 @@
   "use strict";
 
   const WALL_H = 0.75;          // texture 128x96 sur une face de 1 case de large
-  const FOV = 80 * Math.PI / 180;
+  // Champ de vision : 80° en déplacement libre. En vue intégrée sous le jeu, perspective
+  // d'origine : un mur proche (1 case à 0,5 case) occupe 128 px sur 176 -> tan(FOV/2) = 1,375,
+  // soit environ 108°, dans une image au format 176x120 (voir docs § 9.3 bis).
+  let FOV = 80 * Math.PI / 180;
   const MAX_STEPS = 48;
   const RADIUS = 0.22;
   const FACE_N = 0, FACE_E = 1, FACE_S = 2, FACE_W = 3;
@@ -16,6 +19,7 @@
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
+  if (EMBED) FOV = 2 * Math.atan(1.375);
   let dirty = true;
   const view = document.getElementById("view");
   const ctx = view.getContext("2d");
@@ -41,7 +45,8 @@
 
   function resize() {
     const aspect = innerWidth / Math.max(1, innerHeight);
-    if (aspect > 1.6) { H = 250; W = Math.min(900, Math.round(H * aspect)); }   // vue large (sous le jeu)
+    if (EMBED) { W = 352; H = 240; }                                              // format de la vue d'origine
+    else if (aspect > 1.6) { H = 250; W = Math.min(900, Math.round(H * aspect)); } // fenêtre large
     else { W = 400; H = Math.max(160, Math.min(400, Math.round(W / aspect))); }
     view.width = W; view.height = H;
     proj = (W / 2) / Math.tan(FOV / 2);
@@ -373,6 +378,18 @@
   levelSel.addEventListener("change", () => { loadLevel(+levelSel.value, false); levelSel.blur(); });
   addEventListener("resize", () => { resize(); dirty = true; });
 
+  // Mode intégré : grille vivante du jeu (portes ouvertes ou fermées…), par niveau.
+  const liveGrids = new Map();
+  function applyLiveGrid() {
+    const g = L && liveGrids.get(L.level);
+    if (g && g.length === L.faces.length) { L.faces = g; dirty = true; }
+  }
+  addEventListener("message", (e) => {
+    if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-grid") return;
+    liveGrids.set(e.data.level, e.data.faces);
+    applyLiveGrid();
+  });
+
   // Mode intégré : position du groupe envoyée par la page du jeu (case entière + direction).
   let loadingLevel = null;
   addEventListener("message", async (e) => {
@@ -381,7 +398,7 @@
     if (!L || L.level !== level) {
       if (loadingLevel === level) return;
       loadingLevel = level;
-      try { await loadLevel(level, false); } finally { loadingLevel = null; }
+      try { await loadLevel(level, false); applyLiveGrid(); } finally { loadingLevel = null; }
     }
     player.x = x + 0.5; player.y = y + 0.5; player.a = DIR_ANGLE[dir & 3];
     dirty = true;

@@ -283,6 +283,11 @@ dessus (64×64, une case), par projection inverse d'une case de profondeur :
 Le résultat est une approximation : le fond d'origine est une image peinte, pas le rendu
 exact d'un sol répétitif, d'où des raccords visibles.
 
+**Vue 3D intégrée sous le jeu.** Elle reprend cette perspective : champ horizontal
+`2·atan(1,375)` ≈ 108°, image 352×240 (format 176×120). Elle reçoit aussi la grille
+vivante (§ 12.2), donc l'état réel des portes. Pour que ces identifiants aient une
+texture, l'export produit une texture pour tous les types de mur du niveau.
+
 ### 9.4 Décorations — `.DAT` — vérifié pour la vue de face
 
 ```

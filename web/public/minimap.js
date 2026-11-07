@@ -200,7 +200,17 @@
       li.classList.toggle("near", Number.isFinite(c) && Math.abs((c % 32) - x) <= 1 && Math.abs(Math.floor(c / 32) - y) <= 1);
     }
     draw(block, dir);
+    sendGridTo3d(current.level, hash);
     sendTo3d(current.level, x, y, dir);
+  }
+
+  // État des murs et des portes : la grille vivante est envoyée à la vue 3D quand elle change.
+  let lastGridSent = "";
+  function sendGridTo3d(level, hash) {
+    const key = `${level}:${hash}`;
+    if (key === lastGridSent || !frame3d || !frame3d.contentWindow) return;
+    lastGridSent = key;
+    frame3d.contentWindow.postMessage({ type: "lol-grid", level, faces: live.slice() }, location.origin);
   }
 
   // Vue 3D sous le jeu : on ne lui envoie la position que lorsqu'elle change.
@@ -211,7 +221,7 @@
     lastSent = key;
     frame3d.contentWindow.postMessage({ type: "lol-pos", level, x, y, dir }, location.origin);
   }
-  if (frame3d) frame3d.addEventListener("load", () => { lastSent = ""; });
+  if (frame3d) frame3d.addEventListener("load", () => { lastSent = ""; lastGridSent = ""; });
 
   // Aperçu d'un niveau sans le jeu (tests, console) : LoLMinimap.preview(2, 5, 2, 1)
   let previewing = false;
