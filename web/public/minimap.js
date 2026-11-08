@@ -636,6 +636,7 @@
 
   // rôle des 11 emplacements d'équipement, déduit des masques de la table des objets (§ 8.2)
   const EQUIP_NAMES = ["arme", "bouclier", "arme (2)", "bouclier (2)", "tête", "corps", "cou", "poignets", "pieds", "anneau", "anneau (2)"];
+  let lastInvData = null;
   let lastInv = "", owned = new Set();         // types d'objets possédés (inventaire, main, équipement)
   async function updateInventory() {
     if (!itemInfo || previewing) return;
@@ -651,6 +652,7 @@
       eq: Array.from({ length: INV.equipSlots }, (_, k) => typeOf(c.at(INV.equipOffset + 2 * k) | c.at(INV.equipOffset + 2 * k + 1) << 8)) }));
     owned = new Set([...barTypes, handType, ...party.flatMap((c) => c.eq)].filter((t) => t >= 0));
     const key = JSON.stringify([barTypes, handType, party]);
+    lastInvData = { barTypes, handType, party };
     if (key === lastInv) return;          // on ne reconstruit la grille que si elle a changé
     lastInv = key;
 
@@ -666,6 +668,54 @@
       invChars.append(b, row);
     }
   }
+
+  // --- Export texte de l'inventaire ---------------------------------------------
+  function inventoryText() {
+    if (!lastInvData || !itemInfo) return null;
+    const { barTypes, handType, party } = lastInvData;
+    const desc = (t) => {
+      const it = itemInfo[t] || { name: `objet ${t}` };
+      const extra = [it.kind, ...(it.effects || [])].filter(Boolean).join(" ; ");
+      return it.name + (extra ? ` — ${extra}` : "");
+    };
+    const date = new Date().toLocaleString("fr-FR");
+    const lines = [`Lands of Lore — inventaire (${date})`];
+    if (current) lines.push(`Niveau ${current.level}, ${current.name.split(" — ")[0]}`);
+    const money = /\d+/.exec(stMoney.textContent);
+    if (money) lines.push(`Couronnes : ${money[0]}`);
+    lines.push("", `Sac (${barTypes.filter((t) => t >= 0).length} / ${barTypes.length} cases)`);
+    const counts = new Map();
+    for (const t of barTypes) if (t >= 0) counts.set(t, (counts.get(t) || 0) + 1);
+    if (!counts.size) lines.push("  (vide)");
+    for (const [t, n] of counts) lines.push(`  - ${n > 1 ? n + " × " : ""}${desc(t)}`);
+    lines.push("", `En main : ${handType >= 0 ? desc(handType) : "rien"}`);
+    for (const c of party) {
+      lines.push("", `${c.name} — équipement`);
+      let any = false;
+      c.eq.forEach((t, k) => { if (t >= 0) { any = true; lines.push(`  - ${EQUIP_NAMES[k]} : ${desc(t)}`); } });
+      if (!any) lines.push("  (rien)");
+    }
+    return lines.join("\n") + "\n";
+  }
+  document.getElementById("inv-copy").addEventListener("click", async (e) => {
+    const b = e.currentTarget; b.blur();
+    const txt = inventoryText();
+    if (!txt) return;
+    try { await navigator.clipboard.writeText(txt); b.textContent = "Copié ✓"; }
+    catch (err) { b.textContent = "Échec"; }
+    setTimeout(() => { b.textContent = "Copier"; }, 1500);
+  });
+  document.getElementById("inv-save").addEventListener("click", (e) => {
+    e.currentTarget.blur();
+    const txt = inventoryText();
+    if (!txt) return;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([txt], { type: "text/plain;charset=utf-8" }));
+    a.download = `inventaire-lands-of-lore-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  window.lolInventoryText = inventoryText;            // débogage
 
   // Débogage depuis la console : LoLMinimap.monsters() -> case, direction, type, sprite choisi
   function debugMonsters() {
