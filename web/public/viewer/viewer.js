@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261109h";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261109i";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) FOV = 2 * Math.atan(1.375);
   let dirty = true;
@@ -717,6 +717,22 @@
     }
     gameA = ta;
     dirty = true;
+  });
+
+  // Mode intégré : capture de la vue depuis une case (illustration d'un lieu de la mini-carte).
+  // Rendu synchrone à la position demandée puis retour à la position du groupe : rien ne s'affiche.
+  addEventListener("message", (e) => {
+    if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-snap") return;
+    const { id, level, x, y, dir } = e.data;
+    let url = null;
+    if (L && L.level === level) {
+      const saved = { x: player.x, y: player.y, a: player.a }, st = [turning, looking, pitch];
+      player.x = x + 0.5; player.y = y + 0.5; player.a = DIR_ANGLE[dir & 3]; turning = false; looking = false; pitch = 0;
+      try { render(); url = view.toDataURL("image/png"); } catch (err) { url = null; }
+      Object.assign(player, saved); [turning, looking, pitch] = st;
+      render();
+    }
+    e.source.postMessage({ type: "lol-snap", id, url }, location.origin);
   });
 
   let last = performance.now(), saveAt = 0, lastAnimFrame = -1;

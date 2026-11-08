@@ -554,7 +554,7 @@ def main(game_dir, maps_dir, out_dir):
             "fragile": fragile_by_level.get(n, []),   # murs fragiles (tools/fragile.py)
             "scripted": scripted_cells(files, n),
             "exits": level_exits(files, n),        # passages vers un autre niveau (fonction 0x3C)  # cases dont le script réagit (clic sur un mur…)
-            "labels": [{k: l[k] for k in ("x", "y", "text")} for l in level["labels"]],
+            "labels": [{k: l[k] for k in ("x", "y", "x2", "y2", "text")} for l in level["labels"]],
             "items": [{k: it.get(k) for k in ("x", "y", "xOffs", "yOffs", "type", "name", "spawn", "container", "face")}
                       for it in level.get("items", [])],
             "start": {"x": sx_ + 0.5, "y": sy_ + 0.5, "dir": sa_},

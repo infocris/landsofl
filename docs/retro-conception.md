@@ -198,6 +198,15 @@ entrées de 12 octets : u16 x, u16 y, u16 icône, u16 x2, u16 y2, u16 n° de tex
 - La valeur `0xFFFF` marque un emplacement vide.
 - **Inconnu** : le sens exact de `icône` et de `x2/y2` (souvent la case voisine, peut-être
   la case d'accès).
+- **Illustration des lieux** (mini-carte, au survol d'un lieu ou de sa ligne dans la liste).
+  La page cherche d'abord une image du jeu (fonction `0x29`, § 8) sur la case `x2/y2`, sur la
+  case du lieu ou sur une case voisine de `x2/y2`. Au niveau 1, on obtient : Armurerie →
+  VICTOR, Herboristerie → NATHNIAL, Bureau de Geron → GERIM, Salle du trône → CONFRONT.
+  Sinon, la vue 3D fait une capture prise depuis `x2/y2`, tournée vers `x/y` (message
+  `lol-snap`, rendu synchrone puis retour à la position du groupe). Exemple : la Fontaine,
+  vue depuis 13,14 vers le nord, est bien face à la fontaine, ce qui conforte l'idée que
+  `x2/y2` est la case d'accès. La capture n'est possible que pour le niveau affiché par la vue
+  3D.
 
 ## 8. Scripts — `LEVELn.INI` / `LEVELn.INF` (EMC2) — vérifié pour ce qui est utilisé
 
@@ -865,3 +874,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
   des objets seuls sur leur case.
 - **2026-11-08** : téléporteurs (symbole 17 et sauts de la fonction 0x3C dans le même niveau),
   affichés sur la mini-carte avec leur destination.
+- **2026-11-08** : illustration des lieux au survol (image du jeu ou capture de la vue 3D).

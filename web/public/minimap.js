@@ -71,7 +71,7 @@
   async function loadLevels() {
     const index = await getJSON("viewer/data/levels.json");
     for (const l of index) {
-      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261109h`);
+      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261109i`);
       levels.push({ level: l.level, name: l.name, faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
         labels: d.labels, places: numberPlaces(d.labels || []), groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {},
         spriteSigs: d.spriteSigs || {}, spriteConds: d.spriteConds || {}, spriteOf: null, scenes: d.scenes || {}, locks: d.locks || [],
@@ -97,7 +97,7 @@
   function numberPlaces(labels) {
     return labels.filter((l) => l.text && l.text !== "ENDROIT INVALIDE")
       .sort((a, b) => a.y - b.y || a.x - b.x)
-      .map((l, i) => ({ x: l.x, y: l.y, text: l.text, n: i + 1 }));
+      .map((l, i) => ({ x: l.x, y: l.y, x2: l.x2, y2: l.y2, text: l.text, n: i + 1 }));
   }
   const placesEl = document.getElementById("mm-places");
   let hoverCell = -1, selKey = -1;             // selKey : clé choisie dans l'inventaire
@@ -114,8 +114,12 @@
       const b = document.createElement("b"); b.textContent = p.n;
       const t = document.createElement("span"); t.textContent = niceName(p.text); t.title = `case ${p.x},${p.y}`;
       li.append(b, t);
-      li.addEventListener("mouseenter", () => { hoverCell = p.y * 32 + p.x; draw(lastDraw[0], lastDraw[1]); });
-      li.addEventListener("mouseleave", () => { hoverCell = -1; draw(lastDraw[0], lastDraw[1]); });
+      li.addEventListener("mouseenter", (e) => {
+        hoverCell = p.y * 32 + p.x; draw(lastDraw[0], lastDraw[1]);
+        const r = li.getBoundingClientRect();
+        showTip(`<b>Lieu ${p.n} : ${escHtml(niceName(p.text))}</b> <span class="t">· case ${p.x},${p.y}</span>` + placeFigure(L, p), r.right, r.top);
+      });
+      li.addEventListener("mouseleave", () => { hoverCell = -1; draw(lastDraw[0], lastDraw[1]); tipEl.hidden = true; });
       placesEl.appendChild(li);
     }
   }
@@ -571,6 +575,74 @@
     receptacle: "Réceptacle de clé (mécanisme)", coffre: "Donne un objet (lieu)", inconnu: "Serrure" };
   // Info-bulle au survol de la mini-carte : nature de la case, lieu, objets, monstres
   const tipEl = document.getElementById("mm-tip");
+  const escHtml = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  let tipAt = [0, 0];
+  function showTip(html, cx, cy) {
+    tipEl.innerHTML = html; tipEl.hidden = false; tipAt = [cx, cy]; placeTip();
+    for (const im of tipEl.querySelectorAll("img")) if (!im.complete) im.addEventListener("load", placeTip);
+  }
+  function placeTip() {
+    const [cx, cy] = tipAt, w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+    let left = cx + 14, top = cy + 14;
+    if (left + w > innerWidth - 4) left = cx - w - 14;
+    if (top + h > innerHeight - 4) top = cy - h - 14;
+    tipEl.style.left = Math.max(4, left) + "px"; tipEl.style.top = Math.max(4, top) + "px";
+  }
+
+  // Illustration d'un lieu : image du jeu (fonction 0x29, § 8) si une case de l'entrée en a une,
+  // sinon vue 3D prise depuis la case devant l'entrée (x2, y2 de l'annotation), tournée vers le lieu.
+  const placeImg = new Map();             // "niveau:n" -> {src, kind} ou Promise
+  let snapId = 0;
+  const snapWait = new Map();
+  addEventListener("message", (e) => {
+    if (e.origin !== location.origin || !e.data || e.data.type !== "lol-snap") return;
+    const ok = snapWait.get(e.data.id); if (ok) { snapWait.delete(e.data.id); ok(e.data.url); }
+  });
+  function snapshot(level, x, y, dir) {
+    if (!frame3d || !frame3d.contentWindow) return Promise.resolve(null);
+    const id = ++snapId;
+    return new Promise((ok) => {
+      snapWait.set(id, ok);
+      setTimeout(() => { if (snapWait.delete(id)) ok(null); }, 1500);
+      frame3d.contentWindow.postMessage({ type: "lol-snap", id, level, x, y, dir }, location.origin);
+    });
+  }
+  function placeScene(L, p) {
+    const cand = [[p.x2, p.y2], [p.x, p.y]];
+    for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) cand.push([p.x2 + dx, p.y2 + dy]);
+    for (const [x, y] of cand) if (x >= 0 && y >= 0 && x < 32 && y < 32 && L.scenes[y * 32 + x]) return L.scenes[y * 32 + x];
+    return null;
+  }
+  function placeView(p) {
+    let sx = p.x2, sy = p.y2;
+    if (sx == null || (sx === p.x && sy === p.y)) { sx = p.x; sy = p.y; return [sx, sy, 0]; }
+    const dx = p.x - sx, dy = p.y - sy;
+    const dir = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0);
+    return [sx, sy, dir];
+  }
+  function placeFigure(L, p) {
+    if (!L) return "";
+    const key = `${L.level}:${p.n}`, scene = placeScene(L, p);
+    if (scene) return `<img class="pl" src="viewer/data/scenes/${escHtml(scene)}" alt=""><span class="t">Image du lieu dans le jeu</span>`;
+    const got = placeImg.get(key);
+    if (got && got.src) return `<img class="pl" src="${got.src}" alt=""><span class="t">Vue 3D depuis la case ${got.at}</span>`;
+    if (!got) {
+      const [x, y, dir] = placeView(p);
+      const job = snapshot(L.level, x, y, dir).then((url) => {
+        if (url) placeImg.set(key, { src: url, at: `${x},${y}, vers ${["le nord", "l'est", "le sud", "l'ouest"][dir]}` });
+        else placeImg.delete(key);
+        const el = tipEl.querySelector(`[data-place="${key}"]`);
+        if (el && url) {
+          el.outerHTML = `<img class="pl" src="${url}" alt=""><span class="t">Vue 3D depuis la case ${x},${y}, vers ${["le nord", "l'est", "le sud", "l'ouest"][dir]}</span>`;
+          for (const im of tipEl.querySelectorAll("img")) if (!im.complete) im.addEventListener("load", placeTip);
+          placeTip();
+        }
+        else if (el) el.textContent = "(vue 3D indisponible : la vue 3D affiche un autre niveau)";
+      });
+      placeImg.set(key, { pending: job });
+    }
+    return `<br><span class="t" data-place="${key}">Illustration en cours…</span>`;
+  }
   const CLASS_FR = { wall: "mur", floor: "sol", doorOpen: "porte ouverte", doorClosed: "porte fermée",
     special: "case particulière (levier, niche, décor…)", unknown: "mur inconnu" };
   function cellInfo(x, y) {
@@ -579,8 +651,8 @@
     out.push(`<b>Case ${x},${y}</b> <span class="t">· ${CLASS_FR[cellClass(L, i)]}</span>`);
     if (lastDraw[0] === i) out.push("Vous êtes ici");
     for (const p of L.places) if (p.x === x && p.y === y)
-      out.push(`<span class="lb">Lieu ${p.n} : ${esc(niceName(p.text))}</span>`);
-    if (L.scenes[i]) out.push(`<span class="t">Lieu avec image fixe (scène)</span>`);
+      out.push(`<span class="lb">Lieu ${p.n} : ${esc(niceName(p.text))}</span>` + placeFigure(L, p));
+    if (L.scenes[i] && !L.places.some((p) => p.x === x && p.y === y)) out.push(`<span class="t">Lieu avec image fixe (scène)</span>`);
     const grp = L.groups.find((g) => g.x === x && g.y === y);
     if (grp) {
       const where = grp.items[0].container === "chest" ? " (dans un coffre)"
@@ -628,15 +700,11 @@
     const r = canvas.getBoundingClientRect();
     const x = Math.floor((e.clientX - r.left) / r.width * 32), y = Math.floor((e.clientY - r.top) / r.height * 32);
     if (x < 0 || y < 0 || x > 31 || y > 31) { tipEl.hidden = true; return; }
-    tipEl.innerHTML = cellInfo(x, y);
-    tipEl.hidden = false;
-    const w = tipEl.offsetWidth, h = tipEl.offsetHeight;
-    let left = e.clientX + 14, top = e.clientY + 14;
-    if (left + w > innerWidth - 4) left = e.clientX - w - 14;
-    if (top + h > innerHeight - 4) top = e.clientY - h - 14;
-    tipEl.style.left = Math.max(4, left) + "px"; tipEl.style.top = Math.max(4, top) + "px";
+    const key = `${x},${y}`;
+    if (tipEl.hidden || tipEl.dataset.cell !== key) { tipEl.dataset.cell = key; showTip(cellInfo(x, y), e.clientX, e.clientY); }
+    else { tipAt = [e.clientX, e.clientY]; placeTip(); }
   });
-  canvas.addEventListener("mouseleave", () => { tipEl.hidden = true; });
+  canvas.addEventListener("mouseleave", () => { tipEl.hidden = true; tipEl.dataset.cell = ""; });
 
   { let c = 12; try { c = +localStorage.getItem("minimapCell") || 12; } catch (e) {} setCell(c); }
 
@@ -804,6 +872,7 @@
       for (let i = 0; i < 4096; i++) live[i] = current.faces[i];
       titleEl.textContent = `Niveau ${current.level} (aperçu)`;
       draw(y * 32 + x, dir);
+      sendTo3d(current.level, x, y, dir);
     }
   }
   // --- Inventaire (grille d'icônes du jeu) ------------------------------------
