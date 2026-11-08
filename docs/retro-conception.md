@@ -122,6 +122,18 @@ entrées de 12 octets :
   le `.WLL` de l'autre, et le niveau 21 un id du niveau 20. L'extracteur reprend la
   définition dans un niveau du même décor.
 
+### 6.0 bis Portes — étapes d'ouverture (vérifié 2026-11-08)
+
+Une porte est une série de types de mur consécutifs : le premier est fermé (bloquant, avec
+une texture ouverte), le dernier ouvert (non bloquant). Par exemple, au niveau 1 : 3, 4, 5,
+6, puis 7 ouvert. Le jeu fait passer la face d'un type au suivant pendant l'ouverture. Les
+textures exportées des étapes intermédiaires montrent toutes la porte fermée : le jeu
+déplace le panneau lui-même. La vue 3D isole le panneau (pixels différents entre la texture
+fermée et la texture ouverte, d'où sa hauteur dans l'encadrement), puis le fait monter ou
+descendre de façon continue vers l'ouverture visée. Celle-ci vaut (type − premier) /
+(dernier − premier), d'après la grille vivante. Toutes les portes sont animées en
+glissement vertical : le sens réel d'ouverture de chaque décor n'a pas été vérifié.
+
 ### 6.1 Coffres — vérifié visuellement (2026-11-08)
 
 Le champ `automap` d'un type de mur choisit le symbole de la carte du jeu. La valeur

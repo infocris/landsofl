@@ -111,6 +111,8 @@
     L.sprImgs = darken(spr, SHADES);
     L.wallInfo = [];
     for (const [id, w] of Object.entries(L.walls)) L.wallInfo[+id] = w;
+    buildDoorPanels(walls);
+    doorShown.clear();
     openDoors = new Set();
     const saved = store.get("pos");
     if (keepPos && saved && saved.level === n) Object.assign(player, saved);
@@ -136,9 +138,86 @@
     return false;
   }
 
+  // --- Portes animées ---------------------------------------------------------
+  // Le jeu ouvre une porte par étapes : types de mur consécutifs, du fermé (bloquant, avec
+  // texture ouverte) à l'ouvert (non bloquant). Les textures exportées des étapes montrent
+  // toutes la porte fermée : on isole le panneau (pixels qui diffèrent entre la texture
+  // fermée et la texture ouverte) et on le fait monter dans l'encadrement.
+  const DOOR_SPEED = 1.6;                                 // ouverture complète en ~0,6 s
+  const doorShown = new Map();                            // face (case*4+f) -> {q affiché, cible}
+  window.lolDoors = doorShown;                            // débogage
+  function doorSeries(id) {                               // -> {start, end} ou null
+    const w = info(id);
+    if (!w || !w.door) return null;
+    let a = id, b = id;
+    while (info(a - 1) && info(a - 1).door && info(a - 1).block && id - a < 6) a--;
+    while (info(b) && info(b).block && info(b + 1) && info(b + 1).door && b - id < 6) b++;
+    return info(b) && !info(b).block && b > a ? { start: a, end: b } : null;
+  }
+  function openness(id) {
+    const s = doorSeries(id);
+    return s ? (id - s.start) / (s.end - s.start) : null;
+  }
+  function buildDoorPanels(img) {
+    const c = document.createElement("canvas");
+    c.width = img.width; c.height = img.height;
+    const g = c.getContext("2d");
+    g.drawImage(img, 0, 0);
+    const src = g.getImageData(0, 0, c.width, c.height), out = g.createImageData(c.width, c.height);
+    const fw = L.faceW, fh = L.faceH, cols = L.atlasCols;
+    for (const w of L.wallInfo) {
+      if (!w || !w.door || w.openTex === undefined || w.tex < 0) continue;
+      const cx0 = (w.tex % cols) * fw, cy0 = Math.floor(w.tex / cols) * fh;
+      const ox0 = (w.openTex % cols) * fw, oy0 = Math.floor(w.openTex / cols) * fh;
+      let y0 = fh, y1 = -1;
+      for (let y = 0; y < fh; y++) for (let x = 0; x < fw; x++) {
+        const a = ((cy0 + y) * c.width + cx0 + x) * 4, b = ((oy0 + y) * c.width + ox0 + x) * 4;
+        const d = Math.abs(src.data[a] - src.data[b]) + Math.abs(src.data[a + 1] - src.data[b + 1]) + Math.abs(src.data[a + 2] - src.data[b + 2])
+          + Math.abs(src.data[a + 3] - src.data[b + 3]);
+        if (d > 24) {
+          out.data.set(src.data.subarray(a, a + 4), a);
+          if (y < y0) y0 = y; if (y > y1) y1 = y;
+        }
+      }
+      w.panel = y1 >= y0 ? { y0, y1: y1 + 1 } : null;
+    }
+    g.clearRect(0, 0, c.width, c.height);
+    g.putImageData(out, 0, 0);
+    L.panelImgs = darken(c, SHADES);
+  }
+  // Nouvelle grille vivante : les portes dont l'ouverture change sont animées vers leur cible.
+  function retargetDoors(oldFaces, newFaces) {
+    for (let k = 0; k < newFaces.length; k++) {
+      if (oldFaces[k] === newFaces[k]) continue;
+      const qNew = openness(newFaces[k]);
+      if (qNew === null) { doorShown.delete(k); continue; }
+      const cur = doorShown.get(k);
+      const qOld = cur ? cur.q : openness(oldFaces[k]);
+      doorShown.set(k, { q: qOld === null ? qNew : qOld, target: qNew });
+    }
+  }
+  function stepDoors(dt) {
+    let moving = false;
+    for (const [k, d] of doorShown) {
+      if (d.q === d.target) continue;
+      const step = DOOR_SPEED * dt;
+      d.q = d.q < d.target ? Math.min(d.target, d.q + step) : Math.max(d.target, d.q - step);
+      moving = true;
+    }
+    return moving;
+  }
+
   function texFor(cx, cy, f) {
-    const w = info(face(cx, cy, f));
+    const id = face(cx, cy, f), w = info(id);
     if (!w) return null;
+    const shown = doorShown.get((cy * 32 + cx) * 4 + f);
+    if (shown && w.door) {
+      const s = doorSeries(id), closed = s && info(s.start);
+      if (closed && closed.panel && closed.openTex !== undefined) {
+        if (shown.q >= 0.999) return { tex: closed.openTex, opaque: false, block: false };
+        return { tex: closed.openTex, opaque: false, block: shown.q < 0.001, panel: closed.panel, panelTex: closed.tex, q: shown.q };
+      }
+    }
     if (w.door && openDoors.has(cy * 32 + cx)) return w.openTex !== undefined ? { tex: w.openTex, opaque: false, block: false } : null;
     if (w.tex < 0) return w.block ? { tex: -1, opaque: false, block: true } : null;
     return { tex: w.tex, opaque: w.opaque, block: w.block };
@@ -189,7 +268,7 @@
         u -= Math.floor(u);
         // sens de lecture de la texture vu depuis l'extérieur de la face
         if (f === FACE_E || f === FACE_N) u = 1 - u;
-        if (t.tex >= 0) items.push({ d: dist, tex: t.tex, u });
+        if (t.tex >= 0) items.push({ d: dist, tex: t.tex, u, door: t.panel ? t : null });
         if (t.block && (t.opaque || t.tex < 0)) { nearestOpaque = dist; break; }
       }
       zbuf[x] = nearestOpaque;
@@ -215,9 +294,19 @@
           const tx = (it.tex % cols) * fw + Math.min(fw - 1, Math.floor(it.u * fw));
           const ty = Math.floor(it.tex / cols) * fh;
           ctx.drawImage(L.wallImgs[shadeFor(dist)], tx, ty, 1, fh, x, top, 1, colH);
+          if (it.door) drawPanel(it, dist, x, top, colH);
         }
       }
     }
+  }
+  // Panneau d'une porte en cours d'ouverture : remonté de q × hauteur de l'ouverture.
+  function drawPanel(it, dist, x, top, colH) {
+    const { panel, panelTex, q } = it.door, fw = L.faceW, fh = L.faceH, cols = L.atlasCols;
+    const h = panel.y1 - panel.y0, sh = q * h, vis = h - sh;
+    if (vis <= 0.5) return;
+    const tx = (panelTex % cols) * fw + Math.min(fw - 1, Math.floor(it.u * fw)), ty = Math.floor(panelTex / cols) * fh;
+    const k = colH / fh;
+    ctx.drawImage(L.panelImgs[shadeFor(dist)], tx, ty + panel.y0 + sh, 1, vis, x, top + panel.y0 * k, 1, vis * k);
   }
 
   // Sol et plafond projetés ligne par ligne, en coordonnées du monde : la texture
@@ -327,7 +416,7 @@
           const t = texFor(cx, cy, f);
           if (!t) continue;
           if (f === FACE_E || f === FACE_N) uu = 1 - uu;
-          if (t.tex >= 0) items.push({ d: hz, tex: t.tex, u: uu });
+          if (t.tex >= 0) items.push({ d: hz, tex: t.tex, u: uu, door: t.panel ? t : null });
           if (t.block && (t.opaque || t.tex < 0)) { nearest = hz; done = true; break; }
         }
         pwx = wx; pwy = wy; pz = z;
@@ -350,6 +439,7 @@
           const tx = (it.tex % cols) * fw + Math.min(fw - 1, Math.floor(it.u * fw));
           const ty = Math.floor(it.tex / cols) * fh;
           ctx.drawImage(L.wallImgs[shadeFor(dist)], tx, ty, 1, fh, x, top, 1, colH);
+          if (it.door) drawPanel(it, dist, x, top, colH);
         }
       }
     }
@@ -589,7 +679,10 @@
   const liveGrids = new Map();
   function applyLiveGrid() {
     const g = L && liveGrids.get(L.level);
-    if (g && g.length === L.faces.length) { L.faces = g; dirty = true; }
+    if (g && g.length === L.faces.length) {
+      if (L.liveApplied && g !== L.faces) retargetDoors(L.faces, g);   // pas d'animation au premier état reçu
+      L.faces = g; L.liveApplied = true; dirty = true;
+    }
   }
   addEventListener("message", (e) => {
     if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-grid") return;
@@ -630,6 +723,7 @@
   function frame(t) {
     const dt = Math.min(0.05, (t - last) / 1000); last = t;
     if (L && EMBED) {
+      if (stepDoors(dt)) dirty = true;
       if (anim) {
         const k = Math.min(1, (t - anim.t0) / anim.dur), e = k * k * (3 - 2 * k);   // départ et arrivée en douceur
         player.x = anim.x0 + (anim.x1 - anim.x0) * e;
