@@ -71,11 +71,11 @@
   async function loadLevels() {
     const index = await getJSON("viewer/data/levels.json");
     for (const l of index) {
-      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261108v`);
+      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261109e`);
       levels.push({ level: l.level, name: l.name, faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
         labels: d.labels, places: numberPlaces(d.labels || []), groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {},
         spriteSigs: d.spriteSigs || {}, spriteConds: d.spriteConds || {}, spriteOf: null, scenes: d.scenes || {}, locks: d.locks || [],
-        scripted: new Set(d.scripted || []), fragile: d.fragile || [] });
+        scripted: new Set(d.scripted || []), fragile: d.fragile || [], exits: d.exits || [] });
       infoEl.textContent = `chargement des cartes… ${levels.length}/${index.length}`;
     }
   }
@@ -264,6 +264,20 @@
     const id = live[i * 4 + f];
     return id ? chestIds(L).indexOf(id) : -1;
   }
+  // Escaliers et trous : symbole de carte du type de mur posé au sol (automap) : 25 = escalier
+  // qui monte, 26 = escalier qui descend (positions qui se répondent d'un niveau à l'autre),
+  // 11 = trou ou trappe (chute au niveau inférieur, fonction 0x3C des scripts).
+  function floorMark(L, i) {
+    let mark = null;
+    for (let f = 0; f < 4; f++) {
+      const t = L.wallTypes[live[i * 4 + f]];
+      if (!t) continue;
+      if (t[2] === 25) return "up";
+      if (t[2] === 26) return "down";
+      if (t[2] === 11) mark = "hole";
+    }
+    return mark;
+  }
   function isWallCell(L, i) { const c = cellClass(L, i); return c === "wall" || c === "special" || c === "unknown"; }
 
   // État d'un monstre (octet +13 depuis x, § 12.2) : 1 = paisible (n'attaque pas pour l'instant ;
@@ -331,6 +345,28 @@
       const x0 = fw.x * CELL, y0 = fw.y * CELL, c = CELL - 1;
       g.beginPath(); g.moveTo(x0 + c * 0.2, y0 + c * 0.1); g.lineTo(x0 + c * 0.55, y0 + c * 0.4);
       g.lineTo(x0 + c * 0.35, y0 + c * 0.6); g.lineTo(x0 + c * 0.8, y0 + c * 0.9); g.stroke();
+    }
+    // escaliers (triangle), trous (cercle sombre), passages scriptés vers un autre niveau (losange)
+    for (let i = 0; i < 1024; i++) {
+      const mk = floorMark(L, i);
+      if (!mk) continue;
+      const cx = (i % 32) * CELL + (CELL - 1) / 2, cy = Math.floor(i / 32) * CELL + (CELL - 1) / 2, r = CELL * 0.42;
+      g.lineWidth = 1.2; g.strokeStyle = "#000";
+      if (mk === "hole") {
+        g.fillStyle = "#111"; g.beginPath(); g.arc(cx, cy, r * 0.8, 0, 2 * Math.PI); g.fill();
+        g.strokeStyle = "#9a9a9a"; g.stroke();
+        continue;
+      }
+      g.fillStyle = mk === "up" ? "#8fe3ff" : "#c58cff";
+      g.beginPath();
+      if (mk === "up") { g.moveTo(cx, cy - r); g.lineTo(cx + r, cy + r * 0.8); g.lineTo(cx - r, cy + r * 0.8); }
+      else { g.moveTo(cx, cy + r); g.lineTo(cx + r, cy - r * 0.8); g.lineTo(cx - r, cy - r * 0.8); }
+      g.closePath(); g.fill(); g.stroke();
+    }
+    for (const e of L.exits) {
+      const cx = e.x * CELL + (CELL - 1) / 2, cy = e.y * CELL + (CELL - 1) / 2, r = CELL * 0.32;
+      g.fillStyle = "#fff"; g.strokeStyle = "#000"; g.lineWidth = 1.2;
+      g.beginPath(); g.moveTo(cx, cy - r); g.lineTo(cx + r, cy); g.lineTo(cx, cy + r); g.lineTo(cx - r, cy); g.closePath(); g.fill(); g.stroke();
     }
     // coffres (symbole 210 de la carte du jeu) : petite malle contre la face, couleur selon l'état
     for (let i = 0; i < 1024; i++) for (let f = 0; f < 4; f++) {
@@ -442,6 +478,12 @@
     for (let f = 0; f < 4; f++) {
       const st = chestState(L, i, f);
       if (st >= 0) out.push(`<span class="ch">Coffre ${CHEST_FR[st] || ""}, face ${["nord", "est", "sud", "ouest"][f]}</span>`);
+    }
+    const mk = floorMark(L, i);
+    if (mk) out.push(`<span class="st">${{ up: "Escalier qui monte", down: "Escalier qui descend", hole: "Trou ou trappe (chute)" }[mk]}</span>`);
+    for (const e of L.exits) if (e.x === x && e.y === y) {
+      const dest = levels.find((l) => l.level === e.level);
+      out.push(`<span class="st">Passage vers le niveau ${e.level}${dest ? " (" + esc(dest.name.split(" — ")[0]) + ")" : ""}, case ${e.tx},${e.ty}</span>`);
     }
     for (const fw of L.fragile) if (fw.x === x && fw.y === y)
       out.push(isWallCell(L, i) ? `<span class="fr">Mur fragile : se casse en le frappant avec : ${esc(fw.toolName)}</span>`

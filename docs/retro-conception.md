@@ -134,6 +134,21 @@ descendre de façon continue vers l'ouverture visée. Celle-ci vaut (type − pr
 (dernier − premier), d'après la grille vivante. Toutes les portes sont animées en
 glissement vertical : le sens réel d'ouverture de chaque décor n'a pas été vérifié.
 
+### 6.0 ter Escaliers, trous et passages (2026-11-08)
+
+- **Escaliers** : types de mur posés au sol (drapeaux 4) dont le symbole de carte vaut 25 ou
+  26. Les positions se répondent d'un niveau à l'autre. Au niveau 7, le symbole 26 est en
+  15,6, 15,15 et 28,3 ; au niveau 8, le symbole 25 est aux mêmes cases. Au niveau 6, le 26
+  est en 22,3, et au niveau 7, le 25 aussi. D'où **25 = escalier qui monte**, **26 =
+  escalier qui descend** (**déduit** de ces correspondances). Le changement de niveau est fait
+  par le moteur, pas par les scripts : les escaliers n'apparaissent pas dans les appels de la
+  fonction 0x3C.
+- **Trous et trappes** : symbole 11 au sol. Les scripts font tomber le groupe au niveau
+  inférieur, à la même position (niveau 20, case 15,15 → niveau 18, case 495 = 15,15).
+- **Passages scriptés** : la fonction **0x3C** (niveau, case, direction) change de niveau. Ce
+  sont les sorties du château et de la forêt, les entrées des cavernes et les chutes. L'export
+  les relève avec leur case de déclenchement (champ `exits`, `level_exits`).
+
 ### 6.1 Coffres — vérifié visuellement (2026-11-08)
 
 Le champ `automap` d'un type de mur choisit le symbole de la carte du jeu. La valeur
@@ -805,3 +820,5 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
   classe dans le panneau.
 - **2026-11-08** : coffres (symbole 210 de la carte du jeu, 4 états), affichés sur la
   mini-carte avec leur état réel.
+- **2026-11-08** : escaliers (symboles 25 et 26), trous (11) et passages de la fonction 0x3C,
+  affichés sur la mini-carte ; portes animées dans la vue 3D.

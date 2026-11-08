@@ -318,6 +318,26 @@ def sprite_conditions(ini):
     return out
 
 
+def level_exits(files, n):
+    """Passages scriptés (fonction 0x3C : niveau, case, direction), par case de déclenchement."""
+    ck = emc.chunks(files[f"LEVEL{n}.INF"])
+    o = struct.unpack(f">{len(ck['ORDR']) // 2}H", ck["ORDR"])
+    starts = sorted((a, i) for i, a in enumerate(o[:1024]) if a != 0xFFFF)
+    out = []
+    for addr, args in emc.resolved_calls(ck, 0x3C):
+        owner = None
+        for s0, i in starts:
+            if s0 > addr:
+                break
+            owner = i
+        if owner is None or len(args) < 2 or not isinstance(args[0], int) or not isinstance(args[1], int):
+            continue
+        e = {"x": owner % 32, "y": owner // 32, "level": args[0], "tx": args[1] % 32, "ty": args[1] // 32}
+        if e not in out:
+            out.append(e)
+    return out
+
+
 def scripted_cells(files, n):
     """Cases qui ont un script dans LEVELn.INF (entrées ORDR < 1024 différentes de 0xFFFF)."""
     ck = emc.chunks(files[f"LEVEL{n}.INF"])
@@ -501,7 +521,8 @@ def main(game_dir, maps_dir, out_dir):
             "scenes": scenes,   # case -> image du lieu (data/scenes/)
             "locks": locks_by_level.get(n, []),   # serrures : case + clé (tools/locks.py)
             "fragile": fragile_by_level.get(n, []),   # murs fragiles (tools/fragile.py)
-            "scripted": scripted_cells(files, n),  # cases dont le script réagit (clic sur un mur…)
+            "scripted": scripted_cells(files, n),
+            "exits": level_exits(files, n),        # passages vers un autre niveau (fonction 0x3C)  # cases dont le script réagit (clic sur un mur…)
             "labels": [{k: l[k] for k in ("x", "y", "text")} for l in level["labels"]],
             "items": [{k: it.get(k) for k in ("x", "y", "xOffs", "yOffs", "type", "name", "spawn", "container", "face")}
                       for it in level.get("items", [])],
