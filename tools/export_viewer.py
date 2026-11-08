@@ -16,6 +16,8 @@ from wwcomp import cps
 import lolgfx
 import emc
 import item_info
+import chests
+ITEM_NAMES = [i["name"] for i in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "items_fr.json"), encoding="utf-8"))["items"]]
 import locks as locks_mod
 import fragile as fragile_mod
 
@@ -553,12 +555,14 @@ def main(game_dir, maps_dir, out_dir):
             "locks": locks_by_level.get(n, []),   # serrures : case + clé (tools/locks.py)
             "fragile": fragile_by_level.get(n, []),   # murs fragiles (tools/fragile.py)
             "scripted": scripted_cells(files, n),
-            "exits": level_exits(files, n),        # passages vers un autre niveau (fonction 0x3C)  # cases dont le script réagit (clic sur un mur…)
+            "exits": level_exits(files, n),        # passages vers un autre niveau (fonction 0x3C)
             "labels": [{k: l[k] for k in ("x", "y", "x2", "y2", "text")} for l in level["labels"]],
             "items": [{k: it.get(k) for k in ("x", "y", "xOffs", "yOffs", "type", "name", "spawn", "container", "face")}
                       for it in level.get("items", [])],
             "start": {"x": sx_ + 0.5, "y": sy_ + 0.5, "dir": sa_},
         }
+        # contenu des coffres (tools/chests.py) : objets donnés par le script à l'ouverture
+        out["chestItems"] = chests.chest_contents(files[f"LEVEL{n}.INF"], out, ITEM_NAMES) if f"LEVEL{n}.INF" in files else {}
         with open(os.path.join(out_dir, f"level{n:02d}.json"), "w", encoding="utf-8") as fh:
             json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))
         index.append({"level": n, "tileset": tsname,

@@ -71,12 +71,12 @@
   async function loadLevels() {
     const index = await getJSON("viewer/data/levels.json");
     for (const l of index) {
-      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261109i`);
+      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261109n`);
       levels.push({ level: l.level, name: l.name, faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
         labels: d.labels, places: numberPlaces(d.labels || []), groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {},
         spriteSigs: d.spriteSigs || {}, spriteConds: d.spriteConds || {}, spriteOf: null, scenes: d.scenes || {}, locks: d.locks || [],
         scripted: new Set(d.scripted || []), fragile: d.fragile || [], exits: d.exits || [],
-        walls: d.walls || {}, atlasCols: d.atlasCols, faceW: d.faceW, faceH: d.faceH });
+        walls: d.walls || {}, chestItems: d.chestItems || {}, atlasCols: d.atlasCols, faceW: d.faceW, faceH: d.faceH });
       infoEl.textContent = `chargement des cartes… ${levels.length}/${index.length}`;
     }
   }
@@ -669,6 +669,17 @@
     for (let f = 0; f < 4; f++) {
       const st = chestState(L, i, f);
       if (st >= 0) out.push(`<span class="ch">Coffre ${CHEST_FR[st] || ""}, face ${["nord", "est", "sud", "ouest"][f]}</span>`);
+    }
+    const loot = L.chestItems[i];
+    if (loot) {
+      const opened = [0, 1, 2, 3].some((f) => chestState(L, i, f) > 0);
+      out.push(`<span class="ch">Contenu${opened ? " d'origine (coffre déjà ouvert : sans doute pris)" : ""} :</span>`);
+      for (const e of loot) {
+        const inf = itemInfo && itemInfo[e.type];
+        out.push(`<span class="ch">• ${esc(e.name)}${e.value ? ` <span class="t">(${/^Bourse/.test(e.name) ? e.value + " pièces" : "valeur " + e.value})</span>` : ""}`
+          + (inf ? ` <span class="t">(${itemCategory(e.type).label})</span>` : "")
+          + (e.fragile ? ` <span class="t">— Verre cassé si le coffre a été cassé</span>` : "") + "</span>");
+      }
     }
     const mk = floorMark(L, i);
     const here = L.exits.filter((e) => e.x === x && e.y === y);

@@ -188,6 +188,26 @@ casse un coffre (« Un coffre ouvert. », « Le coffre est endommagé. »). La g
 donne donc l'état réel. La page affiche les coffres et leur état sur la mini-carte ; les
 objets posés sur une case de coffre sont indiqués « dans un coffre ».
 
+**Contenu des coffres** (`tools/chests.py`, champ `chestItems` des niveaux ; déduit de la
+lecture des scripts, non vérifié en ouvrant un coffre) :
+- **Serrure** : le script de la case du coffre appelle un sous-programme générique du niveau
+  (au niveau 7 : 625). Ses paramètres sont la case, la face, puis la clé demandée (-1 = aucune).
+  Le sous-programme compare l'objet en main (`0x53`, `0x12` paramètre 4) à la clé et au Jeu
+  de clefs (245), puis change le type du mur (états du § 6.1).
+- **Contenu** : s'il réussit, le script appelle la fonction **`0x49`** (type, valeur, 0),
+  une fois par objet. La valeur semble être un nombre de pièces (Bourse) ou de charges (Coupe
+  Bezel, baguettes, Collier de Jade).
+- **Objets fragiles** : le script teste `getWall(992, 3) == -2`, sans doute « coffre cassé ».
+  Si c'est le cas, il donne un **Verre cassé** (247) à la place de la fiole ou de la coupe
+  qui suit.
+- **Résultat** : en remontant les sous-programmes jusqu'aux cases qui les appellent, on trouve
+  le contenu de **50 coffres sur 54**. Il manque : niveau 4, coffres 15,30, 24,30 et 25,30 ;
+  niveau 17, coffre 25,17.
+- **Coffre à plusieurs faces** : un coffre comme 9,8 au niveau 7 regroupe les objets de ses
+  deux faces.
+- La mini-carte donne ce contenu au survol du coffre ; si le coffre est ouvert, c'est le
+  contenu d'origine.
+
 ## 7. Annotations de carte — `LEVELn.XXX` — vérifié
 
 ```
@@ -885,3 +905,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
   - Pour chaque personnage et chaque emplacement possible, la fiche donne l'écart de force et
     de protection, ainsi que les effets gagnés ou perdus.
   - Les armes et boucliers sont comparés à la main principale seulement.
+- **2026-11-08** : contenu des coffres (fonction 0x49), 50 coffres sur 54, affiché au survol.
