@@ -24,18 +24,32 @@
   // Monstres du niveau courant (§ 12.2) : table de 30 entrées de 46 octets ; positions
   // relatives au champ x : case u16 à -2, x/y u16 (case*256 + décalage), direction à +17, type à +25
   const MON = { x0: 0x31871, size: 46, count: 30 };
-  const CELL = 12;
+  let CELL = 12;               // taille d'une case en pixels (réglable : boutons − / + de la mini-carte)
   const COLORS = { wall: "#2b2b2b", floor: "#8a7f68", doorOpen: "#d08a4a", doorClosed: "#a0522d",
     special: "#6f8f58", unknown: "#3a3550" };
 
   const canvas = document.getElementById("mm-canvas");
   const g = canvas.getContext("2d");
-  const titleEl = document.getElementById("mm-title");
+  const titleEl = document.querySelector("#mm-title span");
   const infoEl = document.getElementById("mm-info");
   const labelEl = document.getElementById("mm-label");
   const itemsEl = document.getElementById("mm-items");
   const frame3d = document.getElementById("v3d-frame");
-  canvas.width = canvas.height = 32 * CELL;
+  // Taille de la mini-carte : 8 à 24 px par case, mémorisée ; le panneau suit (variables CSS)
+  const CELL_MIN = 8, CELL_MAX = 24;
+  let lastDraw = [0, 0];
+  function setCell(c) {
+    CELL = Math.max(CELL_MIN, Math.min(CELL_MAX, c));
+    canvas.width = canvas.height = 32 * CELL;
+    document.documentElement.style.setProperty("--mm-size", 32 * CELL + "px");
+    document.getElementById("mm-smaller").disabled = CELL <= CELL_MIN;
+    document.getElementById("mm-bigger").disabled = CELL >= CELL_MAX;
+    try { localStorage.setItem("minimapCell", String(CELL)); } catch (e) {}
+    draw(lastDraw[0], lastDraw[1]);
+    window.dispatchEvent(new Event("resize"));     // js-dos recalcule la taille du jeu
+  }
+  for (const [id, d] of [["mm-smaller", -2], ["mm-bigger", 2]])
+    document.getElementById(id).addEventListener("click", (e) => { setCell(CELL + d); e.currentTarget.blur(); });
 
   const mem = new LoLMem.RemoteMemory();
   const levels = [];          // { level, name, faces: Uint8Array(4096), wallTypes, labels }
@@ -139,7 +153,8 @@
   }
 
   function draw(block, dir) {
-    const L = current;
+    lastDraw = [block, dir];
+    const L = current, k = CELL / 12;
     g.fillStyle = "#000"; g.fillRect(0, 0, canvas.width, canvas.height);
     if (!L) return;
     for (let i = 0; i < 1024; i++) {
@@ -147,10 +162,11 @@
       g.fillRect((i % 32) * CELL, Math.floor(i / 32) * CELL, CELL - 1, CELL - 1);
     }
     g.fillStyle = "#d22";
-    for (const l of L.labels) g.fillRect(l.x * CELL + 3, l.y * CELL + 3, CELL - 7, CELL - 7);
+    const lp = Math.round(3 * k);
+    for (const l of L.labels) g.fillRect(l.x * CELL + lp, l.y * CELL + lp, CELL - 1 - 2 * lp, CELL - 1 - 2 * lp);
     // objets : numéro du groupe sur sa case
-    g.font = "bold 9px system-ui, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
-    g.lineWidth = 3; g.strokeStyle = "#000";
+    g.font = `bold ${Math.round(9 * k)}px system-ui, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
+    g.lineWidth = 3 * Math.min(1, k); g.strokeStyle = "#000";
     for (const it of L.groups) {
       const tx = it.x * CELL + CELL / 2, ty = it.y * CELL + CELL / 2 + 0.5;
       g.fillStyle = "#28dce6";
@@ -160,9 +176,9 @@
     for (const m of monsters) {
       const mx = m.x * CELL, my = m.y * CELL, a = [-Math.PI / 2, 0, Math.PI / 2, Math.PI][m.dir];
       g.fillStyle = "#ff8c00"; g.strokeStyle = "#000"; g.lineWidth = 1;
-      g.beginPath(); g.arc(mx, my, 3.2, 0, 2 * Math.PI); g.fill(); g.stroke();
+      g.beginPath(); g.arc(mx, my, 3.2 * k, 0, 2 * Math.PI); g.fill(); g.stroke();
       g.strokeStyle = "#ff8c00"; g.lineWidth = 1.5;
-      g.beginPath(); g.moveTo(mx, my); g.lineTo(mx + Math.cos(a) * 5.5, my + Math.sin(a) * 5.5); g.stroke();
+      g.beginPath(); g.moveTo(mx, my); g.lineTo(mx + Math.cos(a) * 5.5 * k, my + Math.sin(a) * 5.5 * k); g.stroke();
     }
     // groupe : flèche orientée
     const cx = (block % 32) * CELL + CELL / 2, cy = Math.floor(block / 32) * CELL + CELL / 2;
@@ -170,11 +186,13 @@
     g.fillStyle = "#fff"; g.strokeStyle = "#000"; g.lineWidth = 1.5;
     g.beginPath();
     g.lineWidth = 1.5;
-    g.moveTo(cx + Math.cos(a) * 9, cy + Math.sin(a) * 9);
-    g.lineTo(cx + Math.cos(a + 2.4) * 6, cy + Math.sin(a + 2.4) * 6);
-    g.lineTo(cx + Math.cos(a - 2.4) * 6, cy + Math.sin(a - 2.4) * 6);
+    g.moveTo(cx + Math.cos(a) * 9 * k, cy + Math.sin(a) * 9 * k);
+    g.lineTo(cx + Math.cos(a + 2.4) * 6 * k, cy + Math.sin(a + 2.4) * 6 * k);
+    g.lineTo(cx + Math.cos(a - 2.4) * 6 * k, cy + Math.sin(a - 2.4) * 6 * k);
     g.closePath(); g.stroke(); g.fill();
   }
+
+  { let c = 12; try { c = +localStorage.getItem("minimapCell") || 12; } catch (e) {} setCell(c); }
 
   let busy = false;
   async function tick() {

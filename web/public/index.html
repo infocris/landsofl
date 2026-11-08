@@ -17,9 +17,10 @@
   #v3d { flex: 2; min-height: 160px; border-top: 1px solid #3a3226; background: #000; }
   #v3d.hidden { display: none; }
   #v3d iframe { width: 100%; height: 100%; border: 0; display: block; }
-  #mm { width: 420px; flex: none; box-sizing: border-box; padding: 12px; background: #0f0d0a;
+  :root { --mm-size: 384px; --mm-w: max(420px, calc(var(--mm-size) + 36px)); }
+  #mm { width: var(--mm-w); flex: none; box-sizing: border-box; padding: 12px; background: #0f0d0a;
     border-left: 1px solid #3a3226; color: #e8dcc0; font: 13px/1.4 system-ui, sans-serif;
-    display: flex; flex-direction: column; gap: 8px; height: 100vh; overflow: hidden; }
+    display: flex; flex-direction: column; gap: 8px; height: 100vh; overflow-y: auto; }
   #mm-items { margin: 0; padding: 0; list-style: none; overflow-y: auto; flex: 1; min-height: 60px;
     border-top: 1px solid #3a3226; padding-top: 6px; font-size: 12px; }
   #mm-items li { display: flex; gap: 6px; padding: 2px 0; color: #cfc3a6; }
@@ -52,9 +53,13 @@
   .slot.full { background-color: #2a2217; border-color: #6d5a3a;
     background-image: url("viewer/data/item_icons.png"); background-size: 480px auto; background-repeat: no-repeat; }
   #mm.hidden { display: none; }
-  #mm-title { font-weight: 600; color: #c9a227; }
+  #mm-title { font-weight: 600; color: #c9a227; display: flex; align-items: center; gap: 6px; }
+  #mm-title button { font: 600 13px/1 system-ui, sans-serif; width: 24px; height: 22px; padding: 0;
+    border: 1px solid #554a36; border-radius: 4px; background: #1d1912; color: #e8dcc0; cursor: pointer; }
+  #mm-title button:first-of-type { margin-left: auto; }
+  #mm-title button:disabled { opacity: .35; cursor: default; }
   #mm-info { color: #a39578; min-height: 1.4em; }
-  #mm-canvas { width: 384px; height: 384px; border: 1px solid #3a3226; flex: none; }
+  #mm-canvas { width: var(--mm-size); height: var(--mm-size); align-self: center; border: 1px solid #3a3226; flex: none; }
   #mm-label { color: #c9a227; font-weight: 600; letter-spacing: .04em; min-height: 1.4em; }
   #mm-legend { color: #a39578; font-size: 11px; }
   #mm-legend i { display: inline-block; width: 9px; height: 9px; margin: 0 3px 0 8px; vertical-align: -1px; }
@@ -68,11 +73,11 @@
   #qload[hidden] { display: none; }
   /* boutons à gauche du panneau quand il est ouvert */
   body:has(#mm:not(.hidden)) #zqsd, body:has(#mm:not(.hidden)) #mmtoggle,
-  body:has(#mm:not(.hidden)) #qload, body:has(#mm:not(.hidden)) #v3dtoggle { right: 432px; }
+  body:has(#mm:not(.hidden)) #qload, body:has(#mm:not(.hidden)) #v3dtoggle { right: calc(var(--mm-w) + 12px); }
   #persp { position: fixed; right: 12px; bottom: 156px; z-index: 1000;
     font: 12px/1 system-ui, sans-serif; padding: 6px 10px; border: 1px solid #555; border-radius: 6px;
     background: rgba(0,0,0,.6); color: #ddd; cursor: pointer; }
-  body:has(#mm:not(.hidden)) #persp { right: 432px; }
+  body:has(#mm:not(.hidden)) #persp { right: calc(var(--mm-w) + 12px); }
   body:has(#v3d.hidden) #persp { display: none; }
   #v3dtoggle { position: fixed; right: 12px; bottom: 120px; z-index: 1000;
     font: 12px/1 system-ui, sans-serif; padding: 6px 10px; border: 1px solid #555; border-radius: 6px;
@@ -94,7 +99,7 @@
   <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261108f" title="Vue 3D synchronisée"></iframe></div>
 </div>
 <aside id="mm" aria-label="Mini-carte">
-  <div id="mm-title">Mini-carte</div>
+  <div id="mm-title"><span>Mini-carte</span><button id="mm-smaller" type="button" title="Réduire la mini-carte">−</button><button id="mm-bigger" type="button" title="Agrandir la mini-carte">+</button></div>
   <div id="mm-info">chargement…</div>
   <canvas id="mm-canvas"></canvas>
   <div id="mm-label"></div>
@@ -313,6 +318,6 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261108i"></script>
+<script src="minimap.js?v=20261108j"></script>
 </body>
 </html>
