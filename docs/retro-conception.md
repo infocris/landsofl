@@ -387,7 +387,7 @@ La RAM fait 16 Mo (`memsize=16`).
 | `0x3E4E0` | u16 | case du groupe = `y*32 + x` (copie probable en `0x3B3DC`) |
 | `0x3E4EF` | u16 | direction : 0 N, 1 E, 2 S, 3 O |
 | `0x3E713` | 1024 × 10 octets | grille vivante du niveau. Octets 0–3 : murs N, E, S, O (identifiants de `.CMZ`, modifiés quand une porte s'ouvre). Octets 4–5 et 6–7 : têtes de listes des objets et monstres de la case (`0x8000 + n°` = monstre n). Octet 8 : direction (5 par défaut, **déduit**). Octet 9 : drapeaux, à 0 partout en début de partie (emplacement probable des marques de l'automap, **non vérifié**) |
-| `0x3186F` | 30 × 46 octets | monstres du niveau courant. Champs relatifs à x (`0x31871 + 46·n`) : case u16 à −2 ; x, y u16 = case·256 + décalage ; destination x, y à +5 ; direction·2 à +9 ; type de monstre à +13. Entrée vide = case 0 |
+| `0x3186F` | 30 × 46 octets | monstres du niveau courant. Champs relatifs à x (`0x31871 + 46·n`) : case u16 à −2 ; x, y u16 = case·256 + décalage ; destination x, y à +5 ; direction·2 à +9 et +16 ; numéro du monstre à +15 ; **direction à +17** ; points de vie u16 à +22 ; **type à +25** (juste avant le pointeur far vers ses caractéristiques, +26) ; +13 vaut 1 pour les gardes, sens inconnu. Entrée vide = case 0 |
 
 | `0x3E4F6` | 48 × u16 | barre d'inventaire commune : n° d'objet du jeu (0 = vide) |
 | `0x3E558` | u16 | objet tenu en main (curseur) |
@@ -403,6 +403,15 @@ le bundle, la configuration DOSBox et l'`autoexec` ne changent pas.
 taille d'une entrée. Les directions lues (0, 4, 6, 6) correspondent aux directions de
 départ 0, 2, 3, 3 du script, multipliées par 2. Les PNJ des dialogues ne sont pas des
 entités de la carte : seuls les gardes du château sont des « monstres ».
+
+**Sprite d'un monstre** : correction faite après qu'un brigand est apparu en sanglier
+dans la vue 3D. Le type est à +25, et non à +13 (les deux valent 1 pour les gardes).
+De plus, un même emplacement de sprite peut recevoir plusieurs fichiers selon
+l'histoire (niveau 2 : ORC ou THUG). Pour trancher, la page cherche dans le premier Mo
+de RAM un extrait de 32 octets de chaque fichier possible (octets 400 à 431 du `.SHP`
+décompressé) : seul le sprite chargé s'y trouve (vérifié : `GUARD.SHP` en 0x7C7B2 au
+niveau 1, `BOAR.SHP` et `THUG.SHP` absents). Cette recherche passe par une commande
+`find` ajoutée au canal du worker.
 
 **Cases explorées** : aucune marque trouvée. Après quelques pas, aucun octet de la grille
 ne change, et la RAM ne laisse pas apparaître de tableau des cases vues.

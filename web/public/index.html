@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="js-dos.css">
 <script src="js-dos.js"></script>
 <!-- ?v= : à changer à chaque modification des scripts (évite les copies en cache) -->
-<script src="memscan.js?v=20261108a"></script>
+<script src="memscan.js?v=20261108b"></script>
 <style>
   html, body { margin: 0; height: 100%; background: #000; }
   body { display: flex; }
@@ -73,7 +73,7 @@
 <body>
 <div id="left">
   <div id="dos"></div>
-  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261108a" title="Vue 3D synchronisée"></iframe></div>
+  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261108b" title="Vue 3D synchronisée"></iframe></div>
 </div>
 <aside id="mm" aria-label="Mini-carte">
   <div id="mm-title">Mini-carte</div>
@@ -226,7 +226,7 @@
   // (jsdos/saves/<url>.changes) ne sont pas touchées.
   const BUNDLE = params.get("bundle") || "lands-cd-v2.jsdos";
   const BUNDLE_VERSION = "2026-11-07-savefile";
-  const SCRIPTS_VERSION = "2026-11-07-lolmem2";   // à changer après tools/patch_jsdos.py
+  const SCRIPTS_VERSION = "2026-11-08-lolmem3";   // à changer après tools/patch_jsdos.py
   async function dropStaleBundleCache() {
     const key = "bundleVersion:" + BUNDLE;
     try { if (localStorage.getItem(key) === BUNDLE_VERSION) return; } catch (e) { return; }
@@ -267,6 +267,6 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261108a"></script>
+<script src="minimap.js?v=20261108b"></script>
 </body>
 </html>

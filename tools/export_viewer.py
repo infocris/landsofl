@@ -331,7 +331,8 @@ def main(game_dir, maps_dir, out_dir):
         ceil_img.save(os.path.join(out_dir, f"level{n:02d}_ceil.png"))
 
         # sprites des monstres : image 0 (face), 4 (profil), 8 (dos)
-        sprite_names = sorted({s for m in level["monsters"] for s in m["sprites"][:1]})
+        sprite_names = sorted({s for m in level["monsters"] for s in m["sprites"]})
+        sprite_sigs = {}
         sprites, sprite_imgs = {}, []
         for sname in sprite_names:
             data = None
@@ -342,6 +343,11 @@ def main(game_dir, maps_dir, out_dir):
             if data is None:
                 continue
             frames = lolgfx.shp_frames(data)
+            # extrait de 32 octets du fichier décompressé : sert à savoir, en mémoire, lequel
+            # des sprites possibles d'un type le jeu a chargé (ex. ORC ou THUG au niveau 2)
+            raw = cps(data)[0] if struct.unpack_from("<H", data, 2)[0] == 4 else data
+            if len(raw) >= 432:
+                sprite_sigs[sname] = raw[400:432].hex()
             entry = []
             for fi in (0, 4, 8):
                 if fi < len(frames) and frames[fi]:
@@ -372,8 +378,9 @@ def main(game_dir, maps_dir, out_dir):
             "monsters": [{k: m[k] for k in ("x", "y", "xOffs", "yOffs", "direction", "sprites", "spawn")}
                          for m in level["monsters"]],
             # type de monstre -> sprite (positions réelles lues en mémoire par la page du jeu)
-            "monsterTypes": {str(m["type"]): m["sprites"][0] for m in level["monsters"]
+            "monsterTypes": {str(m["type"]): m["sprites"] for m in level["monsters"]
                              if m["type"] is not None and m["sprites"]},
+            "spriteSigs": sprite_sigs,
             "labels": [{k: l[k] for k in ("x", "y", "text")} for l in level["labels"]],
             "items": [{k: it.get(k) for k in ("x", "y", "xOffs", "yOffs", "type", "name", "spawn", "container", "face")}
                       for it in level.get("items", [])],

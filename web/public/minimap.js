@@ -18,7 +18,7 @@
     char0: 0x3389F, nameLen: 11, equipOffset: 78, equipSlots: 11,   // équipement : 11 × u16 à +78
   };
   // Monstres du niveau courant (§ 12.2) : table de 30 entrées de 46 octets ; positions
-  // relatives au champ x : case u16 à -2, x/y u16 (case*256 + décalage), direction*2 à +9, type à +13
+  // relatives au champ x : case u16 à -2, x/y u16 (case*256 + décalage), direction à +17, type à +25
   const MON = { x0: 0x31871, size: 46, count: 30 };
   const CELL = 12;
   const COLORS = { wall: "#2b2b2b", floor: "#8a7f68", doorOpen: "#d08a4a", doorClosed: "#a0522d",
@@ -51,7 +51,8 @@
     for (const l of index) {
       const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json`);
       levels.push({ level: l.level, name: l.name, faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
-        labels: d.labels, groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {} });
+        labels: d.labels, groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {},
+        spriteSigs: d.spriteSigs || {}, spriteOf: null });
       infoEl.textContent = `chargement des cartes… ${levels.length}/${index.length}`;
     }
   }
@@ -184,7 +185,7 @@
       const a = i * MON.size + 2;                 // bytes commence à x0 - 2
       const block = bytes[a - 2] | bytes[a - 1] << 8, x = bytes[a] | bytes[a + 1] << 8, y = bytes[a + 2] | bytes[a + 3] << 8;
       if (!block || block > 1023 || (x >> 8) !== (block & 31) || (y >> 8) !== (block >> 5)) continue;
-      out.push({ x: x / 256, y: y / 256, dir: (bytes[a + 9] >> 1) & 3, type: bytes[a + 13] });
+      out.push({ x: x / 256, y: y / 256, dir: bytes[a + 17] & 3, type: bytes[a + 25] });
     }
     return out;
   }
@@ -199,7 +200,7 @@
     const now = performance.now();
     if (hash !== lastHash && now - lastIdentify > 500) {
       const found = identify();
-      if (found !== current) renderItemList(found);
+      if (found !== current) { renderItemList(found); if (found) found.spriteOf = null; }
       current = found; lastHash = hash; lastIdentify = now;
     }
     if (!current || block > 1023 || dir > 3) {
@@ -230,9 +231,32 @@
     sendTo3d(current.level, x, y, dir);
   }
 
+  // Sprite de chaque type : quand un type a plusieurs sprites possibles (ex. ORC ou THUG
+  // selon l'histoire), on cherche en mémoire lequel le jeu a chargé (une fois par niveau).
+  let resolving = false;
+  async function resolveSprites(L) {
+    if (L.spriteOf || resolving) return;
+    resolving = true;
+    try {
+      const spriteOf = {}, ambiguous = [];
+      for (const [t, names] of Object.entries(L.monsterTypes)) {
+        if (names.length === 1) spriteOf[t] = names[0]; else ambiguous.push([t, names]);
+      }
+      for (const [t, names] of ambiguous) {
+        const sigs = names.map((n) => L.spriteSigs[n]).map((h) => (h ? Uint8Array.from(h.match(/../g), (x) => parseInt(x, 16)) : null));
+        const found = await mem.find(sigs.map((x) => x || new Uint8Array([0, 0, 0, 0])));
+        if (!found) return;                       // jeu indisponible : on réessaiera
+        const k = found.findIndex((a, i) => sigs[i] && a >= 0);
+        spriteOf[t] = names[k >= 0 ? k : 0];
+      }
+      L.spriteOf = spriteOf;
+    } finally { resolving = false; }
+  }
+
   let lastMonSent = "";
   function sendMonstersTo3d(L) {
-    const list = monsters.map((m) => ({ ...m, sprite: L.monsterTypes[m.type] || null }));
+    resolveSprites(L);
+    const list = monsters.map((m) => ({ ...m, sprite: (L.spriteOf || {})[m.type] || null }));
     const key = L.level + JSON.stringify(list);
     if (key === lastMonSent || !frame3d || !frame3d.contentWindow) return;
     lastMonSent = key;

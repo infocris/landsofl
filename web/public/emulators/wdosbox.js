@@ -61,9 +61,17 @@ if (worker) {
     }
     return -1;
   }
+  function find(h, pat, limit) {      /* première occurrence de pat dans [base, base+limit) */
+    outer: for (var i = base, end = base + limit - pat.length; i < end; i++) {
+      if (h[i] !== pat[0]) continue;
+      for (var k = 1; k < pat.length; k++) if (h[i + k] !== pat[k]) continue outer;
+      return i - base;
+    }
+    return -1;
+  }
   ch.onmessage = function (e) {
     var m = globalThis.__lolModule, req = e.data;
-    if (!m || !m.HEAPU8 || !req || !req.ranges) return;
+    if (!m || !m.HEAPU8 || !req || !(req.ranges || req.find)) return;
     var h = m.HEAPU8;
     if (base < 0) {
       var now = Date.now();
@@ -71,6 +79,10 @@ if (worker) {
       nextTry = now + 2000;
       base = findBase(h);
       if (base < 0) { ch.postMessage({ id: req.id, error: "base" }); return; }
+    }
+    if (req.find) {                    /* {find:[Uint8Array…], limit} -> {found:[adresse ou -1…]} */
+      ch.postMessage({ id: req.id, found: req.find.map(function (p) { return find(h, p, req.limit || 0x100000); }) });
+      return;
     }
     ch.postMessage({ id: req.id, data: req.ranges.map(function (r) { return h.slice(base + r[0], base + r[0] + r[1]); }) });
   };

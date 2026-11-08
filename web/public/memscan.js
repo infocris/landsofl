@@ -54,8 +54,17 @@
         const p = this.pending.get(e.data && e.data.id);
         if (!p) return;
         this.pending.delete(e.data.id);
-        p(e.data.error ? null : e.data.data);
+        p(e.data.error ? null : (e.data.found || e.data.data));
       };
+    }
+    // Recherche d'extraits dans le premier Mo de RAM : renvoie leurs adresses (-1 = absent).
+    find(patterns, timeout = 3000) {
+      const id = ++this.seq;
+      return new Promise((resolve) => {
+        this.pending.set(id, resolve);
+        this.ch.postMessage({ id, find: patterns, limit: 0x100000 });
+        setTimeout(() => { if (this.pending.delete(id)) resolve(null); }, timeout);
+      });
     }
     read(ranges, timeout = 1000) {
       const id = ++this.seq;
