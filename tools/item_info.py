@@ -85,8 +85,17 @@ def build(game_dir, table_path):
     items = json.load(open(table_path, encoding="utf-8"))["items"]
     strings = read_strings(read_pak(os.path.join(game_dir, "STARTUP.PAK"))["LANDS.FRE"])
     names = [i["name"] for i in items]
-    return [{"name": i["name"], "icon": i["shape"], **describe(bytes.fromhex(i["raw"]), names, strings)}
-            for i in items]
+    out = [{"name": i["name"], "icon": i["shape"], **describe(bytes.fromhex(i["raw"]), names, strings)}
+           for i in items]
+    # clés : serrures où elles s'utilisent (tools/locks.py)
+    import locks
+    for n, ls in locks.all_locks(game_dir).items():
+        for l in ls:
+            out[l["key"]].setdefault("locks", []).append({"level": n, "x": l["x"], "y": l["y"], "how": l["how"]})
+    for t, i in enumerate(items):
+        if bytes.fromhex(i["raw"])[4] & 1:
+            out[t]["kind"] = "Clé"
+    return out
 
 
 if __name__ == "__main__":

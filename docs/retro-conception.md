@@ -196,6 +196,20 @@ Fonctions du moteur identifiées :
   45 cases ont un script, dont la fontaine (13,13) et les seuils des portes. C'est là
   que se trouvent les interactions (entrer dans une case, cliquer sur un mur, poser un
   objet…). Le type d'événement est un paramètre du script, encore à décoder.
+- **Serrures** (`tools/locks.py`) : quand on clique sur un mur, le jeu exécute le script
+  de la case. Une serrure lit l'objet en main (fonction `0x53`), prend son type (`0x12`,
+  paramètre 4) et le compare au type d'une clé. Exemple vérifié au niveau 8, case 17,2 :
+  objet en main → si c'est le « Jeu de clefs » (245), message ; si c'est la « Clef usée »
+  (169), ouverture. Deux formes : comparaison directe (« push <clé> ; eval == ») ou appel
+  d'un sous-programme du niveau qui lit l'objet en main, avec la clé en argument
+  (**probable** : l'argument n'est pas suivi jusqu'à la comparaison). Les clés sont les
+  types d'objets qui ont le drapeau 0x0100. Résultat : 37 clés sur 45 localisées, presque
+  toutes sur des murs décorés, souvent à côté d'une porte. Aucune serrure n'est trouvée
+  pour la Clef de Roland, des Brigands, de bronze, de la mine 3, la Clef usée (186), la Clef
+  Bleue, la Clef de la Mort et la Clef Emoussée : utilisation par un autre mécanisme, ou
+  clés non utilisées. Les nombres 7 et 8 de ces scripts sont des drapeaux d'histoire
+  (`0x07` = écrire, `0x08` = lire, **déduit**) dont les numéros recoupent parfois ceux des
+  clés.
 - **Images des lieux** : la fonction `0x29` (n° de texte d'un `.CPS`, page) charge l'image
   fixe d'un lieu (auberge, échoppe, salle du trône…). Elle est appelée dans le script de
   la case devant l'entrée, qui est le second point (x2, y2) de l'annotation. Au niveau 1 :
@@ -632,3 +646,5 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-08** : champs de la table des objets (emplacements, action, force, protection,
   valeur), script des soins de `ITEM.INF`, rôles des 11 emplacements d'équipement ; fiche
   d'objet au clic dans l'inventaire et info-bulle au survol de la mini-carte.
+- **2026-11-08** : serrures des clés (scripts des niveaux), affichées sur la mini-carte et
+  dans la fiche des clés.

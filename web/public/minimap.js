@@ -67,10 +67,10 @@
   async function loadLevels() {
     const index = await getJSON("viewer/data/levels.json");
     for (const l of index) {
-      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json`);
+      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261108m`);
       levels.push({ level: l.level, name: l.name, faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
         labels: d.labels, places: numberPlaces(d.labels || []), groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {},
-        spriteSigs: d.spriteSigs || {}, spriteOf: null, scenes: d.scenes || {} });
+        spriteSigs: d.spriteSigs || {}, spriteOf: null, scenes: d.scenes || {}, locks: d.locks || [] });
       infoEl.textContent = `chargement des cartes… ${levels.length}/${index.length}`;
     }
   }
@@ -199,6 +199,14 @@
       g.fillStyle = "#fff";
       g.fillText(String(p.n), p.x * CELL + CELL / 2, p.y * CELL + CELL / 2 + 0.5);
     }
+    // serrures : petite clé dorée dans le coin de la case
+    g.strokeStyle = "#ffd700"; g.fillStyle = "#ffd700"; g.lineWidth = Math.max(1, k);
+    for (const c of new Set(L.locks.map((l) => l.y * 32 + l.x))) {
+      const x0 = (c % 32) * CELL, y0 = Math.floor(c / 32) * CELL, r = 2 * k;
+      g.beginPath(); g.arc(x0 + r + 1, y0 + r + 1, r, 0, 2 * Math.PI); g.stroke();
+      g.beginPath(); g.moveTo(x0 + 2 * r + 1, y0 + r + 1); g.lineTo(x0 + CELL - 2, y0 + r + 1);
+      g.lineTo(x0 + CELL - 2, y0 + 2 * r + 1); g.stroke();
+    }
     if (hoverCell >= 0) {                       // lieu survolé dans la liste
       g.strokeStyle = "#ffd700"; g.lineWidth = 2;
       g.strokeRect((hoverCell % 32) * CELL - 2, Math.floor(hoverCell / 32) * CELL - 2, CELL + 3, CELL + 3);
@@ -249,6 +257,8 @@
       out.push(`<span class="it">Objets n° ${grp.n}${where} :</span>`);
       for (const it of grp.items) out.push(`<span class="it">• ${esc(it.name || "objet " + it.type)}${it.spawn === "event" ? " (événement)" : ""}</span>`);
     }
+    for (const l of L.locks) if (l.x === x && l.y === y)
+      out.push(`<span class="ky">Serrure : ${esc(l.name)}${owned.has(l.key) ? " ✔ dans l'inventaire" : ""}${l.how === "direct" ? "" : " (probable)"}</span>`);
     for (const m of monsters) if (Math.floor(m.x) === x && Math.floor(m.y) === y) {
       const nm = (L.spriteOf || {})[m.type] || (L.monsterTypes[m.type] || []).join(" / ") || `type ${m.type}`;
       out.push(`<span class="mo">Monstre : ${esc(nm)} (regarde vers ${["le nord", "l'est", "le sud", "l'ouest"][m.dir]})</span>`);
@@ -410,7 +420,7 @@
   const ICON = 20, ICON_COLS = 16, SCALE = 1.5;
   const invBar = document.getElementById("inv-bar"), invHand = document.getElementById("inv-hand"),
     invChars = document.getElementById("inv-chars"), invCount = document.getElementById("inv-count");
-  getJSON("viewer/data/items.json?v=20261108k").then((d) => { itemInfo = d; }, () => {});
+  getJSON("viewer/data/items.json?v=20261108m").then((d) => { itemInfo = d; }, () => {});
 
   function slot(type, label) {
     const d = document.createElement("div");
@@ -445,6 +455,12 @@
     const close = el("button", "x", "✕"); close.type = "button"; close.title = "Fermer"; close.onclick = hideDetail;
     const lines = [...(it.effects || [])];
     if (it.wear) lines.push(`Se porte : ${it.wear}`);
+    if (it.kind === "Clé") {
+      if (!it.locks) lines.push("Serrure non trouvée dans les scripts des niveaux");
+      for (const l of it.locks || [])
+        lines.push(`Ouvre : niveau ${l.level}, case ${l.x},${l.y}${l.how === "direct" ? "" : " (probable)"}`
+          + (current && current.level === l.level ? " — ce niveau (clé dorée sur la carte)" : ""));
+    }
     if (it.value) lines.push(`Valeur : ${it.value} (supposée)`);
     const ul = el("ul"); for (const l of lines) ul.appendChild(el("li", null, l));
     detailEl.replaceChildren(icon, el("div", "nm", it.name), close,
@@ -473,7 +489,7 @@
 
   // rôle des 11 emplacements d'équipement, déduit des masques de la table des objets (§ 8.2)
   const EQUIP_NAMES = ["arme", "bouclier", "arme (2)", "bouclier (2)", "tête", "corps", "cou", "poignets", "pieds", "anneau", "anneau (2)"];
-  let lastInv = "";
+  let lastInv = "", owned = new Set();         // types d'objets possédés (inventaire, main, équipement)
   async function updateInventory() {
     if (!itemInfo || previewing) return;
     const r = await mem.read([[INV.bar, INV.barSlots * 2], [INV.hand, 2], [INV.items, INV.itemSize * INV.maxItems],
@@ -486,6 +502,7 @@
     const handType = typeOf(hand[0] | hand[1] << 8);
     const party = partyChars(ch).map((c) => ({ name: c.name,
       eq: Array.from({ length: INV.equipSlots }, (_, k) => typeOf(c.at(INV.equipOffset + 2 * k) | c.at(INV.equipOffset + 2 * k + 1) << 8)) }));
+    owned = new Set([...barTypes, handType, ...party.flatMap((c) => c.eq)].filter((t) => t >= 0));
     const key = JSON.stringify([barTypes, handType, party]);
     if (key === lastInv) return;          // on ne reconstruit la grille que si elle a changé
     lastInv = key;

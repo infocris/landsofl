@@ -16,6 +16,7 @@ from wwcomp import cps
 import lolgfx
 import emc
 import item_info
+import locks as locks_mod
 
 FACE_W, FACE_H = 128, 96
 ATLAS_COLS = 16
@@ -328,6 +329,7 @@ def pak_cache(game_dir, name):
 
 
 def main(game_dir, maps_dir, out_dir):
+    locks_by_level = locks_mod.all_locks(game_dir)
     os.makedirs(out_dir, exist_ok=True)
     playfld = cps(read_pak(os.path.join(game_dir, "GENERAL.PAK"))["PLAYFLD.CPS"])[1]
     tilesets, index = {}, []
@@ -443,6 +445,7 @@ def main(game_dir, maps_dir, out_dir):
                              if m["type"] is not None and m["sprites"]},
             "spriteSigs": sprite_sigs,
             "scenes": scenes,   # case -> image du lieu (data/scenes/)
+            "locks": locks_by_level.get(n, []),   # serrures : case + clé (tools/locks.py)
             "labels": [{k: l[k] for k in ("x", "y", "text")} for l in level["labels"]],
             "items": [{k: it.get(k) for k in ("x", "y", "xOffs", "yOffs", "type", "name", "spawn", "container", "face")}
                       for it in level.get("items", [])],
