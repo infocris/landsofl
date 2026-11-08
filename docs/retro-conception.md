@@ -170,7 +170,7 @@ niveau. Treize sauts de ce genre sont trouvés, y compris sur des cases sans le 
 (niveaux 11, 12, 19 et 27). Pour 4 cases au symbole 17 (niveau 23 : 2,11, 3,16 et 20,16 ;
 niveau 26 : 20,19 et 18,23), la destination n'est pas résolue.
 
-Deux fausses pistes écartées :
+Trois fausses pistes écartées :
 - les cases au symbole **10** du niveau 14 sont des dalles à pression : le type 35 devient 36,
   avec le son 80 ;
 - la fonction **0x60** (valeur, case) joue un son sur une case ;
