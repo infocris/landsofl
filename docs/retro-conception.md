@@ -418,7 +418,7 @@ La RAM fait 16 Mo (`memsize=16`).
 | `0x3E558` | u16 | objet tenu en main (curseur) |
 | `0x31F79` | 400 × 16 octets | objets du jeu : l'entrée n commence par le **type** d'objet (u16, index de la table des objets § 8.2) ; le reste est inconnu (case, niveau…) |
 | `0x3389F` | fiche de personnage | premier personnage, champs relatifs au nom (voir ci-dessous) |
-| `0x3E6F0` | u16 | couronnes d'argent du groupe (**probable** : seule valeur 41 du bloc de données du groupe ; à confirmer en dépensant) |
+| `0x3E6F0` | u16 | couronnes d'argent du groupe (**vérifié** : après écriture de 141, un clic sur le tas de pièces affiche « Vous avez 141 couronnes d'argent ». Le chiffre dessiné sur le tas n'est redessiné qu'à la transaction suivante) |
 | `0x8AA05` | 285 × 13 octets | table des types d'objets (§ 8.2) |
 | `0x5D6B5` | u8 | mode : 5 en exploration, 1 pendant l'image fixe d'un lieu (observé deux fois : entrée, sortie, nouvelle entrée) |
 

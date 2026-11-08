@@ -31,6 +31,8 @@
   #st-money { color: #e8dcc0; }
   #cheats { display: flex; gap: 14px; margin-top: 4px; color: #a39578; font-size: 11px; }
   #cheats input { accent-color: #c9a227; vertical-align: -2px; }
+  #cheats button { margin-left: auto; font: 11px/1 system-ui, sans-serif; padding: 3px 7px; cursor: pointer;
+    background: #1d1912; color: #e8dcc0; border: 1px solid #6d5a3a; border-radius: 4px; }
   .st-char { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin-top: 3px; align-items: center; }
   .st-char .nm { grid-column: 1 / -1; color: #a39578; font-weight: 600; }
   .bar { position: relative; height: 10px; background: #17130e; border: 1px solid #3a3226; }
@@ -101,7 +103,8 @@
     <div class="inv-head"><span class="inv-title">Caractéristiques</span><span id="st-money"></span></div>
     <div id="st-chars"></div>
     <div id="cheats"><label><input type="checkbox" id="cheat-hp"> Vie infinie</label>
-      <label><input type="checkbox" id="cheat-mp"> Magie infinie</label></div>
+      <label><input type="checkbox" id="cheat-mp"> Magie infinie</label>
+      <button type="button" id="cheat-money" title="Ajoute 100 couronnes d'argent au groupe">+100 couronnes</button></div>
   </div>
   <div id="inv">
     <div class="inv-head"><span class="inv-title">Inventaire</span><span id="inv-count">en attente du jeu…</span></div>
@@ -310,6 +313,6 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261108g"></script>
+<script src="minimap.js?v=20261108h"></script>
 </body>
 </html>

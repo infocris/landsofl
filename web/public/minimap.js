@@ -12,7 +12,7 @@
     sceneFlag: 0x5D6B5,  // u8 : 5 en exploration, 1 pendant l'image fixe d'un lieu (observé)
   };
   // Caractéristiques (§ 12.2) : fiche de personnage, champs relatifs au nom ; argent du groupe
-  const STATS = { money: 0x3E6F0 };   // couronnes d'argent (u16, probable : vaut 41 au départ)
+  const STATS = { money: 0x3E6F0 };   // couronnes d'argent (u16, vérifié : le jeu annonce la valeur écrite)
   // Inventaire (§ 12.2 bis de la documentation)
   const INV = {
     bar: 0x3E4F6, barSlots: 48,      // u16 : n° d'objet du jeu (0 = vide), barre commune
@@ -414,6 +414,18 @@
     try { box.checked = localStorage.getItem(key) === "on"; } catch (e) {}
     box.addEventListener("change", () => { try { localStorage.setItem(key, box.checked ? "on" : "off"); } catch (e) {} box.blur(); });
   }
+  // +100 couronnes : le jeu relit la valeur (« Vous avez … couronnes »), mais ne redessine le
+  // chiffre du tas de pièces qu'à sa prochaine transaction.
+  document.getElementById("cheat-money").addEventListener("click", async (e) => {
+    e.currentTarget.blur();
+    const r = await mem.read([[STATS.money, 2]]);
+    if (!r) return;
+    const v = Math.min(65535, (r[0][0] | r[0][1] << 8) + 100);
+    await mem.write([[STATS.money, new Uint8Array([v & 255, v >> 8])]]);
+    lastStats = "";                      // rafraîchir l'affichage du panneau
+    updateStats().catch(() => {});
+  });
+
   let cheating = false;
   setInterval(async () => {
     if (cheating || previewing || !(cheatHp.checked || cheatMp.checked)) return;
