@@ -71,7 +71,7 @@
   async function loadLevels() {
     const index = await getJSON("viewer/data/levels.json");
     for (const l of index) {
-      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261109e`);
+      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261109h`);
       levels.push({ level: l.level, name: l.name, faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
         labels: d.labels, places: numberPlaces(d.labels || []), groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {},
         spriteSigs: d.spriteSigs || {}, spriteConds: d.spriteConds || {}, spriteOf: null, scenes: d.scenes || {}, locks: d.locks || [],
@@ -284,6 +284,7 @@
       if (t[2] === 25) return "up";
       if (t[2] === 26) return "down";
       if (t[2] === 11) mark = "hole";
+      if (t[2] === 17) mark = "teleport";       // téléporteur (symbole 17, sol invisible)
     }
     return mark;
   }
@@ -441,6 +442,7 @@
       if (!mk) continue;
       const cx = (i % 32) * CELL + (CELL - 1) / 2, cy = Math.floor(i / 32) * CELL + (CELL - 1) / 2, r = CELL * 0.42;
       g.lineWidth = 1.2; g.strokeStyle = "#000";
+      if (mk === "teleport") continue;          // dessiné avec les passages, plus bas
       if (mk === "hole") {
         g.fillStyle = "#111"; g.beginPath(); g.arc(cx, cy, r * 0.8, 0, 2 * Math.PI); g.fill();
         g.strokeStyle = "#9a9a9a"; g.stroke();
@@ -452,7 +454,35 @@
       else { g.moveTo(cx, cy + r); g.lineTo(cx + r, cy - r * 0.8); g.lineTo(cx - r, cy - r * 0.8); }
       g.closePath(); g.fill(); g.stroke();
     }
+    // téléporteurs : tourbillon magenta ; destination dans le niveau = cercle creux relié en pointillés
+    const ctr = (x, y) => [x * CELL + (CELL - 1) / 2, y * CELL + (CELL - 1) / 2];
+    const portals = new Set();
+    for (let i = 0; i < 1024; i++) if (floorMark(L, i) === "teleport") portals.add(i);
+    for (const e of L.exits) if (e.teleport) portals.add(e.y * 32 + e.x);
+    g.save(); g.setLineDash([Math.max(2, CELL / 4), Math.max(2, CELL / 5)]); g.lineWidth = Math.max(1, CELL / 10);
+    for (const e of L.exits) if (e.teleport) {
+      const [ax, ay] = ctr(e.x, e.y), [bx, by] = ctr(e.tx, e.ty);
+      g.strokeStyle = "rgba(255,79,216,.75)"; g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke();
+    }
+    g.restore();
+    for (const e of L.exits) if (e.teleport) {
+      const [bx, by] = ctr(e.tx, e.ty);
+      g.lineWidth = Math.max(1.5, CELL / 8); g.strokeStyle = "#000";
+      g.beginPath(); g.arc(bx, by, CELL * 0.3, 0, 2 * Math.PI); g.stroke();
+      g.lineWidth = Math.max(1, CELL / 12); g.strokeStyle = "#ff4fd8"; g.stroke();
+    }
+    for (const i of portals) {
+      const [cx, cy] = ctr(i % 32, Math.floor(i / 32)), r = CELL * 0.46;
+      const grd = g.createRadialGradient(cx, cy, 0, cx, cy, r);
+      grd.addColorStop(0, "#fff"); grd.addColorStop(0.35, "#ff4fd8"); grd.addColorStop(1, "rgba(90,0,120,.9)");
+      g.fillStyle = grd; g.strokeStyle = "#000"; g.lineWidth = 1;
+      g.beginPath(); g.arc(cx, cy, r, 0, 2 * Math.PI); g.fill(); g.stroke();
+      g.strokeStyle = "#fff"; g.lineWidth = Math.max(1, CELL / 14); g.beginPath();   // spirale
+      for (let a = 0; a <= 4 * Math.PI; a += 0.3) { const rr = r * 0.85 * a / (4 * Math.PI); g.lineTo(cx + rr * Math.cos(a), cy + rr * Math.sin(a)); }
+      g.stroke();
+    }
     for (const e of L.exits) {
+      if (portals.has(e.y * 32 + e.x)) continue;
       const cx = e.x * CELL + (CELL - 1) / 2, cy = e.y * CELL + (CELL - 1) / 2, r = CELL * 0.32;
       g.fillStyle = "#fff"; g.strokeStyle = "#000"; g.lineWidth = 1.2;
       g.beginPath(); g.moveTo(cx, cy - r); g.lineTo(cx + r, cy); g.lineTo(cx, cy + r); g.lineTo(cx - r, cy); g.closePath(); g.fill(); g.stroke();
@@ -569,11 +599,17 @@
       if (st >= 0) out.push(`<span class="ch">Coffre ${CHEST_FR[st] || ""}, face ${["nord", "est", "sud", "ouest"][f]}</span>`);
     }
     const mk = floorMark(L, i);
-    if (mk) out.push(`<span class="st">${{ up: "Escalier qui monte", down: "Escalier qui descend", hole: "Trou ou trappe (chute)" }[mk]}</span>`);
-    for (const e of L.exits) if (e.x === x && e.y === y) {
+    const here = L.exits.filter((e) => e.x === x && e.y === y);
+    if (mk && (mk !== "teleport" || !here.length))
+      out.push(`<span class="${mk === "teleport" ? "tp" : "st"}">${{ up: "Escalier qui monte", down: "Escalier qui descend", hole: "Trou ou trappe (chute)",
+        teleport: "Téléporteur (destination non trouvée dans les scripts)" }[mk]}</span>`);
+    for (const e of here) {
       const dest = levels.find((l) => l.level === e.level);
-      out.push(`<span class="st">Passage vers le niveau ${e.level}${dest ? " (" + esc(dest.name.split(" — ")[0]) + ")" : ""}, case ${e.tx},${e.ty}</span>`);
+      if (e.teleport) out.push(`<span class="tp">Téléporteur vers la case ${e.tx},${e.ty} (même niveau)</span>`);
+      else out.push(`<span class="${mk === "teleport" ? "tp" : "st"}">${mk === "teleport" ? "Téléporteur" : "Passage"} vers le niveau ${e.level}${dest ? " (" + esc(dest.name.split(" — ")[0]) + ")" : ""}, case ${e.tx},${e.ty}</span>`);
     }
+    for (const e of L.exits) if (e.teleport && e.tx === x && e.ty === y)
+      out.push(`<span class="tp">Arrivée du téléporteur de la case ${e.x},${e.y}</span>`);
     for (const fw of L.fragile) if (fw.x === x && fw.y === y)
       out.push(isWallCell(L, i) ? `<span class="fr">Mur fragile : se casse en le frappant avec : ${esc(fw.toolName)}</span>`
         : `<span class="fr">Mur fragile (déjà cassé)</span>`);

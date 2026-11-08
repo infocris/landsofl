@@ -149,6 +149,33 @@ glissement vertical : le sens réel d'ouverture de chaque décor n'a pas été v
   sont les sorties du château et de la forêt, les entrées des cavernes et les chutes. L'export
   les relève avec leur case de déclenchement (champ `exits`, `level_exits`).
 
+### 6.0 quater Téléporteurs — déduit, concordance vérifiée (2026-11-08)
+
+Le symbole **17** du champ `automap` marque les téléporteurs. Le type de mur est posé au sol,
+sans texture (invisible). On le trouve en 20,1 au niveau 15, sur 4 cases au niveau 16 (la
+mine), et aux niveaux 19, 23, 25 et 26.
+
+Le saut est fait par la fonction de script **0x3C** (niveau, case, direction), le plus souvent
+dans un sous-programme du niveau qui reçoit ces valeurs en paramètres (`pushBPAdd n` = n-ième
+valeur empilée par l'appelant, n = 1 pour la dernière). Juste avant, ce sous-programme teste
+« niveau demandé = niveau courant » pour jouer l'effet du téléporteur (fonction 0x39). Par
+exemple, au niveau 16 :
+- 13,4 → 4,9 (même niveau) ;
+- 14,5 → niveau 12, case 22,7 ;
+- 15,6 → 14,6 ;
+- 14,7 → niveau 14, case 12,10.
+
+`level_exits` suit maintenant ces sous-programmes et marque `teleport` les sauts dans le même
+niveau. Treize sauts de ce genre sont trouvés, y compris sur des cases sans le symbole 17
+(niveaux 11, 12, 19 et 27). Pour 4 cases au symbole 17 (niveau 23 : 2,11, 3,16 et 20,16 ;
+niveau 26 : 20,19 et 18,23), la destination n'est pas résolue.
+
+Deux fausses pistes écartées :
+- les cases au symbole **10** du niveau 14 sont des dalles à pression : le type 35 devient 36,
+  avec le son 80 ;
+- la fonction **0x60** (valeur, case) joue un son sur une case ;
+- la fonction **0x31** (case, ±1 ou 0) change l'état d'une porte.
+
 ### 6.1 Coffres — vérifié visuellement (2026-11-08)
 
 Le champ `automap` d'un type de mur choisit le symbole de la carte du jeu. La valeur
@@ -508,7 +535,8 @@ mur « encadrement » (centré, aligné en bas de l'ouverture).
 ## 10. Non décodé à ce jour
 
 - `.TLC` (5376 octets par niveau), `.INF` au-delà des placements de monstres, `ITEM.INF`.
-- Caractéristiques des monstres (`0x3F`), objets au sol (`0x11`), téléporteurs et escaliers.
+- Caractéristiques des monstres (`0x3F`), objets au sol (`0x11`). Pour les escaliers et les
+  téléporteurs, voir § 6.0 ter et § 6.0 quater.
 - Découpage des vues de côté et lointaines du `.VMP` (inutile pour le visualiseur libre).
 - `.TIM`, `.WSA` (animations), sons.
 
@@ -835,3 +863,5 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
   affichés sur la mini-carte ; portes animées dans la vue 3D.
 - **2026-11-08** : mini-carte illustrée par les textures de chaque lieu, et icône réelle
   des objets seuls sur leur case.
+- **2026-11-08** : téléporteurs (symbole 17 et sauts de la fonction 0x3C dans le même niveau),
+  affichés sur la mini-carte avec leur destination.

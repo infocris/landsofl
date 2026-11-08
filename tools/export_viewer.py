@@ -319,20 +319,51 @@ def sprite_conditions(ini):
 
 
 def level_exits(files, n):
-    """Passages scriptés (fonction 0x3C : niveau, case, direction), par case de déclenchement."""
+    """Passages scriptés (fonction 0x3C : niveau, case, direction), par case de déclenchement.
+
+    Les arguments sont des constantes dans le script de la case, ou des paramètres d'un
+    sous-programme du niveau (pushBPAdd n = n-ième valeur empilée par l'appelant, la dernière
+    étant n = 1). Destination dans le même niveau = téléporteur ("teleport": True)."""
     ck = emc.chunks(files[f"LEVEL{n}.INF"])
+    ins = emc.disasm(ck)
     o = struct.unpack(f">{len(ck['ORDR']) // 2}H", ck["ORDR"])
     starts = sorted((a, i) for i, a in enumerate(o[:1024]) if a != 0xFFFF)
-    out = []
-    for addr, args in emc.resolved_calls(ck, 0x3C):
-        owner = None
+
+    def owner(addr):
+        b = None
         for s0, i in starts:
             if s0 > addr:
                 break
-            owner = i
-        if owner is None or len(args) < 2 or not isinstance(args[0], int) or not isinstance(args[1], int):
+            b = i
+        return b
+
+    calls = [(k, ins[k + 1][2]) for k, (a, op, p) in enumerate(ins)
+             if op == 2 and p == 1 and k + 1 < len(ins) and ins[k + 1][1] == 0]
+    targets = sorted({t for _, t in calls})
+    found = []                                         # (case de déclenchement, niveau, case)
+    for k, (addr, op, p) in enumerate(ins):
+        if op != 14 or p & 0xFF != 0x3C:
             continue
-        e = {"x": owner % 32, "y": owner // 32, "level": args[0], "tx": args[1] % 32, "ty": args[1] // 32}
+        src = emc.call_args(ins, k, 3)
+        if all(o_ in (3, 4) for o_, _ in src[:2]):
+            found.append((owner(addr), src[0][1], src[1][1]))
+            continue
+        sub = max([t for t in targets if t <= addr], default=None)
+        for kk, t in calls:
+            if t != sub:
+                continue
+            g, j = [], kk - 1
+            while j >= 0 and ins[j][1] in (3, 4):
+                g.append(ins[j][2]); j -= 1
+            vals = [q if o_ in (3, 4) else g[q - 1] if o_ == 7 and 1 <= q <= len(g) else None for o_, q in src[:2]]
+            found.append((owner(ins[kk][0]), *vals))
+    out = []
+    for b, lvl, blk in found:
+        if b is None or not isinstance(lvl, int) or not isinstance(blk, int) or not 0 <= blk < 1024 or not 1 <= lvl < 30:
+            continue
+        e = {"x": b % 32, "y": b // 32, "level": lvl, "tx": blk % 32, "ty": blk // 32}
+        if lvl == n:
+            e["teleport"] = True
         if e not in out:
             out.append(e)
     return out
