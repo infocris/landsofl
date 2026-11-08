@@ -69,7 +69,7 @@
     for (const l of index) {
       const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json`);
       levels.push({ level: l.level, name: l.name, faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
-        labels: d.labels, groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {},
+        labels: d.labels, places: numberPlaces(d.labels || []), groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {},
         spriteSigs: d.spriteSigs || {}, spriteOf: null, scenes: d.scenes || {} });
       infoEl.textContent = `chargement des cartes… ${levels.length}/${index.length}`;
     }
@@ -87,7 +87,35 @@
     return [...byCell.values()].sort((a, b) => a.y - b.y || a.x - b.x).map((g, i) => ({ ...g, n: i + 1 }));
   }
 
+  // Lieux nommés (annotations de la carte du jeu), numérotés dans l'ordre de lecture
+  function numberPlaces(labels) {
+    return labels.filter((l) => l.text && l.text !== "ENDROIT INVALIDE")
+      .sort((a, b) => a.y - b.y || a.x - b.x)
+      .map((l, i) => ({ x: l.x, y: l.y, text: l.text, n: i + 1 }));
+  }
+  const placesEl = document.getElementById("mm-places");
+  let hoverCell = -1;
+  const niceName = (t) => t.charAt(0) + t.slice(1).toLowerCase();
+  function renderPlaceList(L) {
+    placesEl.textContent = "";
+    if (!L || !L.places.length) {
+      const li = document.createElement("li"); li.textContent = "aucun lieu nommé sur ce niveau"; placesEl.appendChild(li);
+      return;
+    }
+    for (const p of L.places) {
+      const li = document.createElement("li");
+      li.dataset.cell = p.y * 32 + p.x;
+      const b = document.createElement("b"); b.textContent = p.n;
+      const t = document.createElement("span"); t.textContent = niceName(p.text); t.title = `case ${p.x},${p.y}`;
+      li.append(b, t);
+      li.addEventListener("mouseenter", () => { hoverCell = p.y * 32 + p.x; draw(lastDraw[0], lastDraw[1]); });
+      li.addEventListener("mouseleave", () => { hoverCell = -1; draw(lastDraw[0], lastDraw[1]); });
+      placesEl.appendChild(li);
+    }
+  }
+
   function renderItemList(L) {
+    renderPlaceList(L);
     itemsEl.textContent = "";
     if (!L || !L.groups.length) {
       const li = document.createElement("li"); li.textContent = "aucun objet placé sur ce niveau"; itemsEl.appendChild(li);
@@ -162,8 +190,19 @@
       g.fillRect((i % 32) * CELL, Math.floor(i / 32) * CELL, CELL - 1, CELL - 1);
     }
     g.fillStyle = "#d22";
-    const lp = Math.round(3 * k);
-    for (const l of L.labels) g.fillRect(l.x * CELL + lp, l.y * CELL + lp, CELL - 1 - 2 * lp, CELL - 1 - 2 * lp);
+    // lieux : carré rouge numéroté
+    const lp2 = Math.max(1, Math.round(k));
+    g.font = `bold ${Math.round(9 * k)}px system-ui, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
+    for (const p of L.places) {
+      g.fillStyle = "#d22";
+      g.fillRect(p.x * CELL + lp2 - 1, p.y * CELL + lp2 - 1, CELL + 1 - 2 * lp2, CELL + 1 - 2 * lp2);
+      g.fillStyle = "#fff";
+      g.fillText(String(p.n), p.x * CELL + CELL / 2, p.y * CELL + CELL / 2 + 0.5);
+    }
+    if (hoverCell >= 0) {                       // lieu survolé dans la liste
+      g.strokeStyle = "#ffd700"; g.lineWidth = 2;
+      g.strokeRect((hoverCell % 32) * CELL - 2, Math.floor(hoverCell / 32) * CELL - 2, CELL + 3, CELL + 3);
+    }
     // objets : numéro du groupe sur sa case
     g.font = `bold ${Math.round(9 * k)}px system-ui, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
     g.lineWidth = 3 * Math.min(1, k); g.strokeStyle = "#000";
@@ -201,8 +240,8 @@
     const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
     out.push(`<b>Case ${x},${y}</b> <span class="t">· ${CLASS_FR[cellClass(L, i)]}</span>`);
     if (lastDraw[0] === i) out.push("Vous êtes ici");
-    for (const l of L.labels) if (l.x === x && l.y === y && l.text && l.text !== "ENDROIT INVALIDE")
-      out.push(`<span class="lb">${esc(l.text)}</span>`);
+    for (const p of L.places) if (p.x === x && p.y === y)
+      out.push(`<span class="lb">Lieu ${p.n} : ${esc(niceName(p.text))}</span>`);
     if (L.scenes[i]) out.push(`<span class="t">Lieu avec image fixe (scène)</span>`);
     const grp = L.groups.find((g) => g.x === x && g.y === y);
     if (grp) {
@@ -283,7 +322,7 @@
     }
     labelEl.textContent = near ? near.text : "";
     // objets à portée (case du groupe et cases voisines)
-    for (const li of itemsEl.children) {
+    for (const li of [...itemsEl.children, ...placesEl.children]) {
       const c = +li.dataset.cell;
       li.classList.toggle("near", Number.isFinite(c) && Math.abs((c % 32) - x) <= 1 && Math.abs(Math.floor(c / 32) - y) <= 1);
     }

@@ -20,7 +20,7 @@
   :root { --mm-size: 384px; --mm-w: max(420px, calc(var(--mm-size) + 36px)); }
   #mm { width: var(--mm-w); flex: none; box-sizing: border-box; padding: 12px; background: #0f0d0a;
     border-left: 1px solid #3a3226; color: #e8dcc0; font: 13px/1.4 system-ui, sans-serif;
-    display: flex; flex-direction: column; gap: 8px; height: 100vh; overflow-y: auto; }
+    display: flex; flex-direction: column; gap: 8px; height: 100vh; overflow-y: auto; overflow-x: hidden; }
   #mm-items { margin: 0; padding: 0; list-style: none; overflow-y: auto; flex: 1; min-height: 60px;
     border-top: 1px solid #3a3226; padding-top: 6px; font-size: 12px; }
   #mm-items li { display: flex; gap: 6px; padding: 2px 0; color: #cfc3a6; }
@@ -28,6 +28,16 @@
   #mm-items b { flex: none; min-width: 1.8em; text-align: right; color: #28dce6; }
   #mm-items span.pos { margin-left: auto; color: #7d7058; flex: none; }
   #mm-items-title { color: #a39578; font-size: 12px; }
+  #mm-places { margin: 0; padding: 4px 0 0; list-style: none; font-size: 12px; max-height: 132px; overflow-y: auto;
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px 10px; flex: none; }
+  #mm-places li { display: flex; gap: 6px; padding: 1px 2px; color: #cfc3a6; cursor: default; border-radius: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #mm-places li:hover { background: rgba(255, 215, 0, .12); }
+  #mm-places li.near { color: #fff; background: rgba(221, 34, 34, .22); }
+  #mm-places b { flex: none; min-width: 1.6em; text-align: center; color: #fff; background: #d22; border-radius: 2px;
+    font-size: 11px; line-height: 1.5; }
+  #mm-places span { overflow: hidden; text-overflow: ellipsis; }
+  #mm-places-title { color: #a39578; font-size: 12px; border-top: 1px solid #3a3226; padding-top: 6px; }
   #stats { border-top: 1px solid #3a3226; padding-top: 6px; font-size: 12px; color: #cfc3a6; }
   #st-money { color: #e8dcc0; }
   #cheats { display: flex; gap: 14px; margin-top: 4px; color: #a39578; font-size: 11px; }
@@ -128,6 +138,8 @@
   <canvas id="mm-canvas"></canvas>
   <div id="mm-label"></div>
   <div id="mm-legend"><i style="background:#8a7f68"></i>sol<i style="background:#2b2b2b;outline:1px solid #555"></i>mur<i style="background:#a0522d"></i>porte fermée<i style="background:#d08a4a"></i>ouverte<i style="background:#d22"></i>lieu<i style="background:#28dce6"></i>objets<i style="background:#ff8c00;border-radius:50%"></i>monstres</div>
+  <div id="mm-places-title">Lieux du niveau</div>
+  <ol id="mm-places"></ol>
   <div id="stats">
     <div class="inv-head"><span class="inv-title">Caractéristiques</span><span id="st-money"></span></div>
     <div id="st-chars"></div>
@@ -344,6 +356,6 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261108k"></script>
+<script src="minimap.js?v=20261108l"></script>
 </body>
 </html>
