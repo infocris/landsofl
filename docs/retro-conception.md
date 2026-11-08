@@ -203,10 +203,10 @@ plein, mais dont le bit 0 des drapeaux vaut 0 : la face ne bloque pas le passage
   quand on tient le Gantelet des Ténèbres (254). Passer en 8,26, 3,31 ou 6,28 les remet.
   - Le mécanisme de la case 16,24 (type 38, special 6) attend la Statuette (255). Il vide la
     case 20,26, qui est déjà un faux mur.
-- 44 murs trouvés sur 16 niveaux.
+- 44 murs trouvés sur 14 niveaux.
 - Certains murs s'ouvrent depuis leur propre case (niveau 14 par exemple). Ce sont peut-être
   des murs à frapper ou à cliquer. La page ne marque pas ceux qui sont déjà connus comme murs
-  fragiles (§ 9).
+  fragiles (§ 8.1).
 
 ### 6.1 Coffres — vérifié visuellement (2026-11-08)
 
