@@ -228,6 +228,34 @@ entrées de 12 octets : u16 x, u16 y, u16 icône, u16 x2, u16 y2, u16 n° de tex
   `x2/y2` est la case d'accès. La capture n'est possible que pour le niveau affiché par la vue
   3D.
 
+### 7 bis Noms français des niveaux — déduit, concordance vérifiée (2026-11-08)
+
+Dans `LANDS.FRE` (`STARTUP.PAK`), le texte **528 + n** donne le nom du niveau n. Juste avant,
+les textes 526 à 528 sont « Mur Secret », « Plaque pivotante » et « Téléporteur ».
+
+| n | nom | n | nom | n | nom |
+|---|---|---|---|---|---|
+| 1 | Gladstone | 11 | Marécage | 21 | Tour Niveau 3 |
+| 2 | Forêt du Nord | 12 | Mines d'Urbish | 22 | Cité d'Yvel |
+| 3 | Forêt du Sud | 13 | Mines Niveau 1 | 23 | Passerelle 1 |
+| 4 | Manoir de Roland | 14 | Mines Niveau 2 | 24 | Bois d'Yvel |
+| 5 | Cachette | 15 | Mines Niveau 3 | 25 | Passerelle 2 |
+| 6 | Cavernes Niveau 1 | 16 | Mines Niveau 4 | 26 | Donjons |
+| 7 | Cavernes Niveau 2 | 17 | Haut du Bois d'Opin | 27 | Château Niveau 1 |
+| 8 | Cavernes Niveau 3 | 18 | Tour Niveau 1 | 28 | Château Niveau 2 |
+| 9 | Cavernes Niveau 4 | 19 | Tour Sub-niveau | 29 | Château Niveau 3 |
+| 10 | Bois d'Opin | 20 | Tour Niveau 2 | | |
+
+La concordance tient sur tout le tableau :
+- les décors correspondent : `CAVE1` pour les Cavernes 6 à 9, `MINE1` pour les Mines 13 à 16,
+  `TOWER1` pour les Tours 18 à 21, `CIMMERIA` pour le Château, `YVEL1` pour la Cité d'Yvel ;
+- les annotations de carte aussi : « SALLE DES COCONS » au niveau 7, « PORTES D'YVEL » au
+  niveau 22.
+
+Il reste à savoir à quoi le jeu sert de cette liste (sans doute les sauvegardes ou la carte) :
+**non vérifié**. Les noms sont exportés dans `levels.json` (`frName`), et la mini-carte et la
+vue 3D les affichent.
+
 ## 8. Scripts — `LEVELn.INI` / `LEVELn.INF` (EMC2) — vérifié pour ce qui est utilisé
 
 Outil : `tools/emc.py`. Fichier IFF `FORM` / `EMC2` contenant trois chunks (tailles
@@ -906,3 +934,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
     de protection, ainsi que les effets gagnés ou perdus.
   - Les armes et boucliers sont comparés à la main principale seulement.
 - **2026-11-08** : contenu des coffres (fonction 0x49), 50 coffres sur 54, affiché au survol.
+- **2026-11-08** : noms français des niveaux (texte 528 + n de LANDS.FRE).

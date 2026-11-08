@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261109j";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261109o";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) FOV = 2 * Math.atan(1.375);
   let dirty = true;
@@ -825,10 +825,10 @@
 
   (async () => {
     resize();
-    const levels = await fetch("data/levels.json").then((r) => r.json());
+    const levels = await fetch(`data/levels.json?v=${DATA_V}`).then((r) => r.json());
     for (const l of levels) {
       const o = document.createElement("option");
-      o.value = l.level; o.textContent = `${l.level}. ${l.name}`;
+      o.value = l.level; o.textContent = `${l.level}. ${l.frName ? l.frName + " (" + l.name + ")" : l.name}`;
       levelSel.appendChild(o);
     }
     const q = new URLSearchParams(location.search);

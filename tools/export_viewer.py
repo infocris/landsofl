@@ -11,7 +11,7 @@ Pour chaque niveau :
 import json, os, struct, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from pak import read_pak
+from pak import read_pak, read_strings
 from wwcomp import cps
 import lolgfx
 import emc
@@ -438,6 +438,7 @@ def main(game_dir, maps_dir, out_dir):
     os.makedirs(out_dir, exist_ok=True)
     playfld = cps(read_pak(os.path.join(game_dir, "GENERAL.PAK"))["PLAYFLD.CPS"])[1]
     tilesets, index = {}, []
+    level_names = read_strings(read_pak(os.path.join(game_dir, "STARTUP.PAK"))["LANDS.FRE"])
     for name in sorted(os.listdir(maps_dir)):
         if not (name.startswith("level") and name.endswith(".json") and name[5:7].isdigit()):
             continue
@@ -566,6 +567,8 @@ def main(game_dir, maps_dir, out_dir):
         with open(os.path.join(out_dir, f"level{n:02d}.json"), "w", encoding="utf-8") as fh:
             json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))
         index.append({"level": n, "tileset": tsname,
+                      # nom français du niveau : texte 528 + n de LANDS.FRE (§ 7)
+                      "frName": level_names[528 + n].strip() if 528 + n < len(level_names) else "",
                       "name": tsname + (" — " + ", ".join(dict.fromkeys(
                           l["text"].capitalize() for l in level["labels"]
                           if l["text"] and l["text"] != "ENDROIT INVALIDE"))

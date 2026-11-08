@@ -69,10 +69,10 @@
     }
   }
   async function loadLevels() {
-    const index = await getJSON("viewer/data/levels.json");
+    const index = await getJSON("viewer/data/levels.json?v=20261109o");
     for (const l of index) {
       const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261109n`);
-      levels.push({ level: l.level, name: l.name, faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
+      levels.push({ level: l.level, name: l.name, fr: l.frName || l.name.split(" — ")[0], faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
         labels: d.labels, places: numberPlaces(d.labels || []), groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {},
         spriteSigs: d.spriteSigs || {}, spriteConds: d.spriteConds || {}, spriteOf: null, scenes: d.scenes || {}, locks: d.locks || [],
         scripted: new Set(d.scripted || []), fragile: d.fragile || [], exits: d.exits || [],
@@ -689,7 +689,7 @@
     for (const e of here) {
       const dest = levels.find((l) => l.level === e.level);
       if (e.teleport) out.push(`<span class="tp">Téléporteur vers la case ${e.tx},${e.ty} (même niveau)</span>`);
-      else out.push(`<span class="${mk === "teleport" ? "tp" : "st"}">${mk === "teleport" ? "Téléporteur" : "Passage"} vers le niveau ${e.level}${dest ? " (" + esc(dest.name.split(" — ")[0]) + ")" : ""}, case ${e.tx},${e.ty}</span>`);
+      else out.push(`<span class="${mk === "teleport" ? "tp" : "st"}">${mk === "teleport" ? "Téléporteur" : "Passage"} vers le niveau ${e.level}${dest ? " (" + esc(dest.fr) + ")" : ""}, case ${e.tx},${e.ty}</span>`);
     }
     for (const e of L.exits) if (e.teleport && e.tx === x && e.ty === y)
       out.push(`<span class="tp">Arrivée du téléporteur de la case ${e.x},${e.y}</span>`);
@@ -766,8 +766,8 @@
       return;
     }
     const x = block % 32, y = Math.floor(block / 32);
-    titleEl.textContent = `Niveau ${current.level}`;
-    infoEl.textContent = `${current.name.split(" — ")[0]} · case ${x},${y} · ${["Nord", "Est", "Sud", "Ouest"][dir]}`;
+    titleEl.textContent = `Niveau ${current.level} — ${current.fr}`;
+    infoEl.textContent = `case ${x},${y} · ${["Nord", "Est", "Sud", "Ouest"][dir]}`;
     let near = null, bd = 2.5;
     for (const l of current.labels) {
       if (!l.text || l.text === "ENDROIT INVALIDE") continue;
@@ -881,7 +881,7 @@
     renderItemList(current);
     if (current) {
       for (let i = 0; i < 4096; i++) live[i] = current.faces[i];
-      titleEl.textContent = `Niveau ${current.level} (aperçu)`;
+      titleEl.textContent = `Niveau ${current.level} — ${current.fr} (aperçu)`;
       draw(y * 32 + x, dir);
       sendTo3d(current.level, x, y, dir);
     }
@@ -1090,7 +1090,7 @@
     };
     const date = new Date().toLocaleString("fr-FR");
     const lines = [`Lands of Lore — inventaire (${date})`];
-    if (current) lines.push(`Niveau ${current.level}, ${current.name.split(" — ")[0]}`);
+    if (current) lines.push(`Niveau ${current.level}, ${current.fr}`);
     const money = /\d+/.exec(stMoney.textContent);
     if (money) lines.push(`Couronnes : ${money[0]}`);
     lines.push("", `Sac (${barTypes.filter((t) => t >= 0).length} / ${barTypes.length} cases)`);
