@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261109i";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261109j";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) FOV = 2 * Math.atan(1.375);
   let dirty = true;
@@ -83,6 +83,10 @@
     }
     return out;
   }
+  // Extérieurs : ciel (couleur des lignes hautes du fond d'origine) au lieu du plafond, et
+  // façades de plusieurs étages (murs hauts de la ville d'Yvel). storeys = hauteur en étages.
+  const OUTDOOR = { YVEL1: { storeys: 3 } };
+  const FOOT = 12;              // lignes du bas de la face (soubassement) non répétées aux étages
   const SHADES = 8;
   const shadeFor = (d) => Math.min(SHADES - 1, Math.floor(Math.max(0, d - 0.6) / 1.4));
 
@@ -95,14 +99,66 @@
     return { w: img.width, h: img.height, px: new Uint32Array(g.getImageData(0, 0, img.width, img.height).data.buffer) };
   }
 
+  // Ciel : couleur moyenne de chaque ligne du fond d'origine au-dessus de l'horizon (ligne 47).
+  // Étages : pour chaque face, la texture unie (mur le plus fréquent du niveau) dont le haut
+  // ressemble le plus au haut de la face, pour ne pas répéter portes et enseignes en hauteur.
+  const BG_HORIZON = 47;
+  function setupOutdoor(L, walls, bg) {
+    L.sky = [];
+    if (bg) {
+      const b = pixels(bg);
+      for (let y = 0; y < BG_HORIZON; y++) {
+        let r = 0, g = 0, bl = 0;
+        for (let x = 0; x < b.w; x++) { const c = b.px[y * b.w + x]; r += c & 255; g += (c >> 8) & 255; bl += (c >> 16) & 255; }
+        r = Math.round(r / b.w); g = Math.round(g / b.w); bl = Math.round(bl / b.w);
+        L.sky.push(0xff000000 | (bl << 16) | (g << 8) | r);
+      }
+    }
+    if (!L.sky.length) L.sky.push(0xff9a9090);
+    const W2 = walls.width, px = pixels(walls).px, fw = L.faceW, fh = L.faceH, cols = L.atlasCols;
+    const freq = new Map();
+    for (const id of L.faces) { const w = L.wallInfo[id]; if (w && w.opaque && !w.door && w.tex >= 0) freq.set(w.tex, (freq.get(w.tex) || 0) + 1); }
+    const plain = [...freq].sort((a, b) => b[1] - a[1]).slice(0, 4).map((e) => e[0]);
+    const top = (tex) => {                          // lignes 2 à 13 de la face, sous-échantillonnées
+      const out = [], x0 = (tex % cols) * fw, y0 = Math.floor(tex / cols) * fh;
+      for (let y = 2; y < 14; y += 2) for (let x = 0; x < fw; x += 4) out.push(px[(y0 + y) * W2 + x0 + x]);
+      return out;
+    };
+    const ptop = plain.map(top);
+    L.upper = new Map();
+    const dist = (a, b) => { let d = 0; for (let i = 0; i < a.length; i++) { const p = a[i], q = b[i];
+      d += Math.abs((p & 255) - (q & 255)) + Math.abs(((p >> 8) & 255) - ((q >> 8) & 255)) + Math.abs(((p >> 16) & 255) - ((q >> 16) & 255)); } return d; };
+    L.upperOf = (tex) => {
+      if (!L.upper.has(tex)) {
+        let best = plain.includes(tex) ? tex : plain[0] ?? tex;
+        if (!plain.includes(tex) && plain.length) {
+          const t = top(tex); let bd = Infinity;
+          plain.forEach((p, k) => { const d = dist(t, ptop[k]); if (d < bd) { bd = d; best = p; } });
+        }
+        L.upper.set(tex, best);
+      }
+      return L.upper.get(tex);
+    };
+  }
+  const skyAt = (y, hz) => L.sky[Math.max(0, Math.min(L.sky.length - 1, Math.floor(BG_HORIZON - (hz - y) / Math.max(1, hz) * BG_HORIZON)))];
+  // étages au-dessus d'une colonne de mur (de bas en haut), même assombrissement que la face
+  function drawUpper(tex, u, dist, x, top, colH) {
+    const S = L.outdoor.storeys, fw = L.faceW, fh = L.faceH, cols = L.atlasCols;
+    const ut = L.upperOf(tex), sh = fh - FOOT, h = colH * sh / fh;
+    const tx = (ut % cols) * fw + Math.min(fw - 1, Math.floor(u * fw)), ty = Math.floor(ut / cols) * fh;
+    const img = L.wallImgs[shadeFor(dist)];
+    for (let k = 1; k < S && top - (k - 1) * h > 0; k++) ctx.drawImage(img, tx, ty, 1, sh, x, top - k * h, 1, h + 0.5);
+  }
+
   async function loadLevel(n, keepPos) {
     const nn = String(n).padStart(2, "0");
-    const [data, walls, spr, floor, ceil] = await Promise.all([
+    const [data, walls, spr, floor, ceil, bg] = await Promise.all([
       fetch(`data/level${nn}.json?v=${DATA_V}`).then((r) => r.json()),
       loadImage(`data/level${nn}_walls.png?v=${DATA_V}`),
       loadImage(`data/level${nn}_spr.png?v=${DATA_V}`),
       loadImage(`data/level${nn}_floor.png?v=${DATA_V}`),
       loadImage(`data/level${nn}_ceil.png?v=${DATA_V}`),
+      loadImage(`data/level${nn}_bg.png?v=${DATA_V}`).catch(() => null),
     ]);
     L = data;
     L.wallImgs = darken(walls, SHADES);
@@ -111,6 +167,8 @@
     L.sprImgs = darken(spr, SHADES);
     L.wallInfo = [];
     for (const [id, w] of Object.entries(L.walls)) L.wallInfo[+id] = w;
+    L.outdoor = OUTDOOR[L.tileset] || null;
+    if (L.outdoor) setupOutdoor(L, walls, bg);
     buildDoorPanels(walls);
     doorShown.clear();
     openDoors = new Set();
@@ -293,6 +351,7 @@
           const top = H / 2 + pitch - colH / 2;
           const tx = (it.tex % cols) * fw + Math.min(fw - 1, Math.floor(it.u * fw));
           const ty = Math.floor(it.tex / cols) * fh;
+          if (L.outdoor) drawUpper(it.tex, it.u, dist, x, top, colH);
           ctx.drawImage(L.wallImgs[shadeFor(dist)], tx, ty, 1, fh, x, top, 1, colH);
           if (it.door) drawPanel(it, dist, x, top, colH);
         }
@@ -319,7 +378,8 @@
     const hz = H / 2 + pitch;                              // ligne d'horizon (décalée en vue libre)
     for (let y = 0; y < H; y++) {
       const dy = y + 0.5 - hz, fRow = y * W;
-      if (Math.abs(dy) < 1) { frame32.fill(0xff000000, fRow, fRow + W); continue; }
+      if (Math.abs(dy) < 1) { frame32.fill(L.outdoor ? skyAt(y, hz) : 0xff000000, fRow, fRow + W); continue; }
+      if (dy < 0 && L.outdoor) { frame32.fill(skyAt(y, hz), fRow, fRow + W); continue; }
       const T = dy > 0 ? F : C;                            // sous l'horizon : sol, au-dessus : plafond
       const rowDist = (WALL_H / 2) * proj / Math.abs(dy);
       const level = shadeFor(rowDist);
@@ -362,10 +422,11 @@
         if ((cx + cy) & 1) tx = tw - 1 - tx;
         const i = ty * tw + tx;
         frame32[fRow + x] = shade(F.px[i], k);
-        frame32[cRow + x] = shade(C.px[i], k);
+        if (!L.outdoor) frame32[cRow + x] = shade(C.px[i], k);
       }
+      if (L.outdoor) frame32.fill(skyAt(H - 1 - y, half), cRow, cRow + W);
     }
-    if (H % 2 === 0) frame32.fill(0xff000000, half * W, (half + 1) * W);
+    if (H % 2 === 0) frame32.fill(L.outdoor ? skyAt(half, half) : 0xff000000, half * W, (half + 1) * W);
     ctx.putImageData(frameImg, 0, 0);
 
     // monstres
@@ -438,6 +499,7 @@
           const colH = WALL_H * proj / deff(dist), top = half - colH / 2;
           const tx = (it.tex % cols) * fw + Math.min(fw - 1, Math.floor(it.u * fw));
           const ty = Math.floor(it.tex / cols) * fh;
+          if (L.outdoor) drawUpper(it.tex, it.u, dist, x, top, colH);
           ctx.drawImage(L.wallImgs[shadeFor(dist)], tx, ty, 1, fh, x, top, 1, colH);
           if (it.door) drawPanel(it, dist, x, top, colH);
         }

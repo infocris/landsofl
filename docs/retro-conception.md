@@ -875,3 +875,8 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-08** : téléporteurs (symbole 17 et sauts de la fonction 0x3C dans le même niveau),
   affichés sur la mini-carte avec leur destination.
 - **2026-11-08** : illustration des lieux au survol (image du jeu ou capture de la vue 3D).
+- **2026-11-08** : vue 3D d'Yvel (décor `YVEL1`) traitée comme un extérieur.
+  - Ciel : couleur moyenne de chaque ligne du fond d'origine au-dessus de l'horizon (ligne 47).
+  - Façades sur 3 étages : les étages répètent la texture unie du niveau la plus proche du
+    haut de la face, sans le soubassement (12 lignes), pour ne pas répéter portes et enseignes.
+  - Ce rendu est choisi par nous et n'a pas été comparé au jeu.
