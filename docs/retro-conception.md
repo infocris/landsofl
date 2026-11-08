@@ -301,6 +301,18 @@ dessus (64×64, une case), par projection inverse d'une case de profondeur :
 Le résultat est une approximation : le fond d'origine est une image peinte, pas le rendu
 exact d'un sol répétitif, d'où des raccords visibles.
 
+**Échelle des distances du moteur d'origine — mesurée.** Ce n'est pas une perspective : un
+mur de face mesure 128, environ 80 puis environ 48 px à 0,5, 1,5 et 2,5 cases. Ce sont
+les morceaux de 16, 10 et 6 tuiles du `.VMP`, et les décorations des positions 1 à 3
+du `.DAT` diminuent dans les mêmes proportions (×0,65). La taille diminue donc d'environ
+×0,615 par case, au lieu de 1/distance : au loin, le décor paraît environ deux fois plus
+grand qu'en perspective réelle.
+- **Imitation** : la vue intégrée propose un mode « perspective du jeu », avec une
+  distance apparente `deff(z) = 0,5 · (1/0,615)^(z − 0,5)` au-delà de 0,5 case. Les
+  rayons y deviennent des courbes, que le rendu suit par pas de 0,02 case. Les murs, le
+  sol, le plafond et les monstres utilisent la même échelle.
+- **Bascule** : un bouton de la page du jeu passe d'un mode à l'autre.
+
 **Vue 3D intégrée sous le jeu.** Elle reprend cette perspective : champ horizontal
 `2·atan(1,375)` ≈ 108°, image 352×240 (format 176×120). Elle reçoit aussi la grille
 vivante (§ 12.2), donc l'état réel des portes. Pour que ces identifiants aient une

@@ -65,6 +65,11 @@
   /* boutons à gauche du panneau quand il est ouvert */
   body:has(#mm:not(.hidden)) #zqsd, body:has(#mm:not(.hidden)) #mmtoggle,
   body:has(#mm:not(.hidden)) #qload, body:has(#mm:not(.hidden)) #v3dtoggle { right: 432px; }
+  #persp { position: fixed; right: 12px; bottom: 156px; z-index: 1000;
+    font: 12px/1 system-ui, sans-serif; padding: 6px 10px; border: 1px solid #555; border-radius: 6px;
+    background: rgba(0,0,0,.6); color: #ddd; cursor: pointer; }
+  body:has(#mm:not(.hidden)) #persp { right: 432px; }
+  body:has(#v3d.hidden) #persp { display: none; }
   #v3dtoggle { position: fixed; right: 12px; bottom: 120px; z-index: 1000;
     font: 12px/1 system-ui, sans-serif; padding: 6px 10px; border: 1px solid #555; border-radius: 6px;
     background: rgba(0,0,0,.6); color: #aaa; cursor: pointer; }
@@ -82,7 +87,7 @@
 <body>
 <div id="left">
   <div id="dos"></div>
-  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261108d" title="Vue 3D synchronisée"></iframe></div>
+  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261108f" title="Vue 3D synchronisée"></iframe></div>
 </div>
 <aside id="mm" aria-label="Mini-carte">
   <div id="mm-title">Mini-carte</div>
@@ -104,6 +109,7 @@
   <ol id="mm-items"></ol>
 </aside>
 <button id="v3dtoggle" type="button" title="Afficher/masquer la vue 3D (F10)">3D</button>
+<button id="persp" type="button" title="Perspective de la vue 3D : celle du jeu d'origine ou une perspective réelle"></button>
 <button id="mmtoggle" type="button" title="Afficher/masquer la mini-carte (F9)">Carte</button>
 <button id="qload" type="button" title="Recharger l'état enregistré avec F6 (QUICK.SAV)" hidden>F7 · charger l'état</button>
 <button id="zqsd" type="button" title="Activer/désactiver les touches ZQSD (F8)"></button>
@@ -185,6 +191,23 @@
   }
   try { if (localStorage.getItem("view3d") === "off") v3d.classList.add("hidden"); } catch (e) {}
   document.getElementById("v3dtoggle").addEventListener("click", (e) => { toggle3d(); e.currentTarget.blur(); });
+
+  // Perspective de la vue 3D : « jeu » (échelle du moteur d'origine) ou « réelle »
+  const perspBtn = document.getElementById("persp");
+  let perspMode = "jeu";
+  try { perspMode = localStorage.getItem("persp") || "jeu"; } catch (e) {}
+  function sendPersp() {
+    perspBtn.textContent = "Perspective : " + (perspMode === "jeu" ? "jeu" : "réelle");
+    const f = document.getElementById("v3d-frame");
+    if (f && f.contentWindow) f.contentWindow.postMessage({ type: "lol-persp", mode: perspMode }, location.origin);
+  }
+  perspBtn.addEventListener("click", (e) => {
+    perspMode = perspMode === "jeu" ? "reelle" : "jeu";
+    try { localStorage.setItem("persp", perspMode); } catch (err) {}
+    sendPersp(); e.currentTarget.blur();
+  });
+  document.getElementById("v3d-frame").addEventListener("load", sendPersp);
+  sendPersp();
 
   // --- Conservation des sauvegardes du jeu ---------------------------------
   // js-dos ne garde les fichiers modifiés du disque C: (dont les sauvegardes faites
@@ -280,6 +303,6 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261108e"></script>
+<script src="minimap.js?v=20261108f"></script>
 </body>
 </html>

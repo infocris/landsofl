@@ -137,7 +137,17 @@
   }
 
   // --- Rendu ------------------------------------------------------------------
+  // Deux perspectives (vue intégrée) : « réelle » (taille ∝ 1/distance) et « jeu »,
+  // qui imite le moteur d'origine : la taille ne diminue que d'environ 0,615 par case
+  // (mur de face : 128, 80, 48 px pour 0,5, 1,5, 2,5 cases ; voir docs § 9.3 bis).
+  let persp = "reelle";
+  try { if (EMBED && localStorage.getItem("lol3d:persp") === "jeu") persp = "jeu"; } catch (e) {}
+  const KSTEP = 1 / 0.615;
+  const deff = (z) => (z <= 0.5 ? z : 0.5 * Math.pow(KSTEP, z - 0.5));      // « distance » apparente
+  const zOfDeff = (d) => (d <= 0.5 ? d : 0.5 + Math.log(d / 0.5) / Math.log(KSTEP));
+
   function render() {
+    if (EMBED && persp === "jeu") { renderGamePerspective(); return; }
     const dirX = Math.cos(player.a), dirY = Math.sin(player.a);
     const planeX = -dirY * Math.tan(FOV / 2), planeY = dirX * Math.tan(FOV / 2);
     castFloorCeiling(dirX, dirY, planeX, planeY);
@@ -229,6 +239,110 @@
   function shade(c, k) {
     const r = ((c & 0xff) * k) >> 8, g = (((c >> 8) & 0xff) * k) >> 8, b = (((c >> 16) & 0xff) * k) >> 8;
     return 0xff000000 | (b << 16) | (g << 8) | r;
+  }
+
+  // Perspective du jeu. Le groupe regarde toujours vers N, E, S ou O : on travaille en
+  // profondeur z (vers l'avant) et en écart latéral. À la colonne u (pixels depuis le
+  // centre), le point vu à la profondeur z est à l'écart u·deff(z)/proj : les rayons sont
+  // des courbes, qu'on suit par petits pas en relevant les faces de mur traversées.
+  function renderGamePerspective() {
+    const fx = Math.round(Math.cos(player.a)), fy = Math.round(Math.sin(player.a));
+    const rx = -fy, ry = fx;                                  // vers la droite de l'écran
+    const half = H / 2;
+    // sol et plafond
+    const F = L.floorTex, C = L.ceilTex, tw = F.w, th = F.h;
+    for (let y = Math.floor(half) + 1; y < H; y++) {
+      const d = (WALL_H / 2) * proj / (y - half), z = zOfDeff(d);
+      const k = Math.round((1 - shadeFor(z) / SHADES * 0.85) * 256);
+      const fRow = y * W, cRow = (H - 1 - y) * W;
+      for (let x = 0; x < W; x++) {
+        const lat = (x + 0.5 - W / 2) * d / proj;
+        const wx = player.x + fx * z + rx * lat, wy = player.y + fy * z + ry * lat;
+        const cx = Math.floor(wx), cy = Math.floor(wy);
+        let tx = ((wx - cx) * tw) | 0, ty = ((wy - cy) * th) | 0;
+        if ((cx + cy) & 1) tx = tw - 1 - tx;
+        const i = ty * tw + tx;
+        frame32[fRow + x] = shade(F.px[i], k);
+        frame32[cRow + x] = shade(C.px[i], k);
+      }
+    }
+    if (H % 2 === 0) frame32.fill(0xff000000, half * W, (half + 1) * W);
+    ctx.putImageData(frameImg, 0, 0);
+
+    // monstres
+    const sprites = [];
+    for (const m of (EMBED ? liveMonsters.filter((q) => q.level === L.level) : [])) {
+      const ids = L.sprites[m.sprite];
+      if (!ids) continue;
+      const dx = m.x - player.x, dy = m.y - player.y;
+      const z = dx * fx + dy * fy, lat = dx * rx + dy * ry;
+      if (z < 0.15) continue;
+      let rel = Math.atan2(-dy, -dx) - DIR_ANGLE[m.dir & 3];
+      rel = Math.atan2(Math.sin(rel), Math.cos(rel));
+      let pose = 1, mirror = rel < 0;
+      if (Math.abs(rel) < Math.PI / 4) { pose = 0; mirror = false; }
+      else if (Math.abs(rel) > 3 * Math.PI / 4) { pose = 2; mirror = false; }
+      const rect = L.spriteRects[ids[pose] ?? ids[0]];
+      if (!rect) continue;
+      const [srx, sry, rw, rh] = rect, d = deff(z);
+      const scale = (WALL_H / 96) * proj / d, sw = rw * scale, sh = rh * scale;
+      const left = W / 2 + lat * proj / d - sw / 2, top = half + (WALL_H / 2) * proj / d - sh;
+      sprites.push({ tz: z, rx: srx, ry: sry, rw, rh, sw, sh, left, top, mirror,
+        x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
+    }
+
+    // murs : rayons courbes
+    const cols = L.atlasCols, fw = L.faceW, fh = L.faceH, DZ = 0.02, ZMAX = 9;
+    const items = [];
+    for (let x = 0; x < W; x++) {
+      const u = x + 0.5 - W / 2;
+      let cx = Math.floor(player.x), cy = Math.floor(player.y);
+      let pwx = player.x, pwy = player.y, pz = 0, nearest = 1e9, done = false;
+      items.length = 0;
+      for (let z = DZ; z < ZMAX && !done; z += DZ) {
+        const lat = u * deff(z) / proj;
+        const wx = player.x + fx * z + rx * lat, wy = player.y + fy * z + ry * lat;
+        let ncx = Math.floor(wx), ncy = Math.floor(wy);
+        // franchissements de bord de case dans ce pas (x et/ou y), dans l'ordre où ils arrivent
+        const cross = [];
+        if (ncx !== cx) { const bx = ncx > cx ? ncx : cx; cross.push({ t: (bx - pwx) / (wx - pwx), axis: 0 }); }
+        if (ncy !== cy) { const by = ncy > cy ? ncy : cy; cross.push({ t: (by - pwy) / (wy - pwy), axis: 1 }); }
+        cross.sort((a, b) => a.t - b.t);
+        for (const c of cross) {
+          const hx = pwx + (wx - pwx) * c.t, hy = pwy + (wy - pwy) * c.t, hz = pz + DZ * c.t;
+          let f, uu;
+          if (c.axis === 0) { const nx = ncx > cx ? cx + 1 : cx - 1; f = nx > cx ? FACE_W : FACE_E; cx = nx; uu = hy - Math.floor(hy); }
+          else { const ny = ncy > cy ? cy + 1 : cy - 1; f = ny > cy ? FACE_N : FACE_S; cy = ny; uu = hx - Math.floor(hx); }
+          if (!inside(cx, cy)) { done = true; break; }
+          const t = texFor(cx, cy, f);
+          if (!t) continue;
+          if (f === FACE_E || f === FACE_N) uu = 1 - uu;
+          if (t.tex >= 0) items.push({ d: hz, tex: t.tex, u: uu });
+          if (t.block && (t.opaque || t.tex < 0)) { nearest = hz; done = true; break; }
+        }
+        pwx = wx; pwy = wy; pz = z;
+      }
+      zbuf[x] = nearest;
+      for (const sp of sprites) {
+        if (x < sp.x0 || x > sp.x1 || sp.tz >= nearest) continue;
+        let uu = (x - sp.left) / sp.sw;
+        if (uu < 0 || uu >= 1) continue;
+        items.push({ d: sp.tz, sp, u: sp.mirror ? 1 - uu : uu });
+      }
+      items.sort((a, b) => b.d - a.d);
+      for (const it of items) {
+        const dist = Math.max(0.05, it.d);
+        if (it.sp) {
+          const sp = it.sp;
+          ctx.drawImage(L.sprImgs[shadeFor(dist)], sp.rx + Math.floor(it.u * sp.rw), sp.ry, 1, sp.rh, x, sp.top, 1, sp.sh);
+        } else {
+          const colH = WALL_H * proj / deff(dist), top = half - colH / 2;
+          const tx = (it.tex % cols) * fw + Math.min(fw - 1, Math.floor(it.u * fw));
+          const ty = Math.floor(it.tex / cols) * fh;
+          ctx.drawImage(L.wallImgs[shadeFor(dist)], tx, ty, 1, fh, x, top, 1, colH);
+        }
+      }
+    }
   }
 
   // Projection des monstres à l'écran (choix face / profil / dos selon l'angle de vue).
@@ -389,6 +503,14 @@
     if (image) { img.src = "data/scenes/" + image; img.hidden = false; } else img.hidden = true;
     document.getElementById("scene-label").textContent = label || (image ? "" : "Lieu");
     sceneEl.hidden = false;
+  });
+
+  // Mode intégré : choix de la perspective (bouton de la page du jeu).
+  addEventListener("message", (e) => {
+    if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-persp") return;
+    persp = e.data.mode === "jeu" ? "jeu" : "reelle";
+    try { localStorage.setItem("lol3d:persp", persp); } catch (err) {}
+    dirty = true;
   });
 
   // Mode intégré : monstres à leurs positions réelles.
