@@ -564,7 +564,7 @@ La RAM fait 16 Mo (`memsize=16`).
 | `0x3186F` | 30 × 46 octets | monstres du niveau courant. Champs relatifs à x (`0x31871 + 46·n`) : case u16 à −2 ; x, y u16 = case·256 + décalage ; destination x, y à +5 ; direction·2 à +9 et +16 ; numéro du monstre à +15 ; **direction à +17** ; points de vie u16 à +22 ; **type à +25** (juste avant le pointeur far vers ses caractéristiques, +26) ; +13 vaut 1 pour les gardes, sens inconnu. Entrée vide = case 0 |
 
 | `0x3E4F6` | 48 × u16 | barre d'inventaire commune : n° d'objet du jeu (0 = vide) |
-| `0x3E558` | u16 | objet tenu en main (curseur) |
+| `0x3E558` | u16 | objet tenu en main (curseur). La page le surveille : quand il change, la fiche de l'objet s'ouvre et sa case « en main » est sélectionnée comme après un clic (serrure entourée si c'est une clé) ; quand il revient à 0, cette fiche se ferme. **Vérifié** : clic sur l'Onguent de la barre du jeu → fiche « Onguent » ; reposé → fiche fermée |
 | `0x31F79` | 400 × 16 octets | objets du jeu : l'entrée n commence par le **type** d'objet (u16, index de la table des objets § 8.2) ; le reste est inconnu (case, niveau…) |
 | `0x3389F` | 4 × 130 octets | fiches du groupe : nom du personnage n en `0x3389F + 130·n` (drapeaux 2 octets avant). Champs relatifs au nom (voir ci-dessous) |
 | `0x2E7A2` | 8 × 130 octets | fiches modèles des personnages recrutables : Michael, Timothy, Baccata, (?), Conrad, Paulson, Dawn, Kieran, Ak'shel |

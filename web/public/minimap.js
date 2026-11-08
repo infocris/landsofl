@@ -710,10 +710,12 @@
   // Fiche d'un objet (clic sur une case) : données de tools/item_info.py
   const detailEl = document.getElementById("inv-detail");
   let detailType = -1;
-  function showDetail(type, label, cell) {
+  let fromHand = false;                 // fiche ouverte automatiquement par la prise en main
+  function showDetail(type, label, cell, auto = false) {
+    const wasSel = cell && cell.classList.contains("sel");
     document.querySelectorAll("#inv .slot.sel").forEach((e) => e.classList.remove("sel"));
-    if (detailType === type && !detailEl.hidden && cell && cell.classList.contains("sel")) { hideDetail(); return; }
-    detailType = type;
+    if (!auto && detailType === type && !detailEl.hidden && wasSel) { hideDetail(); return; }
+    detailType = type; fromHand = auto;
     if (cell) cell.classList.add("sel");
     selKey = itemInfo[type] && itemInfo[type].kind === "Clé" ? type : -1;
     draw(lastDraw[0], lastDraw[1]);
@@ -739,7 +741,7 @@
     detailEl.hidden = false;
   }
   function hideDetail() {
-    detailEl.hidden = true; detailType = -1; selKey = -1;
+    detailEl.hidden = true; detailType = -1; selKey = -1; fromHand = false;
     draw(lastDraw[0], lastDraw[1]);
     document.querySelectorAll("#inv .slot.sel").forEach((e) => e.classList.remove("sel"));
   }
@@ -759,7 +761,7 @@
   // rôle des 11 emplacements d'équipement, déduit des masques de la table des objets (§ 8.2)
   const EQUIP_NAMES = ["arme", "bouclier", "arme (2)", "bouclier (2)", "tête", "corps", "cou", "poignets", "pieds", "anneau", "anneau (2)"];
   let lastInvData = null;
-  let lastInv = "", owned = new Set();         // types d'objets possédés (inventaire, main, équipement)
+  let lastInv = "", owned = new Set(), lastHand = -1;         // types d'objets possédés (inventaire, main, équipement)
   async function updateInventory() {
     if (!itemInfo || previewing) return;
     const r = await mem.read([[INV.bar, INV.barSlots * 2], [INV.hand, 2], [INV.items, INV.itemSize * INV.maxItems],
@@ -789,6 +791,13 @@
       row.append(...c.eq.map((t, k) => slot(t, `${c.name}, ${EQUIP_NAMES[k] || "emplacement " + (k + 1)}`)));
       invChars.append(b, row);
     }
+    // objet pris en main dans le jeu : sélectionné comme si on avait cliqué dessus ;
+    // reposé : la fiche ouverte par la prise en main se ferme
+    if (handType !== lastHand) {
+      if (handType >= 0) showDetail(handType, "en main", invHand.firstChild, true);
+      else if (fromHand) hideDetail();
+    } else if (fromHand && handType >= 0) invHand.firstChild.classList.add("sel");
+    lastHand = handType;
   }
 
   // --- Création d'objets dans le sac -------------------------------------------
