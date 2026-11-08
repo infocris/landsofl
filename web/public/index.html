@@ -295,8 +295,11 @@
     // émulateur dans son worker (par défaut) ; ?worker=0 pour le mode direct (plus lourd).
     // La mini-carte lit la mémoire via le canal ajouté à emulators/wdosbox-x.js.
     workerThread: params.has("worker") ? params.get("worker") === "1" : true,
-    // ?souris=libre : pas de capture du pointeur (clics directs, utile pour les tests automatisés)
-    ...(new URLSearchParams(location.search).get("souris") === "libre" ? { mouseCapture: false } : {}),
+    // Souris : pas de capture du pointeur et pas de curseur système (cases « Mouse lock » et
+    // « System cursor » de js-dos décochées), à chaque démarrage. js-dos ne mémorise pas ces
+    // réglages, et réapplique mouseCapture après la config du jeu (qui contient autolock=true).
+    mouseCapture: false,
+    noCursor: true,
     url: BUNDLE,   // ?bundle= : autre fichier de jeu (tests)
     pathPrefix: "emulators/",
     pathSuffix: "?v=" + SCRIPTS_VERSION,  // évite un ancien wdosbox*.js (sans canal « lol-mem ») en cache
