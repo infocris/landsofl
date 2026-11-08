@@ -295,6 +295,33 @@ Fonctions du moteur identifiées :
 
   Numéros de sort, d'après les noms des parchemins : 2 Gel, 3 Boules de feu, 4 Poing
   mortel, 5 Brume fatale, 6 Foudre, 7 Vortex ; le 9 (Bâton d'ébène) reste inconnu.
+- **Effets passifs des anneaux** (code de `MAIN.EXE`, désassemblé avec Capstone). Le jeu
+  appelle une fonction « objet équipé ? » (`0a21:0997`, arguments : personnage, type
+  d'objet) :
+  - **Anneau Bezel (225)** : la fonction qui applique un état (arguments : personnage, état,
+    chance sur 100) ignore l'état 0x80, le poison, si l'anneau est porté. C'est donc une
+    immunité au poison ;
+  - **Anneau Talba (227)** et **Anneau Duble (228)** : dans la boucle de régénération (les
+    4 personnages, fiches de 0x82 octets), la magie (+0x3D, maximum +0x3F depuis le début de
+    la fiche) remonte de maximum/10 au lieu de 1 avec Talba. La vie remonte de 4 au lieu de 1
+    avec Duble. Une zone qui draine la magie (octet 0x7FDE) retire maximum/32 à la place ;
+  - **Anneau de Nuage (229)** : dans le calcul des dégâts subis, les dégâts de type 4 sont
+    divisés par 4. Le type 4 est celui de la Boule de Glace dans `ITEM.INF`, donc du froid
+    (**déduit**) ;
+  - **Anneau de Zéphyr (230)** : après une attaque, le personnage reçoit l'état 0x04
+    (récupération) pour 4 + hasard(8) cycles ; avec l'anneau, cette durée est divisée par 2 ;
+  - **Anneau d'Ambre (226)** : +5 en protection, par la table des objets.
+  La même routine d'attaque lance le script de la case visée avec l'événement 0x400, ce qui
+  confirme que 0x400 correspond à l'attaque.
+- **Objets à utiliser** (entrées de `ITEM.INF`, lues dans le script) : 0x08 Flasque d'huile =
+  remplit la lanterne ; 0x09 Bourse = pièces d'argent ; 0x0F Gobelet d'argent = soin de 255
+  contre 1 point de magie ; 0x12 Coupe Bezel = vie au maximum, utilisations comptées dans
+  l'objet ; 0x15 Cube de Vaelan : le 263 (chargé) rend 25 points de magie puis devient le
+  264 (vide) ; 0x1C Gantelet des Ténèbres = sort Poing mortel ; 0x18 = sort de l'octet 8 ;
+  0x1E As de l'Infini et Réserve de Bannon = magie au maximum, usage unique ; 0x20 Fioles =
+  « Beurk ! », puis Flasque vide. Fonctions du moteur déduites : `0x14` écrire une valeur
+  de la fiche du personnage, `0x0C` supprimer l'objet en main, `0x49` donner un objet,
+  `0x2F`/`0x30` lire et écrire une variable globale (huile de la lanterne = variable 9).
 - **Script des soins** (`ITEM.INF`, point d'entrée 4, lu en désassemblant) : l'objet ne sert
   que si la vie n'est pas au maximum, ou si le personnage est empoisonné (bit 0x80 de son
   état) et que l'objet est le Ginseng (type 218). Le script tire un nombre au hasard entre
@@ -692,3 +719,5 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-08** : objets réellement présents (listes des cases dans la grille vivante),
   leviers et éléments cliquables sur la mini-carte, transitions douces de la vue 3D.
 - **2026-11-08** : murs fragiles (Marteau) des cavernes du Draracle, sur la mini-carte.
+- **2026-11-08** : effets magiques des anneaux (code de `MAIN.EXE`) et des objets à
+  utiliser (`ITEM.INF`), nature des serrures, animation des monstres en 3D.

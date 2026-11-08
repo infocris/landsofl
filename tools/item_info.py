@@ -18,7 +18,30 @@ from pak import read_pak, read_strings
 SLOT_NAMES = ["arme", "bouclier", "arme", "bouclier", "tête", "corps", "cou", "poignets",
               "pieds", "anneau", "anneau"]
 # n° de sort des parchemins et baguettes, nommés d'après les parchemins de la table
-SPELLS = {2: "Gel", 3: "Boules de feu", 4: "Poing mortel", 5: "Brume fatale", 6: "Foudre", 7: "Vortex"}
+SPELLS = {2: "Gel", 3: "Boules de feu", 4: "Poing mortel", 5: "Brume fatale", 6: "Foudre", 7: "Vortex",
+          9: "Essaim"}   # 9 : même n° que l'objet « Essaim » (déduit)
+
+# Effets passifs codés dans MAIN.EXE (fonction « objet équipé ? » 0a21:0997), § 8.2
+PASSIVE = {
+    225: ["Immunité au poison"],
+    227: ["Régénère la magie 10 fois plus vite (10 % du maximum par cycle au lieu de 1 point)"],
+    228: ["Régénère la vie 4 fois plus vite (4 points par cycle au lieu de 1)"],
+    229: ["Divise par 4 les dégâts de type 4 (froid, d'après la Boule de Glace : déduit)"],
+    230: ["Attaques deux fois plus rapides (temps de récupération divisé par 2)"],
+}
+# Actions des objets à utiliser (points d'entrée de ITEM.INF), lues dans le script
+USE = {
+    0x08: ["Remplit la lanterne"],
+    0x09: ["Contient des pièces d'argent (« Vous trouvez N pièces d'argent dans la bourse »)"],
+    0x0A: ["Allume la lanterne"],
+    0x0D: ["Tombe en poussière (« C'est tombé en poussière »)"],
+    0x0F: ["Soigne (jusqu'à 255 points de vie) en consommant 1 point de magie"],
+    0x11: ["Affiche une énigme"],
+    0x12: ["Remet la vie au maximum ; nombre d'utilisations limité"],
+    0x1E: ["Remet la magie au maximum, usage unique"],
+    0x1F: ["Objet de quête (script complexe, non décodé)"],
+    0x20: ["Se boit (« Beurk ! ») et laisse une Flasque vide ; objet de quête"],
+}
 
 
 def slots_label(mask):
@@ -29,7 +52,7 @@ def slots_label(mask):
     return None
 
 
-def describe(raw, names, strings):
+def describe(raw, names, strings, type_id=None):
     """raw : 13 octets ; names : noms par type ; strings : textes LANDS.FRE. -> dict JSON."""
     b = raw
     mask = b[5] | b[6] << 8
@@ -65,17 +88,30 @@ def describe(raw, names, strings):
         tid = p1 | p2 << 8
         if 0x4000 <= tid < 0x4000 + len(strings) and strings[tid - 0x4000].strip():
             out["text"] = strings[tid - 0x4000].strip()
+    elif func == 0x15:
+        kind = "Objet magique"
+        effects.append("Chargé : rend 25 points de magie (dans la limite du maximum), puis se vide"
+                       if b[0] | b[1] << 8 == 0x41C9 and b[2] == 71 else
+                       "Vide : se recharge (condition non décodée)")
+    elif func in (0x18, 0x1C, 0x1D):
+        kind = "Objet magique"
+        sp = 4 if func == 0x1C else p1
+        effects.append(f"Lance le sort « {SPELLS.get(sp, f'n° {sp}')} »")
+    elif func in USE:
+        kind = kind or "Objet utilisable"
+        effects.extend(USE[func])
     elif kind is None and func == 0xFF:
         kind = "Objet (clé, quête, trésor…)"
     elif kind is None:
         kind = "Objet utilisable"
         effects.append(f"Action spéciale (script n° {func} de ITEM.INF, non décodée)")
-    elif kind == "Doigt (anneau)" and not prot:
-        effects.append("Effet magique non décodé")
+    elif kind == "Doigt (anneau)" and not prot and not PASSIVE.get(type_id):
+        effects.append("Pas d'effet trouvé dans le code du jeu")
     if prot:
         effects.append(f"Protection +{prot}")
     if mask:
         out["wear"] = ", ".join(dict.fromkeys(SLOT_NAMES[k] for k in out["slots"]))
+    effects.extend(PASSIVE.get(type_id, []))
     out["kind"] = kind
     out["effects"] = effects
     return out
@@ -85,7 +121,7 @@ def build(game_dir, table_path):
     items = json.load(open(table_path, encoding="utf-8"))["items"]
     strings = read_strings(read_pak(os.path.join(game_dir, "STARTUP.PAK"))["LANDS.FRE"])
     names = [i["name"] for i in items]
-    out = [{"name": i["name"], "icon": i["shape"], **describe(bytes.fromhex(i["raw"]), names, strings)}
+    out = [{"name": i["name"], "icon": i["shape"], **describe(bytes.fromhex(i["raw"]), names, strings, i["type"])}
            for i in items]
     # clés : serrures où elles s'utilisent (tools/locks.py)
     import locks

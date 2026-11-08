@@ -516,7 +516,7 @@
   const ICON = 20, ICON_COLS = 16, SCALE = 1.5;
   const invBar = document.getElementById("inv-bar"), invHand = document.getElementById("inv-hand"),
     invChars = document.getElementById("inv-chars"), invCount = document.getElementById("inv-count");
-  getJSON("viewer/data/items.json?v=20261108r").then((d) => { itemInfo = d; }, () => {});
+  getJSON("viewer/data/items.json?v=20261108s").then((d) => { itemInfo = d; }, () => {});
 
   function slot(type, label) {
     const d = document.createElement("div");
