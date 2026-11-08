@@ -91,7 +91,8 @@ def build(game_dir, table_path):
     import locks
     for n, ls in locks.all_locks(game_dir).items():
         for l in ls:
-            out[l["key"]].setdefault("locks", []).append({"level": n, "x": l["x"], "y": l["y"], "how": l["how"]})
+            out[l["key"]].setdefault("locks", []).append({"level": n, "x": l["x"], "y": l["y"], "how": l["how"],
+                                                          "kind": l["kind"]})
     for t, i in enumerate(items):
         if bytes.fromhex(i["raw"])[4] & 1:
             out[t]["kind"] = "Clé"

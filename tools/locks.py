@@ -82,7 +82,42 @@ def level_locks(inf, keys):
     return sorted((b, t, how) for (b, t), how in best.items())
 
 
-def all_locks(game_dir):
+def lock_kind(inf, block, cells):
+    """Nature de la serrure d'après ce que fait le script de sa case après le test de la clé :
+    "coffre" (crée un objet, fonction 0x11/0x10/0x0F), "passage" (supprime un mur : fonction
+    0x00 avec face -1 et type 0), "receptacle" (change le décor de sa propre face : la clé
+    reste insérée), sinon "porte" si une porte touche la case, sinon "inconnu"."""
+    ck = emc.chunks(inf)
+    ins = emc.disasm(ck)
+    o = struct.unpack(f">{len(ck['ORDR']) // 2}H", ck["ORDR"])
+    s = o[block]
+    later = [a for a in o[:1024] if a != 0xFFFF and a > s]
+    e = min(later) if later else 1 << 30
+    seg = [q for q in ins if s <= q[0] < e]
+    kinds = set()
+    for k in range(3, len(seg)):
+        op, p = seg[k][1], seg[k][2]
+        if op == 14 and p & 0xFF in (0x11, 0x10, 0x0F):
+            kinds.add("coffre")
+        if op == 14 and p & 0xFF == 0 and all(seg[k - i][1] in (3, 4) for i in (1, 2, 3)):
+            tb, face, ty = seg[k - 1][2], seg[k - 2][2], seg[k - 3][2]
+            if face == -1 and ty == 0:
+                kinds.add("passage")
+            elif tb == block:
+                kinds.add("receptacle")
+    for k in ("coffre", "passage", "receptacle"):
+        if k in kinds:
+            return k
+    # arguments du sous-programme de serrure : une case de porte citée -> porte
+    for q in seg:
+        if q[1] in (3, 4) and 32 <= q[2] < 1024 and cells[q[2] // 32][q[2] % 32] == "door":
+            return "porte"
+    x, y = block % 32, block // 32
+    near = [cells[y + dy][x + dx] for dx, dy in ((0, -1), (1, 0), (0, 1), (-1, 0)) if 0 <= x + dx < 32 and 0 <= y + dy < 32]
+    return "porte" if "door" in near else "inconnu"
+
+
+def all_locks(game_dir, maps_dir=None):
     """-> {niveau: [{"x", "y", "key", "name", "how"}]}"""
     keys = key_types()
     res = {}
@@ -93,7 +128,11 @@ def all_locks(game_dir):
         f = read_pak(p)
         if f"LEVEL{n}.INF" not in f:
             continue
-        res[n] = [{"x": b % 32, "y": b // 32, "key": t, "name": keys[t], "how": how}
+        mp = os.path.join(maps_dir or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "maps"),
+                          f"level{n:02d}.json")
+        cells = json.load(open(mp, encoding="utf-8"))["cells"] if os.path.exists(mp) else None
+        res[n] = [{"x": b % 32, "y": b // 32, "key": t, "name": keys[t], "how": how,
+                   "kind": lock_kind(f[f"LEVEL{n}.INF"], b, cells) if cells else "inconnu"}
                   for b, t, how in level_locks(f[f"LEVEL{n}.INF"], keys)]
     return res
 
@@ -104,6 +143,6 @@ if __name__ == "__main__":
     used = {l["key"] for ls in locks.values() for l in ls}
     for n, ls in locks.items():
         for l in ls:
-            print(f"niveau {n:2d} case {l['x']:2d},{l['y']:2d}  {l['name']} ({l['key']}, {l['how']})")
+            print(f"niveau {n:2d} case {l['x']:2d},{l['y']:2d}  {l['name']} ({l['key']}, {l['how']}) : {l['kind']}")
     print(f"{len(used)} clés sur {len(keys)} localisées ; sans serrure trouvée :",
           ", ".join(f"{keys[t]} ({t})" for t in sorted(set(keys) - used)))

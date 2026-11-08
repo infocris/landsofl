@@ -337,7 +337,7 @@ def pak_cache(game_dir, name):
 
 
 def main(game_dir, maps_dir, out_dir):
-    locks_by_level = locks_mod.all_locks(game_dir)
+    locks_by_level = locks_mod.all_locks(game_dir, maps_dir)
     fragile_by_level = fragile_mod.all_fragile(game_dir, maps_dir)
     os.makedirs(out_dir, exist_ok=True)
     playfld = cps(read_pak(os.path.join(game_dir, "GENERAL.PAK"))["PLAYFLD.CPS"])[1]

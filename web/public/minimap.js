@@ -68,7 +68,7 @@
   async function loadLevels() {
     const index = await getJSON("viewer/data/levels.json");
     for (const l of index) {
-      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261108q`);
+      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261108r`);
       levels.push({ level: l.level, name: l.name, faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
         labels: d.labels, places: numberPlaces(d.labels || []), groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {},
         spriteSigs: d.spriteSigs || {}, spriteOf: null, scenes: d.scenes || {}, locks: d.locks || [],
@@ -264,6 +264,12 @@
     g.strokeStyle = "#ffd700"; g.fillStyle = "#ffd700"; g.lineWidth = Math.max(1, k);
     for (const c of new Set(L.locks.map((l) => l.y * 32 + l.x))) {
       const x0 = (c % 32) * CELL, y0 = Math.floor(c / 32) * CELL, r = 2 * k;
+      if (L.locks.some((l) => l.y * 32 + l.x === c && l.kind === "coffre")) {   // coffre : petite malle
+        const w = CELL * 0.6, h = CELL * 0.42, cx0 = x0 + (CELL - 1 - w) / 2, cy0 = y0 + (CELL - 1 - h) / 2;
+        g.fillStyle = "#8b5a2b"; g.fillRect(cx0, cy0, w, h);
+        g.fillStyle = "#ffd700"; g.fillRect(cx0, cy0 + h * 0.35, w, Math.max(1, h * 0.18));
+        g.fillStyle = "#ffd700"; g.strokeStyle = "#ffd700"; continue;
+      }
       g.beginPath(); g.arc(x0 + r + 1, y0 + r + 1, r, 0, 2 * Math.PI); g.stroke();
       g.beginPath(); g.moveTo(x0 + 2 * r + 1, y0 + r + 1); g.lineTo(x0 + CELL - 2, y0 + r + 1);
       g.lineTo(x0 + CELL - 2, y0 + 2 * r + 1); g.stroke();
@@ -311,6 +317,8 @@
     g.closePath(); g.stroke(); g.fill();
   }
 
+  const LOCK_KIND = { porte: "Serrure de porte", passage: "Serrure (ouvre un passage)",
+    receptacle: "Réceptacle de clé (mécanisme)", coffre: "Donne un objet (coffre ou lieu)", inconnu: "Serrure" };
   // Info-bulle au survol de la mini-carte : nature de la case, lieu, objets, monstres
   const tipEl = document.getElementById("mm-tip");
   const CLASS_FR = { wall: "mur", floor: "sol", doorOpen: "porte ouverte", doorClosed: "porte fermée",
@@ -339,7 +347,7 @@
       out.push(isWallCell(L, i) ? `<span class="fr">Mur fragile : se casse en le frappant avec : ${esc(fw.toolName)}</span>`
         : `<span class="fr">Mur fragile (déjà cassé)</span>`);
     for (const l of L.locks) if (l.x === x && l.y === y)
-      out.push(`<span class="ky">Serrure : ${esc(l.name)}${owned.has(l.key) ? " ✔ dans l'inventaire" : ""}${l.how === "direct" ? "" : " (probable)"}</span>`);
+      out.push(`<span class="ky">${LOCK_KIND[l.kind] || "Serrure"} : ${esc(l.name)}${owned.has(l.key) ? " ✔ dans l'inventaire" : ""}${l.how === "direct" ? "" : " (probable)"}</span>`);
     for (const m of monsters) if (Math.floor(m.x) === x && Math.floor(m.y) === y) {
       const nm = (L.spriteOf || {})[m.type] || (L.monsterTypes[m.type] || []).join(" / ") || `type ${m.type}`;
       out.push(`<span class="mo">Monstre : ${esc(nm)} (regarde vers ${["le nord", "l'est", "le sud", "l'ouest"][m.dir]})</span>`);
@@ -508,7 +516,7 @@
   const ICON = 20, ICON_COLS = 16, SCALE = 1.5;
   const invBar = document.getElementById("inv-bar"), invHand = document.getElementById("inv-hand"),
     invChars = document.getElementById("inv-chars"), invCount = document.getElementById("inv-count");
-  getJSON("viewer/data/items.json?v=20261108q").then((d) => { itemInfo = d; }, () => {});
+  getJSON("viewer/data/items.json?v=20261108r").then((d) => { itemInfo = d; }, () => {});
 
   function slot(type, label) {
     const d = document.createElement("div");
@@ -548,7 +556,7 @@
     if (it.kind === "Clé") {
       if (!it.locks) lines.push("Serrure non trouvée dans les scripts des niveaux");
       for (const l of it.locks || [])
-        lines.push(`Ouvre : niveau ${l.level}, case ${l.x},${l.y}${l.how === "direct" ? "" : " (probable)"}`
+        lines.push(`${LOCK_KIND[l.kind] || "Serrure"} : niveau ${l.level}, case ${l.x},${l.y}${l.how === "direct" ? "" : " (probable)"}`
           + (current && current.level === l.level ? " — ce niveau, entourée sur la carte" : ""));
     }
     if (it.value) lines.push(`Valeur : ${it.value} (supposée)`);

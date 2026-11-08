@@ -217,6 +217,15 @@ Fonctions du moteur identifiées :
   mais 32 faces de type 1, toutes sur des cases à script. La mini-carte affiche les leviers
   et, quand la case a un script, les éléments de type 1 ou 4. L'état d'un levier se lit dans
   la grille vivante, puisque l'identifiant du mur change quand on l'actionne.
+- **Nature des serrures** (`tools/locks.py`, `lock_kind`) : d'après ce que fait le script de
+  la case. Si le script crée un objet (fonctions `0x11`, `0x10`, `0x0F`), la serrure **donne
+  un objet**. S'il supprime un mur (`0x00`, face -1, type 0), elle **ouvre un passage**. S'il
+  change le décor de sa propre face, c'est un **réceptacle** : la clé reste insérée (les
+  Clefs Mystiques des tours). S'il cite la case d'une porte, ou si une porte touche la
+  case, c'est une **serrure de porte**. Bilan : 24 portes, 6 passages, 13 réceptacles,
+  2 « donne un objet », 15 indéterminées. Le jeu n'a pas de coffre fermé à clé : les deux
+  cas « donne un objet » sont des lieux (l'Echoppe de Sadie au niveau 22, une scène au
+  niveau 10), et les coffres cités dans les textes (« Un coffre cassé ») sont des décors.
 - **Murs fragiles** (`tools/fragile.py`) : au niveau 6, en marchant en 8,7 puis en 11,13,
   on lit « Ce mur me semble assez fragile » puis « Ce mur est également branlant ». Les
   murs juste au sud (8,8 et 11,14) se cassent en les frappant avec le **Marteau**
