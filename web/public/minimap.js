@@ -94,7 +94,7 @@
       .map((l, i) => ({ x: l.x, y: l.y, text: l.text, n: i + 1 }));
   }
   const placesEl = document.getElementById("mm-places");
-  let hoverCell = -1;
+  let hoverCell = -1, selKey = -1;             // selKey : clé choisie dans l'inventaire
   const niceName = (t) => t.charAt(0) + t.slice(1).toLowerCase();
   function renderPlaceList(L) {
     placesEl.textContent = "";
@@ -206,6 +206,17 @@
       g.beginPath(); g.arc(x0 + r + 1, y0 + r + 1, r, 0, 2 * Math.PI); g.stroke();
       g.beginPath(); g.moveTo(x0 + 2 * r + 1, y0 + r + 1); g.lineTo(x0 + CELL - 2, y0 + r + 1);
       g.lineTo(x0 + CELL - 2, y0 + 2 * r + 1); g.stroke();
+    }
+    // serrures de la clé sélectionnée dans l'inventaire : cercle doré clignotant
+    if (selKey >= 0) {
+      const on = Math.floor(performance.now() / 400) % 2 === 0;
+      for (const l of L.locks) if (l.key === selKey) {
+        const cx = l.x * CELL + CELL / 2, cy = l.y * CELL + CELL / 2;
+        g.strokeStyle = "#000"; g.lineWidth = 4;
+        g.beginPath(); g.arc(cx, cy, CELL * (on ? 1.1 : 0.9), 0, 2 * Math.PI); g.stroke();
+        g.strokeStyle = on ? "#ffd700" : "#fff2a0"; g.lineWidth = 2;
+        g.beginPath(); g.arc(cx, cy, CELL * (on ? 1.1 : 0.9), 0, 2 * Math.PI); g.stroke();
+      }
     }
     if (hoverCell >= 0) {                       // lieu survolé dans la liste
       g.strokeStyle = "#ffd700"; g.lineWidth = 2;
@@ -449,6 +460,8 @@
     if (detailType === type && !detailEl.hidden && cell && cell.classList.contains("sel")) { hideDetail(); return; }
     detailType = type;
     if (cell) cell.classList.add("sel");
+    selKey = itemInfo[type] && itemInfo[type].kind === "Clé" ? type : -1;
+    draw(lastDraw[0], lastDraw[1]);
     const it = itemInfo[type] || { name: `objet ${type}`, icon: -1, effects: [] };
     const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
     const icon = el("div", "slot full"); setIcon(icon, it.icon);
@@ -459,7 +472,7 @@
       if (!it.locks) lines.push("Serrure non trouvée dans les scripts des niveaux");
       for (const l of it.locks || [])
         lines.push(`Ouvre : niveau ${l.level}, case ${l.x},${l.y}${l.how === "direct" ? "" : " (probable)"}`
-          + (current && current.level === l.level ? " — ce niveau (clé dorée sur la carte)" : ""));
+          + (current && current.level === l.level ? " — ce niveau, entourée sur la carte" : ""));
     }
     if (it.value) lines.push(`Valeur : ${it.value} (supposée)`);
     const ul = el("ul"); for (const l of lines) ul.appendChild(el("li", null, l));
@@ -471,7 +484,8 @@
     detailEl.hidden = false;
   }
   function hideDetail() {
-    detailEl.hidden = true; detailType = -1;
+    detailEl.hidden = true; detailType = -1; selKey = -1;
+    draw(lastDraw[0], lastDraw[1]);
     document.querySelectorAll("#inv .slot.sel").forEach((e) => e.classList.remove("sel"));
   }
 
