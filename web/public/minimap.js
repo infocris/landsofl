@@ -405,6 +405,33 @@
   }
   setInterval(() => { updateStats().catch(() => {}); }, 1000);
 
+  // --- Triches : vie / magie infinies ------------------------------------------
+  // Toutes les 100 ms, vie (+55) et magie (+59) actuelles du premier personnage sont remises
+  // à leur maximum (+57, +61). Un coup qui ferait passer la vie sous zéro entre deux
+  // écritures resterait mortel : c'est une vie « quasi » infinie.
+  const cheatHp = document.getElementById("cheat-hp"), cheatMp = document.getElementById("cheat-mp");
+  for (const [box, key] of [[cheatHp, "cheatHp"], [cheatMp, "cheatMp"]]) {
+    try { box.checked = localStorage.getItem(key) === "on"; } catch (e) {}
+    box.addEventListener("change", () => { try { localStorage.setItem(key, box.checked ? "on" : "off"); } catch (e) {} box.blur(); });
+  }
+  let cheating = false;
+  setInterval(async () => {
+    if (cheating || previewing || !(cheatHp.checked || cheatMp.checked)) return;
+    cheating = true;
+    try {
+      const base = INV.char0;                                 // adresse du nom
+      const r = await mem.read([[base - 2, 70]]);
+      if (!r) return;
+      const c = r[0], at = (k) => c[2 + k] | c[2 + k + 1] << 8;
+      if (c[0] !== 1 || !/^[A-Za-z]/.test(String.fromCharCode(c[2]))) return;   // pas de personnage actif
+      const writes = [];
+      const fill = (cur, max) => { const m = at(max); if (m > 0 && m < 1000 && at(cur) !== m) writes.push([base + cur, new Uint8Array([m & 255, m >> 8])]); };
+      if (cheatHp.checked) fill(55, 57);
+      if (cheatMp.checked) fill(59, 61);
+      if (writes.length) await mem.write(writes);
+    } finally { cheating = false; }
+  }, 100);
+
   window.LoLMinimap = { attach() {}, preview, monsters: debugMonsters };
 
   setInterval(() => { updateInventory().catch(() => {}); }, 1000);

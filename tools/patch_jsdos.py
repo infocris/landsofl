@@ -40,7 +40,7 @@ CHANNEL = r'''
   }
   ch.onmessage = function (e) {
     var m = globalThis.__lolModule, req = e.data;
-    if (!m || !m.HEAPU8 || !req || !(req.ranges || req.find)) return;
+    if (!m || !m.HEAPU8 || !req || !(req.ranges || req.find || req.write)) return;
     var h = m.HEAPU8;
     if (base < 0) {
       var now = Date.now();
@@ -48,6 +48,11 @@ CHANNEL = r'''
       nextTry = now + 2000;
       base = findBase(h);
       if (base < 0) { ch.postMessage({ id: req.id, error: "base" }); return; }
+    }
+    if (req.write) {                   /* {write:[[adresse physique, Uint8Array]…]} -> {ok} (triches) */
+      req.write.forEach(function (w) { if (w[0] >= 0 && w[0] + w[1].length <= 0x1000000) h.set(w[1], base + w[0]); });
+      ch.postMessage({ id: req.id, found: [] });
+      return;
     }
     if (req.find) {                    /* {find:[Uint8Array…], limit} -> {found:[adresse ou -1…]} */
       ch.postMessage({ id: req.id, found: req.find.map(function (p) { return find(h, p, req.limit || 0x100000); }) });

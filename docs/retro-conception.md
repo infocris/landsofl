@@ -493,6 +493,15 @@ Calcul des valeurs affichées, vérifié sur la fiche du jeu :
 
 Retirer le poignard fait passer le bonus de +23 de 10 à 0, et la Force affichée baisse.
 
+**Écriture en RAM (triches).** Le canal du worker accepte aussi
+`{write:[[adresse physique, Uint8Array]…]}`. La page s'en sert pour une vie et une magie
+« infinies » : toutes les 100 ms, la vie (+55) et la magie (+59) actuelles du premier
+personnage sont remises à leur maximum (+57, +61).
+- **Vérifié** : une vie écrite à 5 remonte à 20 en moins de 0,5 s, et reste à 5 sans la
+  triche.
+- **Limite** : un coup qui ferait passer la vie sous zéro entre deux écritures resterait
+  mortel. Les barres du jeu ne se redessinent qu'à ses propres événements.
+
 **Inventaire** (trouvé par différences). On prend la potion de la barre en main, puis on
 la repose. Un seul mot passe de n à 0 puis revient à n (la case de la barre, 0x3E4F6), et
 un seul fait l'inverse, 0 puis n puis 0 (l'objet en main, 0x3E558). La table des objets

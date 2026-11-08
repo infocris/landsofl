@@ -66,6 +66,15 @@
         setTimeout(() => { if (this.pending.delete(id)) resolve(null); }, timeout);
       });
     }
+    // Écriture en RAM (triches) : writes = [[adresse physique, Uint8Array]…].
+    write(writes, timeout = 1000) {
+      const id = ++this.seq;
+      return new Promise((resolve) => {
+        this.pending.set(id, resolve);
+        this.ch.postMessage({ id, write: writes });
+        setTimeout(() => { if (this.pending.delete(id)) resolve(null); }, timeout);
+      });
+    }
     read(ranges, timeout = 1000) {
       const id = ++this.seq;
       return new Promise((resolve) => {

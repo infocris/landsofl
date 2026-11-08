@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="js-dos.css">
 <script src="js-dos.js"></script>
 <!-- ?v= : à changer à chaque modification des scripts (évite les copies en cache) -->
-<script src="memscan.js?v=20261108b"></script>
+<script src="memscan.js?v=20261108g"></script>
 <style>
   html, body { margin: 0; height: 100%; background: #000; }
   body { display: flex; }
@@ -29,6 +29,8 @@
   #mm-items-title { color: #a39578; font-size: 12px; }
   #stats { border-top: 1px solid #3a3226; padding-top: 6px; font-size: 12px; color: #cfc3a6; }
   #st-money { color: #e8dcc0; }
+  #cheats { display: flex; gap: 14px; margin-top: 4px; color: #a39578; font-size: 11px; }
+  #cheats input { accent-color: #c9a227; vertical-align: -2px; }
   .st-char { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin-top: 3px; align-items: center; }
   .st-char .nm { grid-column: 1 / -1; color: #a39578; font-weight: 600; }
   .bar { position: relative; height: 10px; background: #17130e; border: 1px solid #3a3226; }
@@ -98,6 +100,8 @@
   <div id="stats">
     <div class="inv-head"><span class="inv-title">Caractéristiques</span><span id="st-money"></span></div>
     <div id="st-chars"></div>
+    <div id="cheats"><label><input type="checkbox" id="cheat-hp"> Vie infinie</label>
+      <label><input type="checkbox" id="cheat-mp"> Magie infinie</label></div>
   </div>
   <div id="inv">
     <div class="inv-head"><span class="inv-title">Inventaire</span><span id="inv-count">en attente du jeu…</span></div>
@@ -262,7 +266,7 @@
   // (jsdos/saves/<url>.changes) ne sont pas touchées.
   const BUNDLE = params.get("bundle") || "lands-cd-v2.jsdos";
   const BUNDLE_VERSION = "2026-11-07-savefile";
-  const SCRIPTS_VERSION = "2026-11-08-lolmem3";   // à changer après tools/patch_jsdos.py
+  const SCRIPTS_VERSION = "2026-11-08-lolmem4";   // à changer après tools/patch_jsdos.py
   async function dropStaleBundleCache() {
     const key = "bundleVersion:" + BUNDLE;
     try { if (localStorage.getItem(key) === BUNDLE_VERSION) return; } catch (e) { return; }
@@ -303,6 +307,6 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261108f"></script>
+<script src="minimap.js?v=20261108g"></script>
 </body>
 </html>
