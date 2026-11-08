@@ -18,6 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
+  const DATA_V = "20261108q";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) FOV = 2 * Math.atan(1.375);
   let dirty = true;
@@ -97,11 +98,11 @@
   async function loadLevel(n, keepPos) {
     const nn = String(n).padStart(2, "0");
     const [data, walls, spr, floor, ceil] = await Promise.all([
-      fetch(`data/level${nn}.json`).then((r) => r.json()),
-      loadImage(`data/level${nn}_walls.png`),
-      loadImage(`data/level${nn}_spr.png`),
-      loadImage(`data/level${nn}_floor.png`),
-      loadImage(`data/level${nn}_ceil.png`),
+      fetch(`data/level${nn}.json?v=${DATA_V}`).then((r) => r.json()),
+      loadImage(`data/level${nn}_walls.png?v=${DATA_V}`),
+      loadImage(`data/level${nn}_spr.png?v=${DATA_V}`),
+      loadImage(`data/level${nn}_floor.png?v=${DATA_V}`),
+      loadImage(`data/level${nn}_ceil.png?v=${DATA_V}`),
     ]);
     L = data;
     L.wallImgs = darken(walls, SHADES);
@@ -291,7 +292,7 @@
       let pose = 1, mirror = rel < 0;
       if (Math.abs(rel) < Math.PI / 4) { pose = 0; mirror = false; }
       else if (Math.abs(rel) > 3 * Math.PI / 4) { pose = 2; mirror = false; }
-      const rect = L.spriteRects[ids[pose] ?? ids[0]];
+      const rect = L.spriteRects[spriteFrame(ids, pose, m)];
       if (!rect) continue;
       const [srx, sry, rw, rh] = rect, d = deff(z);
       const scale = (WALL_H / 96) * proj / d, sw = rw * scale, sh = rh * scale;
@@ -354,6 +355,36 @@
     }
   }
 
+  // Animation des monstres : 16 images par sprite (0-3 face, 4-7 profil, 8-11 dos ; 12-15
+  // attaque). Un monstre qui vient de bouger joue son cycle de marche (8 images/s) ; sinon,
+  // image d'animation lue en mémoire (sf), ou la première du groupe.
+  const WALK_MS = 700, WALK_FPS = 8;
+  const monTrack = new Map();                             // slot -> {x, y, until}
+  function trackMonsters(list) {
+    const now = performance.now();
+    for (const m of list) {
+      const t = monTrack.get(m.slot);
+      if (t && (Math.abs(t.x - m.x) > 1e-3 || Math.abs(t.y - m.y) > 1e-3)) t.until = now + WALK_MS;
+      monTrack.set(m.slot, { x: m.x, y: m.y, until: t ? t.until : 0 });
+    }
+  }
+  function monsterStep(m) {
+    const t = m && m.slot !== undefined ? monTrack.get(m.slot) : null;
+    const now = performance.now();
+    if (t && now < t.until) return Math.floor(now / (1000 / WALK_FPS)) % 4;
+    return m && m.sf ? m.sf & 3 : 0;
+  }
+  window.lolMonStep = (slot) => monsterStep(liveMonsters.find((m) => m.slot === slot));   // débogage
+  function animating() {
+    const now = performance.now();
+    for (const t of monTrack.values()) if (now < t.until) return true;
+    return false;
+  }
+  function spriteFrame(ids, pose, m) {
+    if (ids.length >= 12) return ids[pose * 4 + monsterStep(m)] ?? ids[pose * 4] ?? ids[0];
+    return ids[pose] ?? ids[0];                           // anciennes données : 3 poses
+  }
+
   // Projection des monstres à l'écran (choix face / profil / dos selon l'angle de vue).
   function projectSprites(dirX, dirY, planeX, planeY) {
     const out = [];
@@ -373,7 +404,7 @@
       let pose = 1, mirror = rel < 0;
       if (Math.abs(rel) < Math.PI / 4) { pose = 0; mirror = false; }
       else if (Math.abs(rel) > 3 * Math.PI / 4) { pose = 2; mirror = false; }
-      const rect = L.spriteRects[ids[pose] ?? ids[0]];
+      const rect = L.spriteRects[spriteFrame(ids, pose, m)];
       if (!rect) continue;
       const [rx, ry, rw, rh] = rect;
       const scale = (WALL_H / 96) / tz * proj;      // même échelle que les murs (96 px = hauteur)
@@ -550,6 +581,7 @@
   addEventListener("message", (e) => {
     if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-monsters") return;
     liveMonsters = e.data.list.map((m) => ({ ...m, level: e.data.level }));
+    trackMonsters(liveMonsters);
     dirty = true;
   });
 
@@ -594,7 +626,7 @@
     dirty = true;
   });
 
-  let last = performance.now(), saveAt = 0;
+  let last = performance.now(), saveAt = 0, lastAnimFrame = -1;
   function frame(t) {
     const dt = Math.min(0.05, (t - last) / 1000); last = t;
     if (L && EMBED) {
@@ -606,6 +638,10 @@
         turning = Math.abs(anim.a1 - anim.a0) > 0.01 && k < 1;
         if (k >= 1) { anim = null; turning = false; player.a = gameA + lookYaw; }
         dirty = true;
+      }
+      if (animating()) {                                  // cycle de marche : rendu à chaque nouvelle image
+        const f = Math.floor(t / (1000 / WALK_FPS));
+        if (f !== lastAnimFrame) { lastAnimFrame = f; dirty = true; }
       }
       if (dirty) { render(); updateHud(); dirty = false; }
     } else if (L) {

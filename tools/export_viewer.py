@@ -390,7 +390,7 @@ def main(game_dir, maps_dir, out_dir):
         floor_img.save(os.path.join(out_dir, f"level{n:02d}_floor.png"))
         ceil_img.save(os.path.join(out_dir, f"level{n:02d}_ceil.png"))
 
-        # sprites des monstres : image 0 (face), 4 (profil), 8 (dos)
+        # sprites des monstres : images 0-15 (face, profil, dos par groupes de 4, puis attaque)
         sprite_names = sorted({s for m in level["monsters"] for s in m["sprites"]})
         sprite_sigs = {}
         sprites, sprite_imgs = {}, []
@@ -408,13 +408,14 @@ def main(game_dir, maps_dir, out_dir):
             raw = cps(data)[0] if struct.unpack_from("<H", data, 2)[0] == 4 else data
             if len(raw) >= 432:
                 sprite_sigs[sname] = raw[400:432].hex()
+            # 16 images : 0-3 face (marche), 4-7 profil, 8-11 dos, 12-15 attaque et coups
             entry = []
-            for fi in (0, 4, 8):
-                if fi < len(frames) and frames[fi]:
+            for fi in range(16):
+                if fi < len(frames) and frames[fi] and frames[fi][0] > 8:
                     entry.append(len(sprite_imgs))
                     sprite_imgs.append(frame_image(frames[fi], pal))
-                else:
-                    entry.append(entry[0] if entry else None)
+                else:                                   # image absente : première de son groupe
+                    entry.append(entry[fi - fi % 4] if fi % 4 and entry else (entry[0] if entry else None))
             sprites[sname] = entry
         sx, rects = 0, []
         for img in sprite_imgs:
