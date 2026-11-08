@@ -10,6 +10,8 @@
 <script src="memscan.js?v=20261108g"></script>
 <style>
   html, body { margin: 0; height: 100%; background: #000; }
+  /* pas de retour arrière par balayage horizontal du pavé tactile (Chrome, Edge) */
+  html, body { overscroll-behavior: none; }
   body { display: flex; }
   /* colonne de gauche : jeu, puis vue 3D synchronisée */
   #left { flex: 1; min-width: 0; height: 100vh; display: flex; flex-direction: column; }
@@ -289,6 +291,26 @@
   // donc les changements toutes les 5 s et on déclenche ce même enregistrement.
   // (F6/F7 = état de l'émulateur en mémoire seulement : perdu au rechargement.)
   const params = new URLSearchParams(location.search);
+
+  // --- Protection contre le changement de page par erreur ---------------------
+  // Le navigateur demande confirmation avant de quitter ou recharger la page (retour
+  // arrière, Cmd+R, fermeture d'onglet…). Désactivable avec ?confirm=0.
+  if (params.get("confirm") !== "0") {
+    addEventListener("beforeunload", (e) => { e.preventDefault(); e.returnValue = ""; });
+  }
+  // Retour arrière (bouton ou geste) : on garde une entrée d'historique « tampon » et on
+  // la remet en place, pour rester sur la page sans même afficher la confirmation.
+  // Chrome ignore une entrée ajoutée sans geste de l'utilisateur : on la pose au premier clic
+  // ou à la première touche.
+  if (params.get("confirm") !== "0") {
+    const guard = () => {
+      removeEventListener("pointerdown", guard, true); removeEventListener("keydown", guard, true);
+      if (!(history.state && history.state.lolGuard)) history.pushState({ lolGuard: true }, "");
+    };
+    addEventListener("pointerdown", guard, true); addEventListener("keydown", guard, true);
+    addEventListener("popstate", () => { history.pushState({ lolGuard: true }, ""); });
+  }
+
   function startAutoSave(ci) {
     if (params.get("autosave") === "0") return;
     let last = null, busy = false;
