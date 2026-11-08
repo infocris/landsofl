@@ -60,6 +60,13 @@
   #inv .inv-title { color: #c9a227; font-weight: 600; margin-bottom: 2px; }
   #inv .inv-head { display: flex; align-items: baseline; gap: 8px; }
   #inv .inv-actions { margin-left: auto; display: flex; gap: 4px; }
+  #inv-add { display: flex; gap: 4px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+  #inv-add input { flex: 1; min-width: 160px; font: 12px system-ui, sans-serif; padding: 3px 6px; background: #17130e;
+    color: #e8dcc0; border: 1px solid #554a36; border-radius: 4px; }
+  #inv-add button { font: 11px/1 system-ui, sans-serif; padding: 4px 8px; border: 1px solid #c9a227; border-radius: 4px;
+    background: #1d1912; color: #e8dcc0; cursor: pointer; }
+  #inv-add-msg { color: #a39578; font-size: 11px; width: 100%; }
+  #inv-add-msg:empty { display: none; }
   #inv .inv-actions button { font: 11px/1 system-ui, sans-serif; padding: 3px 6px; border: 1px solid #554a36;
     border-radius: 4px; background: #1d1912; color: #e8dcc0; cursor: pointer; }
   #inv .inv-actions button:hover { background: #2a2217; }
@@ -168,6 +175,8 @@
     <div id="inv-bar" class="inv-grid"></div>
     <div id="inv-handrow">En main <span id="inv-hand"></span></div>
     <div id="inv-chars"></div>
+    <div id="inv-add"><input id="inv-add-name" list="inv-add-list" placeholder="Créer un objet : nom ou numéro…" autocomplete="off">
+      <datalist id="inv-add-list"></datalist><button type="button" id="inv-add-btn">Créer</button><span id="inv-add-msg"></span></div>
     <div id="inv-detail" hidden></div>
   </div>
   <div id="mm-items-title">Objets du niveau</div>
@@ -228,6 +237,7 @@
   setInterval(placeZqsd, 1000);                      // le canevas apparaît/change avec js-dos
 
   function onKey(e) {
+    if (e.target && e.target.closest && e.target.closest("input, textarea, select")) return;   // saisie dans le panneau
     const down = e.type === "keydown";
     if (down && e.code === "F8") { setRemap(!remapOn); e.preventDefault(); e.stopPropagation(); return; }
     if (down && e.code === "F9") { toggleMap(); e.preventDefault(); e.stopPropagation(); return; }
@@ -409,6 +419,6 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261108x"></script>
+<script src="minimap.js?v=20261108z"></script>
 </body>
 </html>

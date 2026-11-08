@@ -609,6 +609,14 @@ les évalue avec les drapeaux en mémoire. Exemples : niveau 2, drapeau 67 → O
 niveau 7, drapeau 64 = 1 → SCAVNGR, sinon RATMAN ; niveau 11, drapeau 86 = 0 → SWAMPMON,
 sinon HURZELL (le Trent) ; niveau 23, drapeau 577 = 1 → DRKCMNDR, sinon NECROSAP.
 
+**Création d'objets (vérifié 2026-11-08)** : dans la table des objets, une entrée libre a
+son mot de drapeaux (+14) à 0x8000. Un objet porté a tout à 0, sauf le niveau (+11) à 0xFF et
+le type (+12). Pour créer un objet, la page remplit la première entrée libre ainsi, puis écrit
+son numéro dans la première case vide du sac. Le jeu ne redessine sa barre qu'au prochain
+défilement (flèches), puis l'objet se comporte normalement : il s'affiche, se prend et
+s'équipe. Les objets à charges (baguettes) ou à contenu (bourse) sont créés avec 0 dans ces
+champs.
+
 **Expérience et niveaux (code de `MAIN.EXE`, vérifié 2026-11-08)** : la routine de gain
 d'expérience (`a98f`) ajoute les points à la fiche (+0x6C + 4 × classe depuis le début de la
 fiche, soit +106 depuis le nom), puis appelle en boucle la vérification de niveau (`41190`)

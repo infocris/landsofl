@@ -669,6 +669,43 @@
     }
   }
 
+  // --- Création d'objets dans le sac -------------------------------------------
+  // Table des objets (§ 12.2) : entrée libre = mot de drapeaux (+14) à 0x8000. Objet porté :
+  // tout à 0 sauf niveau (+11) = 0xFF et type (+12). On remplit une entrée libre puis on met
+  // son numéro dans la première case vide du sac (48 mots en 0x3E4F6).
+  const addInput = document.getElementById("inv-add-name"), addMsg = document.getElementById("inv-add-msg");
+  function fillAddList() {
+    if (!itemInfo) return setTimeout(fillAddList, 500);
+    const dl = document.getElementById("inv-add-list");
+    dl.replaceChildren(...itemInfo.map((it, t) => {
+      if (!t || /^temp object$|^Objet illégal$/.test(it.name)) return null;
+      const o = document.createElement("option"); o.value = `${t} — ${it.name}`; return o;
+    }).filter(Boolean));
+  }
+  fillAddList();
+  async function createItem() {
+    const v = addInput.value.trim();
+    let t = parseInt(v, 10);
+    if (!(t > 0) && itemInfo) t = itemInfo.findIndex((it) => it.name.toLowerCase() === v.toLowerCase());
+    if (!(t > 0 && itemInfo && t < itemInfo.length)) { addMsg.textContent = "Objet inconnu : choisis-le dans la liste."; return; }
+    const r = await mem.read([[ITEMS.base, ITEMS.size * INV.maxItems], [INV.bar, INV.barSlots * 2]]);
+    if (!r) { addMsg.textContent = "Jeu indisponible."; return; }
+    const [table, bar] = r;
+    let slot = -1;
+    for (let k = 0; k < INV.barSlots; k++) if (!(bar[k * 2] | bar[k * 2 + 1] << 8)) { slot = k; break; }
+    if (slot < 0) { addMsg.textContent = "Le sac est plein."; return; }
+    let id = -1;
+    for (let i = 1; i < INV.maxItems; i++) if ((table[i * 16 + 15] & 0x80) && !(table[i * 16 + 12] | table[i * 16 + 13])) { id = i; break; }
+    if (id < 0) { addMsg.textContent = "Plus d'entrée libre dans la table des objets du jeu."; return; }
+    const e = new Uint8Array(16); e[11] = 0xff; e[12] = t & 255; e[13] = t >> 8;
+    await mem.write([[ITEMS.base + id * 16, e], [INV.bar + slot * 2, new Uint8Array([id & 255, id >> 8])]]);
+    addMsg.textContent = `${itemInfo[t].name} créé dans la case ${slot + 1} du sac. Dans le jeu, fais défiler la barre (flèche) pour l'afficher.`;
+    lastInv = ""; updateInventory().catch(() => {});
+  }
+  document.getElementById("inv-add-btn").addEventListener("click", (e) => { e.currentTarget.blur(); createItem().catch(() => {}); });
+  addInput.addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Enter") createItem().catch(() => {}); });
+  addInput.addEventListener("keyup", (e) => e.stopPropagation());
+
   // --- Export texte de l'inventaire ---------------------------------------------
   function inventoryText() {
     if (!lastInvData || !itemInfo) return null;
