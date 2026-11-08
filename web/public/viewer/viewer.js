@@ -21,6 +21,9 @@
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) FOV = 2 * Math.atan(1.375);
   let dirty = true;
+  // Vue libre (mode intégré) : clic gauche maintenu + glisser = tourner la tête ; relâcher =
+  // retour au point de vue du jeu. pitch = décalage vertical de l'horizon, en pixels du rendu.
+  let looking = false, lookYaw = 0, pitch = 0, gameA = 0;
   const view = document.getElementById("view");
   const ctx = view.getContext("2d");
   const mapCanvas = document.getElementById("map");
@@ -147,7 +150,7 @@
   const zOfDeff = (d) => (d <= 0.5 ? d : 0.5 + Math.log(d / 0.5) / Math.log(KSTEP));
 
   function render() {
-    if (EMBED && persp === "jeu") { renderGamePerspective(); return; }
+    if (EMBED && persp === "jeu" && !looking) { renderGamePerspective(); return; }
     const dirX = Math.cos(player.a), dirY = Math.sin(player.a);
     const planeX = -dirY * Math.tan(FOV / 2), planeY = dirX * Math.tan(FOV / 2);
     castFloorCeiling(dirX, dirY, planeX, planeY);
@@ -200,7 +203,7 @@
           ctx.globalAlpha = 1;
         } else {
           const colH = WALL_H / dist * proj;
-          const top = H / 2 - colH / 2;
+          const top = H / 2 + pitch - colH / 2;
           const tx = (it.tex % cols) * fw + Math.min(fw - 1, Math.floor(it.u * fw));
           const ty = Math.floor(it.tex / cols) * fh;
           ctx.drawImage(L.wallImgs[shadeFor(dist)], tx, ty, 1, fh, x, top, 1, colH);
@@ -216,24 +219,23 @@
     const F = L.floorTex, C = L.ceilTex, tw = F.w, th = F.h;
     const lx = dirX - planeX, ly = dirY - planeY;          // rayon de gauche
     const stepX = (2 * planeX) / W, stepY = (2 * planeY) / W;
-    const half = H / 2;
-    for (let y = Math.floor(half) + 1; y < H; y++) {
-      const rowDist = (WALL_H / 2) * proj / (y - half);
+    const hz = H / 2 + pitch;                              // ligne d'horizon (décalée en vue libre)
+    for (let y = 0; y < H; y++) {
+      const dy = y + 0.5 - hz, fRow = y * W;
+      if (Math.abs(dy) < 1) { frame32.fill(0xff000000, fRow, fRow + W); continue; }
+      const T = dy > 0 ? F : C;                            // sous l'horizon : sol, au-dessus : plafond
+      const rowDist = (WALL_H / 2) * proj / Math.abs(dy);
       const level = shadeFor(rowDist);
       const k = Math.round((1 - level / SHADES * 0.85) * 256);
       let wx = player.x + rowDist * lx, wy = player.y + rowDist * ly;
-      const dx = rowDist * stepX, dy = rowDist * stepY;
-      const fRow = y * W, cRow = (H - 1 - y) * W;
-      for (let x = 0; x < W; x++, wx += dx, wy += dy) {
+      const dx = rowDist * stepX, dyw = rowDist * stepY;
+      for (let x = 0; x < W; x++, wx += dx, wy += dyw) {
         const cx = Math.floor(wx), cy = Math.floor(wy);
         let tx = ((wx - cx) * tw) | 0, ty = ((wy - cy) * th) | 0;
         if ((cx + cy) & 1) tx = tw - 1 - tx;
-        const i = ty * tw + tx;
-        frame32[fRow + x] = shade(F.px[i], k);
-        frame32[cRow + x] = shade(C.px[i], k);
+        frame32[fRow + x] = shade(T.px[ty * tw + tx], k);
       }
     }
-    if (H % 2 === 0) frame32.fill(0xff000000, (H / 2) * W, (H / 2 + 1) * W);
     ctx.putImageData(frameImg, 0, 0);
   }
   function shade(c, k) {
@@ -370,7 +372,7 @@
       const scale = (WALL_H / 96) / tz * proj;      // même échelle que les murs (96 px = hauteur)
       const sw = rw * scale, sh = rh * scale;
       const left = W / 2 * (1 + tx / tz) - sw / 2;
-      const top = H / 2 + (WALL_H / 2) / tz * proj - sh;
+      const top = H / 2 + pitch + (WALL_H / 2) / tz * proj - sh;
       out.push({ tz, rx, ry, rw, rh, sw, sh, left, top, mirror, ghost: m.spawn === "event",
         x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
     }
@@ -490,6 +492,28 @@
   addEventListener("mousemove", (e) => {
     if (document.pointerLockElement === view) player.a += e.movementX * 0.0035;
   });
+  if (EMBED) {
+    view.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0 || !L) return;
+      looking = true; view.setPointerCapture(e.pointerId); view.style.cursor = "grabbing"; e.preventDefault();
+    });
+    view.addEventListener("pointermove", (e) => {
+      if (!looking) return;
+      const r = view.getBoundingClientRect();
+      const s = Math.min(r.width / W, r.height / H);       // pixels écran par pixel du rendu
+      lookYaw += e.movementX / s * (FOV / W);
+      pitch = Math.max(-H * 0.6, Math.min(H * 0.6, pitch - e.movementY / s));
+      player.a = gameA + lookYaw;
+      dirty = true;
+    });
+    const endLook = () => {
+      if (!looking) return;
+      looking = false; lookYaw = 0; pitch = 0; player.a = gameA; view.style.cursor = "grab"; dirty = true;
+    };
+    view.addEventListener("pointerup", endLook);
+    view.addEventListener("pointercancel", endLook);
+    view.addEventListener("lostpointercapture", endLook);
+  }
   levelSel.addEventListener("change", () => { loadLevel(+levelSel.value, false); levelSel.blur(); });
   addEventListener("resize", () => { resize(); dirty = true; });
 
@@ -543,7 +567,7 @@
       loadingLevel = level;
       try { await loadLevel(level, false); applyLiveGrid(); } finally { loadingLevel = null; }
     }
-    player.x = x + 0.5; player.y = y + 0.5; player.a = DIR_ANGLE[dir & 3];
+    player.x = x + 0.5; player.y = y + 0.5; gameA = DIR_ANGLE[dir & 3]; player.a = gameA + lookYaw;
     dirty = true;
   });
 
@@ -576,7 +600,8 @@
     if (q.has("hud")) { helpEl.classList.add("hidden"); }
     if (EMBED) {
       for (const id of ["top", "help", "map"]) document.getElementById(id).style.display = "none";
-      view.style.cursor = "default";
+      view.style.cursor = "grab";
+      view.title = "Maintenir le clic gauche et glisser pour regarder autour";
     }
     requestAnimationFrame(frame);
   })();
