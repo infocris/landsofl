@@ -275,6 +275,49 @@ def pick_start(level):
 FN_LOAD_SCENE = 0x29   # (n° de texte de l'image .CPS, page) : image fixe d'un lieu
 
 
+def sprite_conditions(ini):
+    """Sprite -> condition d'histoire qui le fait charger (script .INI du niveau).
+
+    Forme rencontrée : testGameFlag(N) (fonction 0x08) [== V] ; ifNotJmp ; loadMonsterShapes
+    (fonction 0x0B, branche « vrai ») ; jmp ; loadMonsterShapes (branche « faux »).
+    Renvoie {nom: {"flag": N, "eq": V ou None (= drapeau non nul), "when": True/False}}."""
+    ck = emc.chunks(ini)
+    ins, T = emc.disasm(ck), emc.texts(ck)
+    out = {}
+    for k, (a, op, p) in enumerate(ins):
+        if op != 14 or p & 0xFF != 0x0B or ins[k - 1][1] not in (3, 4):
+            continue
+        t = ins[k - 1][2]
+        if not 0 <= t < len(T):
+            continue
+        name = T[t].upper().rsplit(".", 1)[0]
+        seen_jmp, jmp_target = False, None
+        for j in range(k - 2, max(0, k - 80), -1):
+            o, q = ins[j][1], ins[j][2]
+            if o == 14 and q & 0xFF == 0x0B and not seen_jmp:
+                break                                      # chargement inconditionnel avant
+            if o == 0 and not seen_jmp:
+                seen_jmp, jmp_target = True, q
+            if o == 15:                                    # ifNotJmp : la condition est avant
+                target = q & 0x7FFF                        # début de la branche « faux »
+                if not seen_jmp and target <= a:
+                    break                                  # k est après le bloc : sans condition
+                if seen_jmp and not (target <= a < (jmp_target or 0)):
+                    break
+                eq = None
+                m = j - 1
+                if ins[m][1] == 17 and ins[m][2] == 2 and ins[m - 1][1] in (3, 4):
+                    eq, m = ins[m - 1][2], m - 2
+                while m > 0 and ins[m][1] == 2:             # pushRetOrPos 0
+                    m -= 1
+                while m > 0 and ins[m][1] == 12:            # addSP
+                    m -= 1
+                if ins[m][1] == 14 and ins[m][2] & 0xFF == 0x08 and ins[m - 1][1] in (3, 4):
+                    out[name] = {"flag": ins[m - 1][2], "eq": eq, "when": not seen_jmp}
+                break
+    return out
+
+
 def scripted_cells(files, n):
     """Cases qui ont un script dans LEVELn.INF (entrées ORDR < 1024 différentes de 0xFFFF)."""
     ck = emc.chunks(files[f"LEVEL{n}.INF"])
@@ -454,6 +497,7 @@ def main(game_dir, maps_dir, out_dir):
             "monsterTypes": {str(m["type"]): m["sprites"] for m in level["monsters"]
                              if m["type"] is not None and m["sprites"]},
             "spriteSigs": sprite_sigs,
+            "spriteConds": sprite_conditions(files[f"LEVEL{n}.INI"]) if f"LEVEL{n}.INI" in files else {},
             "scenes": scenes,   # case -> image du lieu (data/scenes/)
             "locks": locks_by_level.get(n, []),   # serrures : case + clé (tools/locks.py)
             "fragile": fragile_by_level.get(n, []),   # murs fragiles (tools/fragile.py)

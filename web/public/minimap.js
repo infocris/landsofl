@@ -24,6 +24,9 @@
   // Monstres du niveau courant (§ 12.2) : table de 30 entrées de 46 octets ; positions
   // relatives au champ x : case u16 à -2, x/y u16 (case*256 + décalage), direction à +17, type à +25
   const MON = { x0: 0x31871, size: 46, count: 30 };
+  // Drapeaux d'histoire du jeu : mots de 16 bits en DS:0x804C (adresse physique 0x3E55C) ;
+  // drapeau n = bit (n & 15) du mot n >> 4 (fonctions de script 0x07 écrire / 0x08 lire).
+  const FLAGS = 0x3E55C;
   let CELL = 12;               // taille d'une case en pixels (réglable : boutons − / + de la mini-carte)
   const COLORS = { wall: "#2b2b2b", floor: "#8a7f68", doorOpen: "#d08a4a", doorClosed: "#a0522d",
     special: "#6f8f58", unknown: "#3a3550" };
@@ -68,10 +71,10 @@
   async function loadLevels() {
     const index = await getJSON("viewer/data/levels.json");
     for (const l of index) {
-      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261108r`);
+      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261108v`);
       levels.push({ level: l.level, name: l.name, faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
         labels: d.labels, places: numberPlaces(d.labels || []), groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {},
-        spriteSigs: d.spriteSigs || {}, spriteOf: null, scenes: d.scenes || {}, locks: d.locks || [],
+        spriteSigs: d.spriteSigs || {}, spriteConds: d.spriteConds || {}, spriteOf: null, scenes: d.scenes || {}, locks: d.locks || [],
         scripted: new Set(d.scripted || []), fragile: d.fragile || [] });
       infoEl.textContent = `chargement des cartes… ${levels.length}/${index.length}`;
     }
@@ -478,7 +481,19 @@
       const refs = sure.length ? await mem.find(sure.map(sig)) : [];
       if (!refs) return;                          // jeu indisponible : on réessaiera
       const refAddrs = refs.filter((a) => a >= 0);
+      // Choix exact : la condition d'histoire du script .INI (drapeau du jeu, § 12.2)
+      const flags = await mem.read([[FLAGS, 128]]);
+      if (!flags) return;
+      const flag = (n) => (flags[0][(n >> 4) * 2 + ((n & 15) >> 3)] >> (n & 7)) & 1;
+      const byCond = (names) => names.find((n) => {
+        const c = L.spriteConds[n];
+        if (!c) return false;
+        const v = flag(c.flag), truth = c.eq === null ? v !== 0 : v === c.eq;
+        return truth === c.when;
+      });
       for (const [t, names] of ambiguous) {
+        const chosen = byCond(names);
+        if (chosen) { spriteOf[t] = chosen; continue; }
         const sigs = names.map(sig);
         const found = await mem.find(sigs.map((x) => x || new Uint8Array([0, 0, 0, 0])));
         if (!found) return;
@@ -791,7 +806,16 @@
     } finally { cheating = false; }
   }, 100);
 
-  window.LoLMinimap = { attach() {}, preview, monsters: debugMonsters };
+  // Débogage : LoLMinimap.spriteChoice(11) -> sprites retenus pour ce niveau avec les drapeaux actuels
+  async function spriteChoice(level) {
+    const L = levels.find((l) => l.level === level);
+    if (!L) return null;
+    const saved = L.spriteOf; L.spriteOf = null;
+    await resolveSprites(L);
+    const res = L.spriteOf; L.spriteOf = saved;
+    return res;
+  }
+  window.LoLMinimap = { attach() {}, preview, monsters: debugMonsters, spriteChoice };
 
   setInterval(() => { updateInventory().catch(() => {}); }, 1000);
   loadLevels().then(() => setInterval(tick, 200),

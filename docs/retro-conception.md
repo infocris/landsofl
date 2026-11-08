@@ -595,6 +595,20 @@ ScummVM utilise pour les sauvegardes de Lands of Lore ; il colle exactement (éq
 | +103 à +105 | modificateurs de compétence |
 | +106 / +110 / +114 | expérience des trois classes (u32 ; vaut 1 au départ, à confirmer) |
 
+**Drapeaux d'histoire (vérifié 2026-11-08)** : les fonctions de script 0x07 (écrire) et 0x08
+(lire) utilisent un tableau de mots de 16 bits en `DS:0x804C` (code `MAIN.EXE` en `136a1`).
+Le drapeau n est le bit (n & 15) du mot n >> 4. Le segment DS se déduit de la case du groupe :
+`DS:0x7FD0` = case (adresse physique 0x3E4E0) et `DS:0x7FDF` = direction (0x3E4EF). D'où
+DS = 0x36510 et le tableau en **0x3E55C**. Contrôle : au début du jeu, le drapeau 110 est à 1,
+et c'est l'un de ceux que le script du niveau 1 active.
+
+**Choix des sprites selon l'histoire** : le `.INI` d'un niveau charge un sprite ou un autre
+dans le même emplacement, selon un drapeau (`testGameFlag(N) [== V] ; ifNotJmp ; 0x0B ; jmp ;
+0x0B`). L'export (`sprite_conditions`, champ `spriteConds`) relève ces conditions, et la page
+les évalue avec les drapeaux en mémoire. Exemples : niveau 2, drapeau 67 → ORC, sinon THUG ;
+niveau 7, drapeau 64 = 1 → SCAVNGR, sinon RATMAN ; niveau 11, drapeau 86 = 0 → SWAMPMON,
+sinon HURZELL (le Trent) ; niveau 23, drapeau 577 = 1 → DRKCMNDR, sinon NECROSAP.
+
 **Expérience et niveaux (code de `MAIN.EXE`, vérifié 2026-11-08)** : la routine de gain
 d'expérience (`a98f`) ajoute les points à la fiche (+0x6C + 4 × classe depuis le début de la
 fiche, soit +106 depuis le nom), puis appelle en boucle la vérification de niveau (`41190`)
