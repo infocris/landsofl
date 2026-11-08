@@ -617,6 +617,16 @@ défilement (flèches). Vérifié : l'objet s'affiche alors dans la barre ; le p
 l'équiper n'a pas encore été testé. Les objets à charges (baguettes) ou à contenu (bourse) sont créés avec 0 dans ces
 champs.
 
+**État des monstres (vérifié 2026-11-08, en attaquant un garde)** : dans la fiche d'un
+monstre (46 octets ; positions depuis le champ x), +12 est l'image d'animation en cours
+(passe de 0 à 1 ou 3 quand le monstre bouge) et +13 le **mode**. Les gardes du château
+restent en mode 1 (paisible). Après une attaque, les quatre passent en mode 7 (marche vers
+le groupe) ou 8 (attaque), leur destination (+5, +7) devient la case du groupe, et l'octet
++24 passe de 1 à 0. Les scripts placent aussi des ennemis en mode 1 (hommes-rats,
+cavaliers…) : le mode 1 veut dire « n'attaque pas pour l'instant », pas « amical ». Les
+modes 2, 3, 4 et 12 des scripts restent à identifier. La mini-carte colore les monstres
+ainsi : vert = mode 1, rouge = modes 7 et 8, orange = autre.
+
 **Expérience et niveaux (code de `MAIN.EXE`, vérifié 2026-11-08)** : la routine de gain
 d'expérience (`a98f`) ajoute les points à la fiche (+0x6C + 4 × classe depuis le début de la
 fiche, soit +106 depuis le nom), puis appelle en boucle la vérification de niveau (`41190`)

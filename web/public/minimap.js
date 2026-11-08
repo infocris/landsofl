@@ -225,6 +225,15 @@
 
   function isWallCell(L, i) { const c = cellClass(L, i); return c === "wall" || c === "special" || c === "unknown"; }
 
+  // État d'un monstre (octet +13 depuis x, § 12.2) : 1 = paisible (n'attaque pas pour l'instant ;
+  // les gardes du château y restent) ; 7 = marche vers le groupe, 8 = l'attaque (vu en attaquant
+  // un garde). Les autres valeurs (2, 3, 4… données par les scripts) ne sont pas identifiées.
+  function monsterMood(m) {
+    if (m.mode === 1) return { color: "#4ade80", label: "paisible (n'attaque pas pour l'instant)" };
+    if (m.mode === 7 || m.mode === 8) return { color: "#ff3b30", label: m.mode === 8 ? "attaque le groupe" : "marche vers le groupe (hostile)" };
+    return { color: "#ff8c00", label: `autre état (mode ${m.mode})` };
+  }
+
   function cellClass(L, i) {
     let cls = "floor", allZero = true;
     for (let k = 0; k < 4; k++) {
@@ -322,9 +331,10 @@
     // monstres : position réelle et direction
     for (const m of monsters) {
       const mx = m.x * CELL, my = m.y * CELL, a = [-Math.PI / 2, 0, Math.PI / 2, Math.PI][m.dir];
-      g.fillStyle = "#ff8c00"; g.strokeStyle = "#000"; g.lineWidth = 1;
+      const col = monsterMood(m).color;
+      g.fillStyle = col; g.strokeStyle = "#000"; g.lineWidth = 1;
       g.beginPath(); g.arc(mx, my, 3.2 * k, 0, 2 * Math.PI); g.fill(); g.stroke();
-      g.strokeStyle = "#ff8c00"; g.lineWidth = 1.5;
+      g.strokeStyle = col; g.lineWidth = 1.5;
       g.beginPath(); g.moveTo(mx, my); g.lineTo(mx + Math.cos(a) * 5.5 * k, my + Math.sin(a) * 5.5 * k); g.stroke();
     }
     // groupe : flèche orientée
@@ -372,7 +382,9 @@
       out.push(`<span class="ky">${LOCK_KIND[l.kind] || "Serrure"} : ${esc(l.name)}${owned.has(l.key) ? " ✔ dans l'inventaire" : ""}${l.how === "direct" ? "" : " (probable)"}</span>`);
     for (const m of monsters) if (Math.floor(m.x) === x && Math.floor(m.y) === y) {
       const nm = (L.spriteOf || {})[m.type] || (L.monsterTypes[m.type] || []).join(" / ") || `type ${m.type}`;
-      out.push(`<span class="mo">Monstre : ${esc(nm)} (regarde vers ${["le nord", "l'est", "le sud", "l'ouest"][m.dir]})</span>`);
+      const mood = monsterMood(m);
+      out.push(`<span class="mo">Monstre : ${esc(nm)} (regarde vers ${["le nord", "l'est", "le sud", "l'ouest"][m.dir]})</span>`
+        + `<br><span style="color:${mood.color}">${mood.label}</span>`);
     }
     return out.join("<br>");
   }
@@ -406,7 +418,7 @@
       const a = i * MON.size + 2;                 // bytes commence à x0 - 2
       const block = bytes[a - 2] | bytes[a - 1] << 8, x = bytes[a] | bytes[a + 1] << 8, y = bytes[a + 2] | bytes[a + 3] << 8;
       if (!block || block > 1023 || (x >> 8) !== (block & 31) || (y >> 8) !== (block >> 5)) continue;
-      out.push({ slot: i, x: x / 256, y: y / 256, dir: bytes[a + 17] & 3, type: bytes[a + 25], sf: bytes[a + 12] });   // +12 : image d'animation (ScummVM, non vérifié)
+      out.push({ slot: i, x: x / 256, y: y / 256, dir: bytes[a + 17] & 3, type: bytes[a + 25], sf: bytes[a + 12], mode: bytes[a + 13] });   // +12 image d'animation, +13 mode
     }
     return out;
   }
