@@ -178,17 +178,36 @@
 
   // Le niveau courant est celui dont la grille d'origine ressemble le plus à la grille vivante
   // (les portes ouvertes changent quelques identifiants, d'où un seuil et non une égalité).
+  // Seules les cases « parlantes » comptent : la roche pleine, identique d'un niveau à l'autre
+  // du même décor, faisait confondre les cavernes (963 cases sur 1024 communes aux niveaux 5 et 25).
+  // Score = cases identiques / cases où la carte d'origine OU la grille vivante n'est pas de la roche.
+  function fillOf(L) {
+    if (L.fill) return L.fill;
+    const count = new Map();
+    for (let i = 0; i < 1024; i++) { const k = L.faces.slice(i * 4, i * 4 + 4).join(","); count.set(k, (count.get(k) || 0) + 1); }
+    L.fill = [...count].sort((a, b) => b[1] - a[1])[0][0].split(",").map(Number);
+    return L.fill;
+  }
   function identify() {
     let best = null, bestScore = 0;
     for (const L of levels) {
-      let same = 0;
+      const f = fillOf(L);
+      let same = 0, total = 0;
       for (let i = 0; i < 1024; i++) {
         const o = i * 4;
-        if (L.faces[o] === live[o] && L.faces[o + 1] === live[o + 1] && L.faces[o + 2] === live[o + 2] && L.faces[o + 3] === live[o + 3]) same++;
+        let eq = true, lf = true, vf = true;
+        for (let k = 0; k < 4; k++) {
+          if (L.faces[o + k] !== live[o + k]) eq = false;
+          if (L.faces[o + k] !== f[k]) lf = false;
+          if (live[o + k] !== f[k]) vf = false;
+        }
+        if (lf && vf) continue;
+        total++; if (eq) same++;
       }
-      if (same > bestScore) { bestScore = same; best = L; }
+      const score = total ? same / total : 0;
+      if (score > bestScore) { bestScore = score; best = L; }
     }
-    return bestScore > 900 ? best : null;
+    return bestScore > 0.8 ? best : null;
   }
 
   // Type spécial d'une face de mur (WLL, champ « special ») : 2/3 = levier (l'état change dans la
@@ -450,12 +469,26 @@
       for (const [t, names] of Object.entries(L.monsterTypes)) {
         if (names.length === 1) spriteOf[t] = names[0]; else ambiguous.push([t, names]);
       }
+      // Plusieurs sprites possibles pour un type (choix selon l'histoire) : on cherche en mémoire
+      // lequel est chargé. Une copie périmée d'un niveau précédent peut subsister (ex. RATMAN
+      // du niveau 6 au niveau 7) : on garde le candidat le plus proche, en mémoire, des sprites
+      // sûrs du niveau (les tampons des emplacements sont alloués côte à côte).
+      const sig = (n) => (L.spriteSigs[n] ? Uint8Array.from(L.spriteSigs[n].match(/../g), (x) => parseInt(x, 16)) : null);
+      const sure = [...new Set(Object.values(spriteOf))].filter((n) => L.spriteSigs[n]);
+      const refs = sure.length ? await mem.find(sure.map(sig)) : [];
+      if (!refs) return;                          // jeu indisponible : on réessaiera
+      const refAddrs = refs.filter((a) => a >= 0);
       for (const [t, names] of ambiguous) {
-        const sigs = names.map((n) => L.spriteSigs[n]).map((h) => (h ? Uint8Array.from(h.match(/../g), (x) => parseInt(x, 16)) : null));
+        const sigs = names.map(sig);
         const found = await mem.find(sigs.map((x) => x || new Uint8Array([0, 0, 0, 0])));
-        if (!found) return;                       // jeu indisponible : on réessaiera
-        const k = found.findIndex((a, i) => sigs[i] && a >= 0);
-        spriteOf[t] = names[k >= 0 ? k : 0];
+        if (!found) return;
+        let best = -1, bestD = Infinity;
+        found.forEach((a, i) => {
+          if (!sigs[i] || a < 0) return;
+          const d = refAddrs.length ? Math.min(...refAddrs.map((r) => Math.abs(r - a))) : -a;   // sans repère : le plus haut
+          if (d < bestD) { bestD = d; best = i; }
+        });
+        spriteOf[t] = names[best >= 0 ? best : 0];
       }
       L.spriteOf = spriteOf;
     } finally { resolving = false; }

@@ -721,3 +721,8 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-08** : murs fragiles (Marteau) des cavernes du Draracle, sur la mini-carte.
 - **2026-11-08** : effets magiques des anneaux (code de `MAIN.EXE`) et des objets à
   utiliser (`ITEM.INF`), nature des serrures, animation des monstres en 3D.
+- **2026-11-08** : reconnaissance du niveau sur les seules cases significatives (les cavernes
+  se ressemblent : 963 cases sur 1024 identiques entre les niveaux 5 et 25) ; choix du sprite
+  d'un type ambigu (ex. SCAVNGR ou RATMAN au niveau 7, selon le drapeau d'histoire 64) : on
+  garde le candidat le plus proche en mémoire des sprites sûrs du niveau, car une copie
+  périmée du niveau précédent peut subsister.
