@@ -1126,6 +1126,18 @@
   // --- Caractéristiques --------------------------------------------------------
   const stMoney = document.getElementById("st-money"), stChars = document.getElementById("st-chars");
   let lastStats = "";
+  // fiches repliées (clic sur le nom), mémorisées par nom de personnage
+  let foldedChars = new Set();
+  try { foldedChars = new Set(JSON.parse(localStorage.getItem("foldedChars") || "[]")); } catch (e) {}
+  stChars.addEventListener("click", (e) => {
+    const nm = e.target.closest(".st-char .nm");
+    if (!nm) return;
+    const box = nm.parentElement, name = box.dataset.name;
+    if (foldedChars.has(name)) foldedChars.delete(name); else foldedChars.add(name);
+    box.classList.toggle("folded", foldedChars.has(name));
+    nm.title = `Cliquer pour ${foldedChars.has(name) ? "déplier" : "replier"}`;
+    try { localStorage.setItem("foldedChars", JSON.stringify([...foldedChars])); } catch (err) {}
+  });
   async function updateStats() {
     if (previewing) return;
     const r = await mem.read([PARTY_RANGE(), [STATS.money, 2], [XP.table, 4 * 11]]);
@@ -1160,11 +1172,12 @@
           ? `<button type="button" class="lvup" data-slot="${c.slot}" data-skill="${k}" title="Monter ${n} au niveau ${c.lv[k] + 1} (comme le jeu : expérience au seuil, bonus de vie ou de magie)">+</button>` : "";
         return `${n} ${c.lv[k]} (${c.xp[k]}${next !== null ? " / " + next : ""} xp)${btn}`;
       }).join(" · ");
-      return `<div class="st-char"><div class="nm"></div>${bar("hp", "Vie", c.hp)}${bar("mp", "Magie", c.mp)}
+      const folded = foldedChars.has(c.name);
+      return `<div class="st-char${folded ? " folded" : ""}" data-name="${escHtml(c.name)}"><div class="nm" title="Cliquer pour ${folded ? "déplier" : "replier"}"><b></b><span class="sum">Vie ${c.hp[0]}/${c.hp[1]} · Magie ${c.mp[0]}/${c.mp[1]}</span></div>${bar("hp", "Vie", c.hp)}${bar("mp", "Magie", c.mp)}
         <span>Force</span><span>${c.force}</span><span>Protection</span><span>${c.prot}</span>
         <div class="st-skills">${cls}</div></div>`;
     }).join("");
-    stChars.querySelectorAll(".nm").forEach((el, i) => { el.textContent = st.chars[i].name; });
+    stChars.querySelectorAll(".nm b").forEach((el, i) => { el.textContent = st.chars[i].name; });
   }
   setInterval(() => { updateStats().catch(() => {}); }, 1000);
 

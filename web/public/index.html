@@ -49,7 +49,12 @@
   #cheats button { margin-left: auto; font: 11px/1 system-ui, sans-serif; padding: 3px 7px; cursor: pointer;
     background: #1d1912; color: #e8dcc0; border: 1px solid #6d5a3a; border-radius: 4px; }
   .st-char { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin-top: 3px; align-items: center; }
-  .st-char .nm { grid-column: 1 / -1; color: #a39578; font-weight: 600; }
+  .st-char .nm { grid-column: 1 / -1; color: #a39578; font-weight: 600; cursor: pointer; user-select: none; display: flex; gap: 8px; align-items: baseline; }
+  .st-char .nm::before { content: "▾"; color: #c9a227; width: 10px; }
+  .st-char .nm .sum { display: none; font-weight: 400; color: #cfc3a6; }
+  .st-char.folded .nm::before { content: "▸"; }
+  .st-char.folded .nm .sum { display: inline; }
+  .st-char.folded > :not(.nm) { display: none; }
   .bar { position: relative; height: 10px; background: #17130e; border: 1px solid #3a3226; }
   .bar i { position: absolute; inset: 0 auto 0 0; display: block; }
   .bar span { position: absolute; inset: -2px 4px; font-size: 10px; line-height: 12px; color: #fff; text-shadow: 0 0 2px #000; }
@@ -431,6 +436,6 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261109l"></script>
+<script src="minimap.js?v=20261109m"></script>
 </body>
 </html>
