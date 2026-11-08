@@ -34,6 +34,7 @@
   const infoEl = document.getElementById("mm-info");
   const labelEl = document.getElementById("mm-label");
   const itemsEl = document.getElementById("mm-items");
+  const itemsTitleEl = document.getElementById("mm-items-title");
   const frame3d = document.getElementById("v3d-frame");
   // Taille de la mini-carte : 8 à 24 px par case, mémorisée ; le panneau suit (variables CSS)
   const CELL_MIN = 8, CELL_MAX = 24;
@@ -67,10 +68,11 @@
   async function loadLevels() {
     const index = await getJSON("viewer/data/levels.json");
     for (const l of index) {
-      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261108m`);
+      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261108o`);
       levels.push({ level: l.level, name: l.name, faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
         labels: d.labels, places: numberPlaces(d.labels || []), groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {},
-        spriteSigs: d.spriteSigs || {}, spriteOf: null, scenes: d.scenes || {}, locks: d.locks || [] });
+        spriteSigs: d.spriteSigs || {}, spriteOf: null, scenes: d.scenes || {}, locks: d.locks || [],
+        scripted: new Set(d.scripted || []) });
       infoEl.textContent = `chargement des cartes… ${levels.length}/${index.length}`;
     }
   }
@@ -117,6 +119,7 @@
   function renderItemList(L) {
     renderPlaceList(L);
     itemsEl.textContent = "";
+    itemsTitleEl.textContent = L && L.live ? "Objets au sol et dans les niches (état réel)" : "Objets du niveau (positions de départ)";
     if (!L || !L.groups.length) {
       const li = document.createElement("li"); li.textContent = "aucun objet placé sur ce niveau"; itemsEl.appendChild(li);
       return;
@@ -132,12 +135,36 @@
       }
       const t = document.createElement("span");
       t.textContent = [...names].map(([k, c]) => (c > 1 ? `${c} × ` : "") + k).join(", ")
+        + (g.items[0].container === "wall" ? " — dans un mur (niche)" : "")
         + (g.items[0].container === "niche"
           ? (DIRS[g.items[0].face] ? ` — niche, face ${DIRS[g.items[0].face]}` : " — dans un mur") : "");
       const pos = document.createElement("span"); pos.className = "pos"; pos.textContent = `${g.x},${g.y}`;
       li.append(b, t, pos);
       itemsEl.appendChild(li);
     }
+  }
+
+  // Objets réellement présents (§ 12.2) : octets 4-5 d'une case de la grille vivante = premier
+  // objet posé (n° d'entrée, 0x8000 = monstre), chaîné par le champ « suivant » (+0) de l'entrée.
+  // Entrée de 16 octets : +0 suivant, +5 case, +7 x, +9 y (case*256 + décalage), +12 type.
+  const ITEMS = { base: INV.items - 12, size: 16 };
+  function readLiveItems(grid, table) {
+    if (!itemInfo) return null;
+    const out = [];
+    const w = (o) => table[o] | table[o + 1] << 8;
+    for (let c = 0; c < 1024; c++) {
+      let id = grid[c * ADDR.stride + 4] | grid[c * ADDR.stride + 5] << 8;
+      for (let guard = 0; id && !(id & 0x8000) && id < INV.maxItems && guard < 64; guard++) {
+        const o = id * ITEMS.size, type = w(o + 12);
+        if (type > 0 && type < itemInfo.length) {
+          const wall = cellClass(current, c) === "wall" || cellClass(current, c) === "special";
+          out.push({ x: c % 32, y: c >> 5, type, name: itemInfo[type].name,
+            xOffs: table[o + 7], yOffs: table[o + 9], container: wall ? "wall" : undefined });
+        }
+        id = w(o);
+      }
+    }
+    return out;
   }
 
   function readGrid(bytes) {
@@ -162,6 +189,16 @@
       if (same > bestScore) { bestScore = same; best = L; }
     }
     return bestScore > 900 ? best : null;
+  }
+
+  // Type spécial d'une face de mur (WLL, champ « special ») : 2/3 = levier (l'état change dans la
+  // grille vivante quand on l'actionne), 1/4 = élément cliquable ; gardé seulement si la case a un script.
+  function switchKind(L, i, f) {
+    const id = live[i * 4 + f], t = id && L.wallTypes[id];
+    if (!t) return null;
+    if (t[1] === 2 || t[1] === 3) return "lever";
+    if ((t[1] === 1 || t[1] === 4) && L.scripted.has(i)) return "button";
+    return null;
   }
 
   function cellClass(L, i) {
@@ -198,6 +235,20 @@
       g.fillRect(p.x * CELL + lp2 - 1, p.y * CELL + lp2 - 1, CELL + 1 - 2 * lp2, CELL + 1 - 2 * lp2);
       g.fillStyle = "#fff";
       g.fillText(String(p.n), p.x * CELL + CELL / 2, p.y * CELL + CELL / 2 + 0.5);
+    }
+    // interrupteurs : leviers (barre verte) et éléments cliquables à script (point violet), sur le bord du mur
+    for (let i = 0; i < 1024; i++) for (let f = 0; f < 4; f++) {
+      const kind = switchKind(L, i, f);
+      if (!kind) continue;
+      const x0 = (i % 32) * CELL, y0 = Math.floor(i / 32) * CELL, t = Math.max(2, Math.round(2.5 * k));
+      const m = Math.round(CELL * 0.2), len = CELL - 1 - 2 * m;
+      const [rx, ry, rw, rh] = [[x0 + m, y0, len, t], [x0 + CELL - 1 - t, y0 + m, t, len],
+        [x0 + m, y0 + CELL - 1 - t, len, t], [x0, y0 + m, t, len]][f];
+      if (kind === "lever") { g.fillStyle = "#000"; g.fillRect(rx - 1, ry - 1, rw + 2, rh + 2); g.fillStyle = "#7cfc00"; g.fillRect(rx, ry, rw, rh); }
+      else {
+        g.fillStyle = "#c77dff"; g.beginPath();
+        g.arc(rx + rw / 2, ry + rh / 2, Math.max(1.5, 1.6 * k), 0, 2 * Math.PI); g.fill();
+      }
     }
     // serrures : petite clé dorée dans le coin de la case
     g.strokeStyle = "#ffd700"; g.fillStyle = "#ffd700"; g.lineWidth = Math.max(1, k);
@@ -268,6 +319,12 @@
       out.push(`<span class="it">Objets n° ${grp.n}${where} :</span>`);
       for (const it of grp.items) out.push(`<span class="it">• ${esc(it.name || "objet " + it.type)}${it.spawn === "event" ? " (événement)" : ""}</span>`);
     }
+    const FACE_FR = ["nord", "est", "sud", "ouest"];
+    for (let f = 0; f < 4; f++) {
+      const kind = switchKind(L, i, f);
+      if (kind === "lever") out.push(`<span class="sw">Levier, face ${FACE_FR[f]} (état ${L.wallTypes[live[i * 4 + f]][1] === 2 ? "A" : "B"})</span>`);
+      else if (kind) out.push(`<span class="bt">Élément cliquable (bouton, serrure, décor…), face ${FACE_FR[f]}</span>`);
+    }
     for (const l of L.locks) if (l.x === x && l.y === y)
       out.push(`<span class="ky">Serrure : ${esc(l.name)}${owned.has(l.key) ? " ✔ dans l'inventaire" : ""}${l.how === "direct" ? "" : " (probable)"}</span>`);
     for (const m of monsters) if (Math.floor(m.x) === x && Math.floor(m.y) === y) {
@@ -313,17 +370,24 @@
 
   async function update() {
     const r = await mem.read([[ADDR.block, 2], [ADDR.dir, 2], [ADDR.grid, 1024 * ADDR.stride],
-      [MON.x0 - 2, MON.size * MON.count], [ADDR.sceneFlag, 1]]);
+      [MON.x0 - 2, MON.size * MON.count], [ADDR.sceneFlag, 1], [ITEMS.base, ITEMS.size * INV.maxItems]]);
     if (!r) { titleEl.textContent = "Mini-carte"; infoEl.textContent = "en attente du jeu…"; return; }
     const block = r[0][0] | r[0][1] << 8, dir = r[1][0] | r[1][1] << 8;
     const hash = readGrid(r[2]);
     monsters = readMonsters(r[3]);
     const inScene = r[4][0] === 1;
+    const liveItems = readLiveItems(r[2], r[5]);
     const now = performance.now();
     if (hash !== lastHash && now - lastIdentify > 500) {
       const found = identify();
       if (found !== current) { renderItemList(found); if (found) found.spriteOf = null; }
       current = found; lastHash = hash; lastIdentify = now;
+    }
+    if (current && liveItems) {
+      const groups = groupItems(liveItems), key = JSON.stringify(groups);
+      if (key !== current.liveKey) {
+        current.liveKey = key; current.groups = groups; current.live = true; renderItemList(current);
+      }
     }
     if (!current || block > 1023 || dir > 3) {
       titleEl.textContent = "Mini-carte";

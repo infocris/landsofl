@@ -86,6 +86,8 @@
   #mm-tip .mo { color: #ff8c00; }
   #mm-tip .lb { color: #ff6b6b; font-weight: 600; }
   #mm-tip .ky { color: #ffd700; }
+  #mm-tip .sw { color: #7cfc00; }
+  #mm-tip .bt { color: #c77dff; }
   #mm-canvas { cursor: crosshair; }
   #mm.hidden { display: none; }
   #mm-title { font-weight: 600; color: #c9a227; display: flex; align-items: center; gap: 6px; }
@@ -134,14 +136,14 @@
 <body>
 <div id="left">
   <div id="dos"></div>
-  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261108g" title="Vue 3D synchronisée"></iframe></div>
+  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261108h" title="Vue 3D synchronisée"></iframe></div>
 </div>
 <aside id="mm" aria-label="Mini-carte">
   <div id="mm-title"><span>Mini-carte</span><button id="mm-smaller" type="button" title="Réduire la mini-carte">−</button><button id="mm-bigger" type="button" title="Agrandir la mini-carte">+</button></div>
   <div id="mm-info">chargement…</div>
   <canvas id="mm-canvas"></canvas>
   <div id="mm-label"></div>
-  <div id="mm-legend"><i style="background:#8a7f68"></i>sol<i style="background:#2b2b2b;outline:1px solid #555"></i>mur<i style="background:#a0522d"></i>porte fermée<i style="background:#d08a4a"></i>ouverte<i style="background:#d22"></i>lieu<i style="background:#28dce6"></i>objets<i style="background:none;border:2px solid #ffd700;border-radius:50%;width:5px;height:5px"></i>serrure<i style="background:#ff8c00;border-radius:50%"></i>monstres</div>
+  <div id="mm-legend"><i style="background:#8a7f68"></i>sol<i style="background:#2b2b2b;outline:1px solid #555"></i>mur<i style="background:#a0522d"></i>porte fermée<i style="background:#d08a4a"></i>ouverte<i style="background:#d22"></i>lieu<i style="background:#28dce6"></i>objets<i style="background:none;border:2px solid #ffd700;border-radius:50%;width:5px;height:5px"></i>serrure<i style="background:#7cfc00;height:4px"></i>levier<i style="background:#c77dff;border-radius:50%;width:6px;height:6px"></i>cliquable<i style="background:#ff8c00;border-radius:50%"></i>monstres</div>
   <div id="mm-places-title">Lieux du niveau</div>
   <ol id="mm-places"></ol>
   <div id="stats">
@@ -158,7 +160,7 @@
     <div id="inv-chars"></div>
     <div id="inv-detail" hidden></div>
   </div>
-  <div id="mm-items-title">Objets du niveau (positions de départ)</div>
+  <div id="mm-items-title">Objets du niveau</div>
   <ol id="mm-items"></ol>
 </aside>
 <button id="v3dtoggle" type="button" title="Afficher/masquer la vue 3D (F10)">3D</button>
@@ -377,6 +379,6 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261108n"></script>
+<script src="minimap.js?v=20261108o"></script>
 </body>
 </html>

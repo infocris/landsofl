@@ -210,6 +210,13 @@ Fonctions du moteur identifiées :
   clés non utilisées. Les nombres 7 et 8 de ces scripts sont des drapeaux d'histoire
   (`0x07` = écrire, `0x08` = lire, **déduit**) dont les numéros recoupent parfois ceux des
   clés.
+- **Interrupteurs** : le champ `special` d'un type de mur (`.WLL`, § 6) dit ce qui se passe
+  au clic. Correspondance reprise de ScummVM (**non vérifiée en jeu**) : 1 = décor
+  cliquable, 2 et 3 = levier dans l'une ou l'autre position, 4 = script seul, 5 = porte,
+  6 = niche. Comptage : niveau 8, 7 faces de levier ; niveau 16, 7 ; niveau 1, aucun levier
+  mais 32 faces de type 1, toutes sur des cases à script. La mini-carte affiche les leviers
+  et, quand la case a un script, les éléments de type 1 ou 4. L'état d'un levier se lit dans
+  la grille vivante, puisque l'identifiant du mur change quand on l'actionne.
 - **Images des lieux** : la fonction `0x29` (n° de texte d'un `.CPS`, page) charge l'image
   fixe d'un lieu (auberge, échoppe, salle du trône…). Elle est appelée dans le script de
   la case devant l'entrée, qui est le second point (x2, y2) de l'annotation. Au niveau 1 :
@@ -537,6 +544,16 @@ ScummVM utilise pour les sauvegardes de Lands of Lore ; il colle exactement (éq
 | +103 à +105 | modificateurs de compétence |
 | +106 / +110 / +114 | expérience des trois classes (u32 ; vaut 1 au départ, à confirmer) |
 
+**Objets réellement présents (vérifié 2026-11-08)** : chaque entrée de la table des objets
+fait 16 octets et commence 12 octets avant le type (0x31F79 − 12 = 0x31F6D). Champs :
++0 objet suivant de la même case, +2 suivant à dessiner, +4 hauteur, +5 case, +7 x et +9 y
+(case × 256 + décalage), +11 niveau, +12 type, +14 drapeaux (0x4000 vu sur un objet posé).
+Dans la grille vivante, les octets 4-5 d'une case donnent le premier objet posé ; une
+valeur avec le bit 0x8000 désigne un monstre (dans les octets 6-7). Vérification : un
+Onguent posé devant le groupe apparaît en case 525 (13,16), avec x = 0x0D40 et
+y = 0x10C0, et les octets 4-5 de la case valent 1, son numéro. L'octet de niveau reste à
+255, y compris pour un objet posé : c'est donc la liste de chaque case qui fait foi.
+
 **Taille d'une fiche : 130 octets — vérifié.** Les modèles des personnages sont espacés
 de 0x82 octets. Pour le vérifier sur le groupe, on a copié le modèle de Kieran dans le
 deuxième emplacement (`0x3389F + 130 − 2`) :
@@ -648,3 +665,5 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
   d'objet au clic dans l'inventaire et info-bulle au survol de la mini-carte.
 - **2026-11-08** : serrures des clés (scripts des niveaux), affichées sur la mini-carte et
   dans la fiche des clés.
+- **2026-11-08** : objets réellement présents (listes des cases dans la grille vivante),
+  leviers et éléments cliquables sur la mini-carte, transitions douces de la vue 3D.

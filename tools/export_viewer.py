@@ -274,6 +274,13 @@ def pick_start(level):
 FN_LOAD_SCENE = 0x29   # (n° de texte de l'image .CPS, page) : image fixe d'un lieu
 
 
+def scripted_cells(files, n):
+    """Cases qui ont un script dans LEVELn.INF (entrées ORDR < 1024 différentes de 0xFFFF)."""
+    ck = emc.chunks(files[f"LEVEL{n}.INF"])
+    o = struct.unpack(f">{len(ck['ORDR']) // 2}H", ck["ORDR"])
+    return [i for i, a in enumerate(o[:1024]) if a != 0xFFFF]
+
+
 def level_scenes(files, n):
     """Case -> image du lieu, d'après les appels 0x29 du script d'événements (.INF).
 
@@ -446,6 +453,7 @@ def main(game_dir, maps_dir, out_dir):
             "spriteSigs": sprite_sigs,
             "scenes": scenes,   # case -> image du lieu (data/scenes/)
             "locks": locks_by_level.get(n, []),   # serrures : case + clé (tools/locks.py)
+            "scripted": scripted_cells(files, n),  # cases dont le script réagit (clic sur un mur…)
             "labels": [{k: l[k] for k in ("x", "y", "text")} for l in level["labels"]],
             "items": [{k: it.get(k) for k in ("x", "y", "xOffs", "yOffs", "type", "name", "spawn", "container", "face")}
                       for it in level.get("items", [])],

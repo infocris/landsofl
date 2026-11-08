@@ -24,6 +24,9 @@
   // Vue libre (mode intégré) : clic gauche maintenu + glisser = tourner la tête ; relâcher =
   // retour au point de vue du jeu. pitch = décalage vertical de l'horizon, en pixels du rendu.
   let looking = false, lookYaw = 0, pitch = 0, gameA = 0;
+  // Transitions douces (mode intégré) : un pas ou un quart de tour du jeu est animé.
+  let anim = null, turning = false;                     // {x0, y0, a0, x1, y1, a1, t0, dur}
+  const ANIM_MOVE = 220, ANIM_TURN = 200;               // durées en ms
   const view = document.getElementById("view");
   const ctx = view.getContext("2d");
   const mapCanvas = document.getElementById("map");
@@ -37,6 +40,7 @@
   let frameImg = null, frame32 = null;
   let L = null;                 // niveau courant
   const player = { x: 16, y: 16, a: 0 };
+  window.lolPlayer = player;                          // débogage (console de la vue 3D)
   const keys = new Set();
   let noclip = false, showMap = true;
   let openDoors = new Set();    // index de case dont la porte est ouverte
@@ -145,12 +149,15 @@
   // (mur de face : 128, 80, 48 px pour 0,5, 1,5, 2,5 cases ; voir docs § 9.3 bis).
   let persp = "reelle";
   try { if (EMBED && localStorage.getItem("lol3d:persp") === "jeu") persp = "jeu"; } catch (e) {}
+  let smooth = true;
+  try { smooth = localStorage.getItem("lol3d:smooth") !== "off"; } catch (e) {}
   const KSTEP = 1 / 0.615;
   const deff = (z) => (z <= 0.5 ? z : 0.5 * Math.pow(KSTEP, z - 0.5));      // « distance » apparente
   const zOfDeff = (d) => (d <= 0.5 ? d : 0.5 + Math.log(d / 0.5) / Math.log(KSTEP));
 
   function render() {
-    if (EMBED && persp === "jeu" && !looking) { renderGamePerspective(); return; }
+    // pendant une rotation, la perspective du jeu (4 directions seulement) cède la place à la réelle
+    if (EMBED && persp === "jeu" && !looking && !turning) { renderGamePerspective(); return; }
     const dirX = Math.cos(player.a), dirY = Math.sin(player.a);
     const planeX = -dirY * Math.tan(FOV / 2), planeY = dirX * Math.tan(FOV / 2);
     castFloorCeiling(dirX, dirY, planeX, planeY);
@@ -494,6 +501,7 @@
   });
   if (EMBED) {
     view.addEventListener("pointerdown", (e) => {
+      if (anim) { player.x = anim.x1; player.y = anim.y1; anim = null; turning = false; }
       if (e.button !== 0 || !L) return;
       looking = true; view.setPointerCapture(e.pointerId); view.style.cursor = "grabbing"; e.preventDefault();
     });
@@ -562,12 +570,27 @@
   addEventListener("message", async (e) => {
     if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-pos") return;
     const { level, x, y, dir } = e.data;
+    let freshLevel = false;
     if (!L || L.level !== level) {
+      freshLevel = true;
       if (loadingLevel === level) return;
       loadingLevel = level;
       try { await loadLevel(level, false); applyLiveGrid(); } finally { loadingLevel = null; }
     }
-    player.x = x + 0.5; player.y = y + 0.5; gameA = DIR_ANGLE[dir & 3]; player.a = gameA + lookYaw;
+    const tx = x + 0.5, ty = y + 0.5, ta = DIR_ANGLE[dir & 3];
+    const same = Math.abs(tx - (anim ? anim.x1 : player.x)) < 1e-6 && Math.abs(ty - (anim ? anim.y1 : player.y)) < 1e-6 && ta === gameA;
+    if (same) return;
+    let da = ta - (player.a - lookYaw);                 // plus court chemin angulaire
+    da = Math.atan2(Math.sin(da), Math.cos(da));
+    const step = Math.hypot(tx - player.x, ty - player.y);
+    if (smooth && !freshLevel && step <= 1.5 && (step > 0.01 || Math.abs(da) > 0.01)) {
+      anim = { x0: player.x, y0: player.y, a0: player.a - lookYaw, x1: tx, y1: ty, a1: player.a - lookYaw + da,
+        t0: performance.now(), dur: Math.abs(da) > 0.01 ? ANIM_TURN : ANIM_MOVE };
+    } else {
+      anim = null; turning = false;
+      player.x = tx; player.y = ty; player.a = ta + lookYaw;
+    }
+    gameA = ta;
     dirty = true;
   });
 
@@ -575,6 +598,15 @@
   function frame(t) {
     const dt = Math.min(0.05, (t - last) / 1000); last = t;
     if (L && EMBED) {
+      if (anim) {
+        const k = Math.min(1, (t - anim.t0) / anim.dur), e = k * k * (3 - 2 * k);   // départ et arrivée en douceur
+        player.x = anim.x0 + (anim.x1 - anim.x0) * e;
+        player.y = anim.y0 + (anim.y1 - anim.y0) * e;
+        player.a = anim.a0 + (anim.a1 - anim.a0) * e + lookYaw;
+        turning = Math.abs(anim.a1 - anim.a0) > 0.01 && k < 1;
+        if (k >= 1) { anim = null; turning = false; player.a = gameA + lookYaw; }
+        dirty = true;
+      }
       if (dirty) { render(); updateHud(); dirty = false; }
     } else if (L) {
       update(dt); render(); drawMap(); updateHud();
