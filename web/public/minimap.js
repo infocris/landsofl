@@ -119,6 +119,27 @@
     }
   }
 
+  // Catégories d'objets (d'après la fiche, tools/item_info.py) et icône du jeu qui les représente
+  const iconSheet = new Image();
+  iconSheet.src = "viewer/data/item_icons.png";
+  iconSheet.onload = () => { draw(lastDraw[0], lastDraw[1]); if (current) renderItemList(current); };
+  const CATEGORIES = {
+    arme: { label: "arme", icon: 5 }, armure: { label: "armure", icon: 19 }, soin: { label: "soin", icon: 30 },
+    cle: { label: "clé", icon: 60 }, parchemin: { label: "parchemin, texte", icon: 34 }, anneau: { label: "anneau", icon: 82 },
+    magie: { label: "objet magique", icon: 27 }, divers: { label: "trésor, quête, divers", icon: 103 },
+  };
+  function itemCategory(type) {
+    const k = itemInfo && itemInfo[type] ? itemInfo[type].kind || "" : "";
+    if (/^Arme|Munition/.test(k)) return CATEGORIES.arme;
+    if (/^(Corps|Tête|Bouclier|Pieds|Poignets|Cou)/.test(k)) return CATEGORIES.armure;
+    if (/^Soin/.test(k)) return CATEGORIES.soin;
+    if (k === "Clé") return CATEGORIES.cle;
+    if (/Parchemin|Texte/.test(k)) return CATEGORIES.parchemin;
+    if (/anneau/.test(k)) return CATEGORIES.anneau;
+    if (/Baguette|magique/.test(k)) return CATEGORIES.magie;
+    return CATEGORIES.divers;
+  }
+
   function renderItemList(L) {
     renderPlaceList(L);
     itemsEl.textContent = "";
@@ -131,6 +152,12 @@
       const li = document.createElement("li");
       li.dataset.cell = g.y * 32 + g.x;
       const b = document.createElement("b"); b.textContent = g.n + ".";
+      const ic = document.createElement("i"); ic.className = "cat";
+      if (itemInfo) {
+        const cat = itemCategory(g.items[0].type);
+        ic.style.backgroundPosition = `-${(cat.icon % 16) * 16}px -${Math.floor(cat.icon / 16) * 16}px`;
+        ic.title = cat.label;
+      }
       const names = new Map();
       for (const it of g.items) {
         const label = (it.name || `objet ${it.type}`) + (it.spawn === "event" ? " (événement)" : "");
@@ -142,7 +169,7 @@
         + (g.items[0].container === "niche"
           ? (DIRS[g.items[0].face] ? ` — niche, face ${DIRS[g.items[0].face]}` : " — dans un mur") : "");
       const pos = document.createElement("span"); pos.className = "pos"; pos.textContent = `${g.x},${g.y}`;
-      li.append(b, t, pos);
+      li.append(b, ic, t, pos);
       itemsEl.appendChild(li);
     }
   }
@@ -323,8 +350,24 @@
     // objets : numéro du groupe sur sa case
     g.font = `bold ${Math.round(9 * k)}px system-ui, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
     g.lineWidth = 3 * Math.min(1, k); g.strokeStyle = "#000";
+    // objets : icône de la catégorie du premier objet de la case (icônes du jeu), numéro en coin
+    const iconOk = iconSheet.complete && iconSheet.naturalWidth > 0 && itemInfo;
     for (const it of L.groups) {
       const tx = it.x * CELL + CELL / 2, ty = it.y * CELL + CELL / 2 + 0.5;
+      if (iconOk) {
+        const cat = itemCategory(it.items[0].type), sz = CELL + 2, ix = it.x * CELL - 1, iy = it.y * CELL - 1;
+        g.fillStyle = "rgba(10, 30, 32, .85)"; g.fillRect(ix, iy, sz, sz);
+        g.strokeStyle = "#28dce6"; g.lineWidth = 1; g.strokeRect(ix + .5, iy + .5, sz - 1, sz - 1);
+        g.imageSmoothingEnabled = true;
+        g.drawImage(iconSheet, (cat.icon % 16) * 20, Math.floor(cat.icon / 16) * 20, 20, 20, ix + 1, iy + 1, sz - 2, sz - 2);
+        if (CELL >= 14) {
+          g.font = `bold ${Math.round(7 * k)}px system-ui, sans-serif`; g.textAlign = "right"; g.textBaseline = "bottom";
+          g.lineWidth = 2.5; g.strokeStyle = "#000"; g.fillStyle = "#28dce6";
+          g.strokeText(String(it.n), ix + sz, iy + sz + 1); g.fillText(String(it.n), ix + sz, iy + sz + 1);
+          g.textAlign = "center"; g.textBaseline = "middle";
+        }
+        continue;
+      }
       g.fillStyle = "#28dce6";
       g.strokeText(String(it.n), tx, ty); g.fillText(String(it.n), tx, ty);
     }
@@ -367,7 +410,7 @@
     if (grp) {
       const where = grp.items[0].container === "niche" ? (DIRS[grp.items[0].face] ? ` (niche, face ${DIRS[grp.items[0].face]})` : " (dans un mur)") : "";
       out.push(`<span class="it">Objets n° ${grp.n}${where} :</span>`);
-      for (const it of grp.items) out.push(`<span class="it">• ${esc(it.name || "objet " + it.type)}${it.spawn === "event" ? " (événement)" : ""}</span>`);
+      for (const it of grp.items) out.push(`<span class="it">• ${esc(it.name || "objet " + it.type)} <span class="t">(${itemCategory(it.type).label})</span>${it.spawn === "event" ? " (événement)" : ""}</span>`);
     }
     const FACE_FR = ["nord", "est", "sud", "ouest"];
     for (let f = 0; f < 4; f++) {
@@ -576,7 +619,7 @@
   const ICON = 20, ICON_COLS = 16, SCALE = 1.5;
   const invBar = document.getElementById("inv-bar"), invHand = document.getElementById("inv-hand"),
     invChars = document.getElementById("inv-chars"), invCount = document.getElementById("inv-count");
-  getJSON("viewer/data/items.json?v=20261108s").then((d) => { itemInfo = d; }, () => {});
+  getJSON("viewer/data/items.json?v=20261108s").then((d) => { itemInfo = d; if (current) renderItemList(current); }, () => {});
 
   function slot(type, label) {
     const d = document.createElement("div");
