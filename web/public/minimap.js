@@ -75,7 +75,8 @@
       levels.push({ level: l.level, name: l.name, faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
         labels: d.labels, places: numberPlaces(d.labels || []), groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {},
         spriteSigs: d.spriteSigs || {}, spriteConds: d.spriteConds || {}, spriteOf: null, scenes: d.scenes || {}, locks: d.locks || [],
-        scripted: new Set(d.scripted || []), fragile: d.fragile || [], exits: d.exits || [] });
+        scripted: new Set(d.scripted || []), fragile: d.fragile || [], exits: d.exits || [],
+        walls: d.walls || {}, atlasCols: d.atlasCols, faceW: d.faceW, faceH: d.faceH });
       infoEl.textContent = `chargement des cartes… ${levels.length}/${index.length}`;
     }
   }
@@ -139,6 +140,14 @@
     if (/Baguette|magique/.test(k)) return CATEGORIES.magie;
     return CATEGORIES.divers;
   }
+  // icône d'une case d'objets : celle de l'objet lui-même (ITEMICN.SHP) si la case ne contient
+  // qu'un seul type d'objet, sinon celle de la catégorie du premier objet
+  function groupIcon(grp) {
+    const t = grp.items[0].type;
+    if (itemInfo && itemInfo[t] && itemInfo[t].icon >= 0 && grp.items.every((it) => it.type === t))
+      return { icon: itemInfo[t].icon, label: itemInfo[t].name + (grp.items.length > 1 ? ` (×${grp.items.length})` : ""), own: true };
+    return itemCategory(t);
+  }
 
   function renderItemList(L) {
     renderPlaceList(L);
@@ -154,7 +163,7 @@
       const b = document.createElement("b"); b.textContent = g.n + ".";
       const ic = document.createElement("i"); ic.className = "cat";
       if (itemInfo) {
-        const cat = itemCategory(g.items[0].type);
+        const cat = groupIcon(g);
         ic.style.backgroundPosition = `-${(cat.icon % 16) * 16}px -${Math.floor(cat.icon / 16) * 16}px`;
         ic.title = cat.label;
       }
@@ -305,14 +314,94 @@
     return allZero ? "floor" : cls;
   }
 
+  // --- Cases illustrées avec les graphismes du lieu ----------------------------
+  // Textures exportées pour la vue 3D (viewer/data) : sol 64×64 (moitié basse = dalles vues de
+  // près) et planche des faces de murs (128×96 par face, n° de face = walls[id].tex).
+  let texMode = true;
+  try { texMode = localStorage.getItem("minimapTex") !== "0"; } catch (e) {}
+  const texBtn = document.getElementById("mm-tex");
+  const setTexMode = (on) => {
+    texMode = on; texBtn.classList.toggle("on", on);
+    try { localStorage.setItem("minimapTex", on ? "1" : "0"); } catch (e) {}
+    draw(lastDraw[0], lastDraw[1]);
+  };
+  texBtn.addEventListener("click", (e) => { setTexMode(!texMode); e.currentTarget.blur(); });
+  texBtn.classList.toggle("on", texMode);
+
+  function levelImages(L) {
+    if (L.img) return L.img.ready ? L.img : null;
+    const nn = String(L.level).padStart(2, "0"), img = { ready: false, tiles: null };
+    L.img = img;
+    const load = (name) => new Promise((ok, ko) => { const im = new Image(); im.onload = () => ok(im); im.onerror = ko;
+      im.src = `viewer/data/level${nn}_${name}.png?v=20261109e`; });
+    Promise.all([load("floor"), load("walls")]).then(([floor, walls]) => {
+      Object.assign(img, { floor, walls, ready: true });
+      if (current === L) draw(lastDraw[0], lastDraw[1]);
+    }, () => {});
+    return null;
+  }
+  // texture de mur « de base » du niveau : la face opaque, non porte, la plus fréquente
+  function baseWallTex(L) {
+    if (L.baseTex != null) return L.baseTex;
+    const n = new Map();
+    for (const id of L.faces) { const w = L.walls[id]; if (w && w.opaque && !w.door && w.tex >= 0) n.set(w.tex, (n.get(w.tex) || 0) + 1); }
+    L.baseTex = n.size ? [...n].sort((a, b) => b[1] - a[1])[0][0] : -1;
+    return L.baseTex;
+  }
+  // tuiles à la taille courante des cases, mises en cache par niveau
+  function tile(L, img, key, paint) {
+    if (!img.tiles || img.tiles.cell !== CELL) img.tiles = { cell: CELL, map: new Map() };
+    let c = img.tiles.map.get(key);
+    if (!c) {
+      c = document.createElement("canvas"); c.width = c.height = CELL - 1;
+      const t = c.getContext("2d"); t.imageSmoothingEnabled = true; t.imageSmoothingQuality = "high";
+      paint(t, CELL - 1); img.tiles.map.set(key, c);
+    }
+    return c;
+  }
+  const face = (L, img, t, tex, s, crop) => {          // crop : [x, y, l, h] dans la face 128×96
+    const fx = (tex % L.atlasCols) * L.faceW, fy = Math.floor(tex / L.atlasCols) * L.faceH;
+    const [cx, cy, cw, ch] = crop || [0, 0, L.faceW, L.faceH];
+    t.drawImage(img.walls, fx + cx, fy + cy, cw, ch, 0, 0, s, s);
+  };
+  const floorTile = (L, img) => tile(L, img, "floor", (t, s) => {
+    t.drawImage(img.floor, 0, 32, 64, 32, 0, 0, s, s);
+    t.fillStyle = "rgba(255,236,190,.22)"; t.fillRect(0, 0, s, s); });
+  function cellTile(L, img, i, cls) {
+    if (cls === "floor") return floorTile(L, img);
+    if (cls === "special") return tile(L, img, "special", (t, s) => {
+      t.drawImage(floorTile(L, img), 0, 0); t.fillStyle = "rgba(111,143,88,.45)"; t.fillRect(0, 0, s, s); });
+    if (cls === "wall") {
+      const tex = baseWallTex(L);
+      if (tex < 0) return null;
+      return tile(L, img, "wall", (t, s) => {
+        face(L, img, t, tex, s, [32, 16, 64, 64]);
+        t.fillStyle = "rgba(0,0,0,.72)"; t.fillRect(0, 0, s, s); });
+    }
+    if (cls === "doorClosed" || cls === "doorOpen") {
+      let w = null;
+      for (let k = 0; k < 4 && !w; k++) { const v = L.walls[live[i * 4 + k]]; if (v && v.door && v.tex >= 0) w = v; }
+      const tex = w ? (cls === "doorOpen" && w.openTex != null ? w.openTex : w.tex) : -1;
+      return tile(L, img, cls + tex, (t, s) => {
+        t.drawImage(floorTile(L, img), 0, 0);
+        if (tex >= 0 && cls === "doorClosed") face(L, img, t, tex, s, [16, 0, 96, 96]);
+        t.strokeStyle = COLORS[cls]; t.lineWidth = Math.max(1, s / 8); t.strokeRect(0.5, 0.5, s - 1, s - 1);
+      });
+    }
+    return null;
+  }
+
   function draw(block, dir) {
     lastDraw = [block, dir];
     const L = current, k = CELL / 12;
     g.fillStyle = "#000"; g.fillRect(0, 0, canvas.width, canvas.height);
     if (!L) return;
+    const img = texMode ? levelImages(L) : null;
     for (let i = 0; i < 1024; i++) {
-      g.fillStyle = COLORS[cellClass(L, i)];
-      g.fillRect((i % 32) * CELL, Math.floor(i / 32) * CELL, CELL - 1, CELL - 1);
+      const cls = cellClass(L, i), x = (i % 32) * CELL, y = Math.floor(i / 32) * CELL;
+      const tl = img && cellTile(L, img, i, cls);
+      if (tl) g.drawImage(tl, x, y);
+      else { g.fillStyle = COLORS[cls]; g.fillRect(x, y, CELL - 1, CELL - 1); }
     }
     g.fillStyle = "#d22";
     // lieux : carré rouge numéroté
@@ -411,9 +500,9 @@
     for (const it of L.groups) {
       const tx = it.x * CELL + CELL / 2, ty = it.y * CELL + CELL / 2 + 0.5;
       if (iconOk) {
-        const cat = itemCategory(it.items[0].type), sz = CELL + 2, ix = it.x * CELL - 1, iy = it.y * CELL - 1;
+        const cat = groupIcon(it), sz = CELL + 2, ix = it.x * CELL - 1, iy = it.y * CELL - 1;
         g.fillStyle = "rgba(10, 30, 32, .85)"; g.fillRect(ix, iy, sz, sz);
-        g.strokeStyle = "#28dce6"; g.lineWidth = 1; g.strokeRect(ix + .5, iy + .5, sz - 1, sz - 1);
+        g.strokeStyle = cat.own ? "#e8dcc0" : "#28dce6"; g.lineWidth = 1; g.strokeRect(ix + .5, iy + .5, sz - 1, sz - 1);
         g.imageSmoothingEnabled = true;
         g.drawImage(iconSheet, (cat.icon % 16) * 20, Math.floor(cat.icon / 16) * 20, 20, 20, ix + 1, iy + 1, sz - 2, sz - 2);
         if (CELL >= 14) {

@@ -521,6 +521,17 @@ mur « encadrement » (centré, aligné en bas de l'ouverture).
 | `web/public/viewer/` | visualiseur 3D libre (lancer de rayons maison) | http://localhost:8000/viewer/ |
 | `web/public/minimap.js`, `memscan.js` | mini-carte en direct à côté du jeu | http://localhost:8000/ |
 
+**Rendu illustré de la mini-carte** (bouton ▦, réglage mémorisé). Les cases reprennent les
+graphismes du lieu exportés pour la vue 3D :
+- **sol** : moitié basse de `levelNN_floor.png`, c'est-à-dire les dalles vues de près ;
+- **murs** : la face opaque la plus fréquente du niveau (`walls[id].tex`), recadrée au centre
+  et assombrie ;
+- **portes fermées** : leur propre face, avec un liseré de couleur.
+
+Une case qui ne contient qu'un seul type d'objet montre l'icône de cet objet
+(`ITEMICN.SHP`, octet 2 de la table des objets), encadrée en crème. Les autres cases
+gardent l'icône de leur catégorie, encadrée en cyan.
+
 ## 12. Mémoire du jeu en cours d'exécution — vérifié
 
 Ces adresses servent à la mini-carte en direct de `web/public/index.html` (`minimap.js`,
@@ -822,3 +833,5 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
   mini-carte avec leur état réel.
 - **2026-11-08** : escaliers (symboles 25 et 26), trous (11) et passages de la fonction 0x3C,
   affichés sur la mini-carte ; portes animées dans la vue 3D.
+- **2026-11-08** : mini-carte illustrée par les textures de chaque lieu, et icône réelle
+  des objets seuls sur leur case.

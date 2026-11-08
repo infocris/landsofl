@@ -116,6 +116,8 @@
     border: 1px solid #554a36; border-radius: 4px; background: #1d1912; color: #e8dcc0; cursor: pointer; }
   #mm-title button:first-of-type { margin-left: auto; }
   #mm-title button:disabled { opacity: .35; cursor: default; }
+  #mm-title #mm-tex { width: 28px; }
+  #mm-title #mm-tex.on { border-color: #c9a227; color: #c9a227; }
   #mm-info { color: #a39578; min-height: 1.4em; }
   #mm-canvas { width: var(--mm-size); height: var(--mm-size); align-self: center; border: 1px solid #3a3226; flex: none; }
   #mm-label { color: #c9a227; font-weight: 600; letter-spacing: .04em; min-height: 1.4em; }
@@ -160,7 +162,7 @@
   <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261109e" title="Vue 3D synchronisée"></iframe></div>
 </div>
 <aside id="mm" aria-label="Mini-carte">
-  <div id="mm-title"><span>Mini-carte</span><button id="mm-smaller" type="button" title="Réduire la mini-carte">−</button><button id="mm-bigger" type="button" title="Agrandir la mini-carte">+</button></div>
+  <div id="mm-title"><span>Mini-carte</span><button id="mm-tex" type="button" title="Cases illustrées avec les textures du lieu / couleurs simples">▦</button><button id="mm-smaller" type="button" title="Réduire la mini-carte">−</button><button id="mm-bigger" type="button" title="Agrandir la mini-carte">+</button></div>
   <div id="mm-info">chargement…</div>
   <canvas id="mm-canvas"></canvas>
   <div id="mm-label"></div>
@@ -423,6 +425,6 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261109f"></script>
+<script src="minimap.js?v=20261109g"></script>
 </body>
 </html>
