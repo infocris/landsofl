@@ -347,7 +347,14 @@
     }
   }
 
-  window.LoLMinimap = { attach() {}, preview };
+  // Débogage depuis la console : LoLMinimap.monsters() -> case, direction, type, sprite choisi
+  function debugMonsters() {
+    const L = current;
+    return monsters.map((m) => ({ case: `${Math.floor(m.x)},${Math.floor(m.y)}`, dir: m.dir, type: m.type,
+      sprite: L && L.spriteOf ? L.spriteOf[m.type] || "(aucun : type inconnu du niveau)" : "(en cours)",
+      possibles: L ? (L.monsterTypes[m.type] || []).join("/") : "" }));
+  }
+  window.LoLMinimap = { attach() {}, preview, monsters: debugMonsters };
 
   setInterval(() => { updateInventory().catch(() => {}); }, 1000);
   loadLevels().then(() => setInterval(tick, 200),
