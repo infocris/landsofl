@@ -122,6 +122,18 @@ entrées de 12 octets :
   le `.WLL` de l'autre, et le niveau 21 un id du niveau 20. L'extracteur reprend la
   définition dans un niveau du même décor.
 
+### 6.1 Coffres — vérifié visuellement (2026-11-08)
+
+Le champ `automap` d'un type de mur choisit le symbole de la carte du jeu. La valeur
+**210** marque les coffres : tous les décors de coffre repérés sur les planches de décors ont
+cette valeur (cavernes, marais, mines, Urbish, manoir, Yvel, tours, Cimmeria…). Chaque décor
+définit 4 types consécutifs, qui sont les états d'un coffre : **fermé**, **ouvert**, ouvert
+(couvercle levé, sans doute vide) et **cassé**. Par exemple, aux niveaux 7 à 9 : 53, 70, 72
+et 73. Il y a 64 faces de coffre sur 21 niveaux. Le script change le type quand on ouvre ou
+casse un coffre (« Un coffre ouvert. », « Le coffre est endommagé. »). La grille vivante
+donne donc l'état réel. La page affiche les coffres et leur état sur la mini-carte ; les
+objets posés sur une case de coffre sont indiqués « dans un coffre ».
+
 ## 7. Annotations de carte — `LEVELn.XXX` — vérifié
 
 ```
@@ -779,3 +791,5 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
   périmée du niveau précédent peut subsister.
 - **2026-11-08** : seuils d'expérience et montée de niveau (code du jeu), boutons « + » par
   classe dans le panneau.
+- **2026-11-08** : coffres (symbole 210 de la carte du jeu, 4 états), affichés sur la
+  mini-carte avec leur état réel.

@@ -166,6 +166,7 @@
       const t = document.createElement("span");
       t.textContent = [...names].map(([k, c]) => (c > 1 ? `${c} × ` : "") + k).join(", ")
         + (g.items[0].container === "wall" ? " — dans un mur (niche)" : "")
+        + (g.items[0].container === "chest" ? " — dans un coffre" : "")
         + (g.items[0].container === "niche"
           ? (DIRS[g.items[0].face] ? ` — niche, face ${DIRS[g.items[0].face]}` : " — dans un mur") : "");
       const pos = document.createElement("span"); pos.className = "pos"; pos.textContent = `${g.x},${g.y}`;
@@ -188,8 +189,9 @@
         const o = id * ITEMS.size, type = w(o + 12);
         if (type > 0 && type < itemInfo.length) {
           const wall = cellClass(current, c) === "wall" || cellClass(current, c) === "special";
+          const chest = [0, 1, 2, 3].some((f) => chestState(current, c, f) >= 0);
           out.push({ x: c % 32, y: c >> 5, type, name: itemInfo[type].name,
-            xOffs: table[o + 7], yOffs: table[o + 9], container: wall ? "wall" : undefined });
+            xOffs: table[o + 7], yOffs: table[o + 9], container: chest ? "chest" : wall ? "wall" : undefined });
         }
         id = w(o);
       }
@@ -245,11 +247,23 @@
   function switchKind(L, i, f) {
     const id = live[i * 4 + f], t = id && L.wallTypes[id];
     if (!t) return null;
+    if (t[2] === 210) return null;                      // coffre : affiché à part
     if (t[1] === 2 || t[1] === 3) return "lever";
     if ((t[1] === 1 || t[1] === 4) && L.scripted.has(i)) return "button";
     return null;
   }
 
+  // Coffres : types de mur dont le symbole de carte (automap) vaut 210 ; chaque décor en définit 4,
+  // dans l'ordre : fermé, ouvert, ouvert (vide ?), cassé (§ 6). -1 = pas de coffre sur cette face.
+  const CHEST_FR = ["fermé", "ouvert", "ouvert (vide ?)", "cassé"];
+  function chestIds(L) {
+    if (!L.chestIds) L.chestIds = Object.entries(L.wallTypes).filter(([, t]) => t && t[2] === 210).map(([k]) => +k).sort((a, b) => a - b);
+    return L.chestIds;
+  }
+  function chestState(L, i, f) {
+    const id = live[i * 4 + f];
+    return id ? chestIds(L).indexOf(id) : -1;
+  }
   function isWallCell(L, i) { const c = cellClass(L, i); return c === "wall" || c === "special" || c === "unknown"; }
 
   // État d'un monstre (octet +13 depuis x, § 12.2) : 1 = paisible (n'attaque pas pour l'instant ;
@@ -318,16 +332,22 @@
       g.beginPath(); g.moveTo(x0 + c * 0.2, y0 + c * 0.1); g.lineTo(x0 + c * 0.55, y0 + c * 0.4);
       g.lineTo(x0 + c * 0.35, y0 + c * 0.6); g.lineTo(x0 + c * 0.8, y0 + c * 0.9); g.stroke();
     }
+    // coffres (symbole 210 de la carte du jeu) : petite malle contre la face, couleur selon l'état
+    for (let i = 0; i < 1024; i++) for (let f = 0; f < 4; f++) {
+      const st = chestState(L, i, f);
+      if (st < 0) continue;
+      const x0 = (i % 32) * CELL, y0 = Math.floor(i / 32) * CELL, w = CELL * 0.62, h = CELL * 0.42;
+      const cx = x0 + (CELL - 1) / 2 + [0, 1, 0, -1][f] * (CELL - 1 - w) / 2;
+      const cy = y0 + (CELL - 1) / 2 + [-1, 0, 1, 0][f] * (CELL - 1 - h) / 2;
+      const [body, band] = [["#8b5a2b", "#ffd700"], ["#c08a4a", "#7cfc00"], ["#c08a4a", "#7cfc00"], ["#6b6b6b", "#999"]][st] || ["#8b5a2b", "#ffd700"];
+      g.fillStyle = "#000"; g.fillRect(cx - w / 2 - 1, cy - h / 2 - 1, w + 2, h + 2);
+      g.fillStyle = body; g.fillRect(cx - w / 2, cy - h / 2, w, h);
+      g.fillStyle = band; g.fillRect(cx - w / 2, cy - h * 0.12, w, Math.max(1, h * 0.24));
+    }
     // serrures : petite clé dorée dans le coin de la case
     g.strokeStyle = "#ffd700"; g.fillStyle = "#ffd700"; g.lineWidth = Math.max(1, k);
     for (const c of new Set(L.locks.map((l) => l.y * 32 + l.x))) {
       const x0 = (c % 32) * CELL, y0 = Math.floor(c / 32) * CELL, r = 2 * k;
-      if (L.locks.some((l) => l.y * 32 + l.x === c && l.kind === "coffre")) {   // coffre : petite malle
-        const w = CELL * 0.6, h = CELL * 0.42, cx0 = x0 + (CELL - 1 - w) / 2, cy0 = y0 + (CELL - 1 - h) / 2;
-        g.fillStyle = "#8b5a2b"; g.fillRect(cx0, cy0, w, h);
-        g.fillStyle = "#ffd700"; g.fillRect(cx0, cy0 + h * 0.35, w, Math.max(1, h * 0.18));
-        g.fillStyle = "#ffd700"; g.strokeStyle = "#ffd700"; continue;
-      }
       g.beginPath(); g.arc(x0 + r + 1, y0 + r + 1, r, 0, 2 * Math.PI); g.stroke();
       g.beginPath(); g.moveTo(x0 + 2 * r + 1, y0 + r + 1); g.lineTo(x0 + CELL - 2, y0 + r + 1);
       g.lineTo(x0 + CELL - 2, y0 + 2 * r + 1); g.stroke();
@@ -393,7 +413,7 @@
   }
 
   const LOCK_KIND = { porte: "Serrure de porte", passage: "Serrure (ouvre un passage)",
-    receptacle: "Réceptacle de clé (mécanisme)", coffre: "Donne un objet (coffre ou lieu)", inconnu: "Serrure" };
+    receptacle: "Réceptacle de clé (mécanisme)", coffre: "Donne un objet (lieu)", inconnu: "Serrure" };
   // Info-bulle au survol de la mini-carte : nature de la case, lieu, objets, monstres
   const tipEl = document.getElementById("mm-tip");
   const CLASS_FR = { wall: "mur", floor: "sol", doorOpen: "porte ouverte", doorClosed: "porte fermée",
@@ -408,7 +428,8 @@
     if (L.scenes[i]) out.push(`<span class="t">Lieu avec image fixe (scène)</span>`);
     const grp = L.groups.find((g) => g.x === x && g.y === y);
     if (grp) {
-      const where = grp.items[0].container === "niche" ? (DIRS[grp.items[0].face] ? ` (niche, face ${DIRS[grp.items[0].face]})` : " (dans un mur)") : "";
+      const where = grp.items[0].container === "chest" ? " (dans un coffre)"
+        : grp.items[0].container === "niche" ? (DIRS[grp.items[0].face] ? ` (niche, face ${DIRS[grp.items[0].face]})` : " (dans un mur)") : "";
       out.push(`<span class="it">Objets n° ${grp.n}${where} :</span>`);
       for (const it of grp.items) out.push(`<span class="it">• ${esc(it.name || "objet " + it.type)} <span class="t">(${itemCategory(it.type).label})</span>${it.spawn === "event" ? " (événement)" : ""}</span>`);
     }
@@ -417,6 +438,10 @@
       const kind = switchKind(L, i, f);
       if (kind === "lever") out.push(`<span class="sw">Levier, face ${FACE_FR[f]} (état ${L.wallTypes[live[i * 4 + f]][1] === 2 ? "A" : "B"})</span>`);
       else if (kind) out.push(`<span class="bt">Élément cliquable (bouton, serrure, décor…), face ${FACE_FR[f]}</span>`);
+    }
+    for (let f = 0; f < 4; f++) {
+      const st = chestState(L, i, f);
+      if (st >= 0) out.push(`<span class="ch">Coffre ${CHEST_FR[st] || ""}, face ${["nord", "est", "sud", "ouest"][f]}</span>`);
     }
     for (const fw of L.fragile) if (fw.x === x && fw.y === y)
       out.push(isWallCell(L, i) ? `<span class="fr">Mur fragile : se casse en le frappant avec : ${esc(fw.toolName)}</span>`
