@@ -18,7 +18,8 @@
     bar: 0x3E4F6, barSlots: 48,      // u16 : n° d'objet du jeu (0 = vide), barre commune
     hand: 0x3E558,                   // u16 : objet tenu en main
     items: 0x31F79, itemSize: 16, maxItems: 400,   // u16 au début de chaque entrée : type d'objet
-    char0: 0x3389F, nameLen: 11, equipOffset: 78, equipSlots: 11,   // équipement : 11 × u16 à +78
+    char0: 0x3389F, charSize: 130, chars: 4,   // groupe : 4 fiches de 130 octets (nom de la 1re en 0x3389F)
+    nameLen: 11, equipOffset: 78, equipSlots: 11,   // équipement : 11 × u16 à +78
   };
   // Monstres du niveau courant (§ 12.2) : table de 30 entrées de 46 octets ; positions
   // relatives au champ x : case u16 à -2, x/y u16 (case*256 + décalage), direction à +17, type à +25
@@ -330,22 +331,32 @@
     return d;
   }
 
+  // Fiches du groupe lues d'un bloc [char0 - 2, 4 × 130] : personnages actifs (drapeau 1, nom valide)
+  function partyChars(block) {
+    const out = [];
+    for (let i = 0; i < INV.chars; i++) {
+      const o = i * INV.charSize;                       // block[o] = drapeaux, block[o + 2] = nom
+      let name = ""; for (let k = 0; k < INV.nameLen && block[o + 2 + k]; k++) name += String.fromCharCode(block[o + 2 + k]);
+      if ((block[o] & 1) && /^[A-Za-z' -]{2,}$/.test(name)) out.push({ slot: i, name, at: (k) => block[o + 2 + k] });
+    }
+    return out;
+  }
+  const PARTY_RANGE = () => [INV.char0 - 2, INV.chars * INV.charSize];
+
   let lastInv = "";
   async function updateInventory() {
     if (!itemInfo || previewing) return;
     const r = await mem.read([[INV.bar, INV.barSlots * 2], [INV.hand, 2], [INV.items, INV.itemSize * INV.maxItems],
-      [INV.char0, INV.equipOffset + INV.equipSlots * 2]]);
+      PARTY_RANGE()]);
     if (!r) return;
     const [bar, hand, table, ch] = r;
     const typeOf = (id) => (id > 0 && id < INV.maxItems ? table[id * INV.itemSize] | table[id * INV.itemSize + 1] << 8 : -1);
     const barTypes = [];
     for (let k = 0; k < INV.barSlots; k++) barTypes.push(typeOf(bar[k * 2] | bar[k * 2 + 1] << 8));
     const handType = typeOf(hand[0] | hand[1] << 8);
-    let name = "";
-    for (let k = 0; k < INV.nameLen && ch[k]; k++) name += String.fromCharCode(ch[k]);
-    const eqTypes = [];
-    for (let k = 0; k < INV.equipSlots; k++) { const o = INV.equipOffset + k * 2; eqTypes.push(typeOf(ch[o] | ch[o + 1] << 8)); }
-    const key = JSON.stringify([barTypes, handType, name, eqTypes]);
+    const party = partyChars(ch).map((c) => ({ name: c.name,
+      eq: Array.from({ length: INV.equipSlots }, (_, k) => typeOf(c.at(INV.equipOffset + 2 * k) | c.at(INV.equipOffset + 2 * k + 1) << 8)) }));
+    const key = JSON.stringify([barTypes, handType, party]);
     if (key === lastInv) return;          // on ne reconstruit la grille que si elle a changé
     lastInv = key;
 
@@ -353,10 +364,10 @@
     invCount.textContent = `${barTypes.filter((t) => t >= 0).length} / ${INV.barSlots} cases occupées`;
     invHand.replaceChildren(slot(handType, "en main"));
     invChars.replaceChildren();
-    if (/^[A-Za-z' -]{2,}$/.test(name)) {
-      const b = document.createElement("div"); b.className = "inv-sub"; b.textContent = `${name} — équipement`;
+    for (const c of party) {
+      const b = document.createElement("div"); b.className = "inv-sub"; b.textContent = `${c.name} — équipement`;
       const row = document.createElement("div"); row.className = "inv-grid";
-      row.append(...eqTypes.map((t, k) => slot(t, `emplacement ${k + 1}`)));
+      row.append(...c.eq.map((t, k) => slot(t, `emplacement ${k + 1}`)));
       invChars.append(b, row);
     }
   }
@@ -373,22 +384,22 @@
   let lastStats = "";
   async function updateStats() {
     if (previewing) return;
-    const r = await mem.read([[INV.char0 - 2, 130], [STATS.money, 2]]);
+    const r = await mem.read([PARTY_RANGE(), [STATS.money, 2]]);
     if (!r) return;
-    const c = r[0], o = 2;                                   // c[o + k] = octet au nom + k
-    const u16 = (k) => c[o + k] | c[o + k + 1] << 8, s16 = (k) => (u16(k) << 16) >> 16;
-    const u32 = (k) => (u16(k) | u16(k + 2) << 16) >>> 0;
-    let name = ""; for (let k = 0; k < INV.nameLen && c[o + k]; k++) name += String.fromCharCode(c[o + k]);
     const money = r[1][0] | r[1][1] << 8;
-    if (!/^[A-Za-z' -]{2,}$/.test(name)) return;
-    let itemsMight = 0; for (let k = 0; k < 8; k++) itemsMight += u16(21 + 2 * k);
-    const st = {
-      name, money,
-      hp: [s16(55), u16(57)], mp: [s16(59), u16(61)],
-      force: Math.floor((u16(72) + itemsMight) * u16(68) / 256),
-      prot: Math.floor((u16(74) + u16(53)) * u16(70) / 256),
-      lv: [c[o + 100], c[o + 101], c[o + 102]], xp: [u32(106), u32(110), u32(114)],
-    };
+    const chars = partyChars(r[0]).map((c) => {
+      const u16 = (k) => c.at(k) | c.at(k + 1) << 8, s16 = (k) => (u16(k) << 16) >> 16;
+      const u32 = (k) => (u16(k) | u16(k + 2) << 16) >>> 0;
+      let itemsMight = 0; for (let k = 0; k < 8; k++) itemsMight += u16(21 + 2 * k);
+      return {
+        name: c.name, hp: [s16(55), u16(57)], mp: [s16(59), u16(61)],
+        force: Math.floor((u16(72) + itemsMight) * u16(68) / 256),
+        prot: Math.floor((u16(74) + u16(53)) * u16(70) / 256),
+        lv: [c.at(100), c.at(101), c.at(102)], xp: [u32(106), u32(110), u32(114)],
+      };
+    });
+    if (!chars.length) return;
+    const st = { money, chars };
     const key = JSON.stringify(st);
     if (key === lastStats) return;
     lastStats = key;
@@ -397,16 +408,18 @@
       const pct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0;
       return `<span>${label}</span><div class="bar ${cls}"><i style="width:${pct}%"></i><span>${cur} / ${max}</span></div>`;
     };
-    const cls = ["Guerrier", "Voleur", "Mage"].map((n, k) => `${n} ${st.lv[k]} (${st.xp[k]} xp)`).join(" · ");
-    stChars.innerHTML = `<div class="st-char"><div class="nm"></div>${bar("hp", "Vie", st.hp)}${bar("mp", "Magie", st.mp)}
-      <span>Force</span><span>${st.force}</span><span>Protection</span><span>${st.prot}</span>
-      <div class="st-skills">${cls}</div></div>`;
-    stChars.querySelector(".nm").textContent = name;
+    stChars.innerHTML = st.chars.map((c) => {
+      const cls = ["Guerrier", "Voleur", "Mage"].map((n, k) => `${n} ${c.lv[k]} (${c.xp[k]} xp)`).join(" · ");
+      return `<div class="st-char"><div class="nm"></div>${bar("hp", "Vie", c.hp)}${bar("mp", "Magie", c.mp)}
+        <span>Force</span><span>${c.force}</span><span>Protection</span><span>${c.prot}</span>
+        <div class="st-skills">${cls}</div></div>`;
+    }).join("");
+    stChars.querySelectorAll(".nm").forEach((el, i) => { el.textContent = st.chars[i].name; });
   }
   setInterval(() => { updateStats().catch(() => {}); }, 1000);
 
   // --- Triches : vie / magie infinies ------------------------------------------
-  // Toutes les 100 ms, vie (+55) et magie (+59) actuelles du premier personnage sont remises
+  // Toutes les 100 ms, vie (+55) et magie (+59) actuelles de chaque personnage du groupe sont remises
   // à leur maximum (+57, +61). Un coup qui ferait passer la vie sous zéro entre deux
   // écritures resterait mortel : c'est une vie « quasi » infinie.
   const cheatHp = document.getElementById("cheat-hp"), cheatMp = document.getElementById("cheat-mp");
@@ -431,15 +444,16 @@
     if (cheating || previewing || !(cheatHp.checked || cheatMp.checked)) return;
     cheating = true;
     try {
-      const base = INV.char0;                                 // adresse du nom
-      const r = await mem.read([[base - 2, 70]]);
+      const r = await mem.read([PARTY_RANGE()]);
       if (!r) return;
-      const c = r[0], at = (k) => c[2 + k] | c[2 + k + 1] << 8;
-      if (c[0] !== 1 || !/^[A-Za-z]/.test(String.fromCharCode(c[2]))) return;   // pas de personnage actif
       const writes = [];
-      const fill = (cur, max) => { const m = at(max); if (m > 0 && m < 1000 && at(cur) !== m) writes.push([base + cur, new Uint8Array([m & 255, m >> 8])]); };
-      if (cheatHp.checked) fill(55, 57);
-      if (cheatMp.checked) fill(59, 61);
+      for (const c of partyChars(r[0])) {
+        const base = INV.char0 + c.slot * INV.charSize;       // adresse du nom de ce personnage
+        const at = (k) => c.at(k) | c.at(k + 1) << 8;
+        const fill = (cur, max) => { const m = at(max); if (m > 0 && m < 1000 && at(cur) !== m) writes.push([base + cur, new Uint8Array([m & 255, m >> 8])]); };
+        if (cheatHp.checked) fill(55, 57);
+        if (cheatMp.checked) fill(59, 61);
+      }
       if (writes.length) await mem.write(writes);
     } finally { cheating = false; }
   }, 100);

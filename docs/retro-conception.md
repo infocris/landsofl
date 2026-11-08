@@ -417,7 +417,8 @@ La RAM fait 16 Mo (`memsize=16`).
 | `0x3E4F6` | 48 × u16 | barre d'inventaire commune : n° d'objet du jeu (0 = vide) |
 | `0x3E558` | u16 | objet tenu en main (curseur) |
 | `0x31F79` | 400 × 16 octets | objets du jeu : l'entrée n commence par le **type** d'objet (u16, index de la table des objets § 8.2) ; le reste est inconnu (case, niveau…) |
-| `0x3389F` | fiche de personnage | premier personnage, champs relatifs au nom (voir ci-dessous) |
+| `0x3389F` | 4 × 130 octets | fiches du groupe : nom du personnage n en `0x3389F + 130·n` (drapeaux 2 octets avant). Champs relatifs au nom (voir ci-dessous) |
+| `0x2E7A2` | 8 × 130 octets | fiches modèles des personnages recrutables : Michael, Timothy, Baccata, (?), Conrad, Paulson, Dawn, Kieran, Ak'shel |
 | `0x3E6F0` | u16 | couronnes d'argent du groupe (**vérifié** : après écriture de 141, un clic sur le tas de pièces affiche « Vous avez 141 couronnes d'argent ». Le chiffre dessiné sur le tas n'est redessiné qu'à la transaction suivante) |
 | `0x8AA05` | 285 × 13 octets | table des types d'objets (§ 8.2) |
 | `0x5D6B5` | u8 | mode : 5 en exploration, 1 pendant l'image fixe d'un lieu (observé deux fois : entrée, sortie, nouvelle entrée) |
@@ -483,6 +484,17 @@ ScummVM utilise pour les sauvegardes de Lands of Lore ; il colle exactement (éq
 | +100 à +102 | niveaux Guerrier / Voleur / Mage |
 | +103 à +105 | modificateurs de compétence |
 | +106 / +110 / +114 | expérience des trois classes (u32 ; vaut 1 au départ, à confirmer) |
+
+**Taille d'une fiche : 130 octets — vérifié.** Les modèles des personnages sont espacés
+de 0x82 octets. Pour le vérifier sur le groupe, on a copié le modèle de Kieran dans le
+deuxième emplacement (`0x3389F + 130 − 2`) :
+- **Réaction du jeu** : il affiche aussitôt un second portrait (avec le visage de
+  Michael, l'image du personnage n'étant pas chargée) ;
+- **Panneau et triches** : la page lit et soigne ce personnage comme le premier.
+
+Sur un modèle, la Protection calculée (1) diffère de celle de l'écran de choix (6). Les
+multiplicateurs ne sont sans doute recalculés par le jeu qu'à l'arrivée réelle du
+personnage dans le groupe.
 
 Calcul des valeurs affichées, vérifié sur la fiche du jeu :
 
