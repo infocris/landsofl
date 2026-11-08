@@ -880,7 +880,7 @@
   const ICON = 20, ICON_COLS = 16, SCALE = 1.5;
   const invBar = document.getElementById("inv-bar"), invHand = document.getElementById("inv-hand"),
     invChars = document.getElementById("inv-chars"), invCount = document.getElementById("inv-count");
-  getJSON("viewer/data/items.json?v=20261108s").then((d) => { itemInfo = d; if (current) renderItemList(current); }, () => {});
+  getJSON("viewer/data/items.json?v=20261109k").then((d) => { itemInfo = d; if (current) renderItemList(current); }, () => {});
 
   function slot(type, label) {
     const d = document.createElement("div");
@@ -927,12 +927,49 @@
     }
     if (it.value) lines.push(`Valeur : ${it.value} (supposée)`);
     const ul = el("ul"); for (const l of lines) ul.appendChild(el("li", null, l));
+    const cmp = compareEquip(type, it);
     detailEl.replaceChildren(icon, el("div", "nm", it.name), close,
       el("div", "kd", (it.kind || "Objet") + (label ? ` · ${label}` : "") + ` · type ${type}`));
     if (lines.length) detailEl.appendChild(ul);
+    if (cmp) detailEl.appendChild(cmp);
     if (it.text) detailEl.appendChild(el("div", "txt", it.text));
     detailEl.appendChild(el("div", "note", "Valeurs lues dans la table des objets du jeu ; sens des champs déduit (doc § 8.2)."));
     detailEl.hidden = false;
+  }
+  // Comparaison avec l'équipement porté par chaque personnage, pour les emplacements où
+  // l'objet peut aller (masque d'emplacements, § 8.2) : force et protection, effets passifs.
+  // Armes et boucliers : comparés à la main principale (emplacements 0 et 1) seulement.
+  function compareEquip(type, it) {
+    if (!it.slots || !it.slots.length || !lastInvData || !lastInvData.party.length) return null;
+    const slots = [...new Set(it.slots.map((k) => (k === 2 ? 0 : k === 3 ? 1 : k)))];
+    const stat = (t) => { const o = itemInfo[t] || {}; return { m: o.might || 0, p: o.prot || 0 }; };
+    const me = stat(type);
+    const box = document.createElement("div"); box.className = "cmp";
+    const h = document.createElement("div"); h.className = "cmp-h"; h.textContent = "Comparaison avec l'équipement porté";
+    box.appendChild(h);
+    const fmt = (a, b, label) => {
+      if (!a && !b) return "";
+      const d = a - b, cls = d > 0 ? "up" : d < 0 ? "down" : "eq";
+      return `<span class="${cls}">${label} ${a}${d ? ` (${d > 0 ? "+" : ""}${d})` : " (=)"}</span>`;
+    };
+    for (const c of lastInvData.party) {
+      for (const k of slots) {
+        const cur = c.eq[k], row = document.createElement("div"); row.className = "cmp-r";
+        const who = `<b>${escHtml(c.name)}</b>, ${EQUIP_NAMES[k] || "emplacement " + (k + 1)} : `;
+        if (cur === type) { row.innerHTML = who + "<i>déjà porté</i>"; box.appendChild(row); continue; }
+        const o = stat(cur >= 0 ? cur : -1), curName = cur >= 0 && itemInfo[cur] ? itemInfo[cur].name : null;
+        const parts = [fmt(me.m, o.m, "Force"), fmt(me.p, o.p, "Protection")].filter(Boolean);
+        const special = (e) => !/^(Force|Protection|Dégâts|Munition|Pas d'effet)/.test(e);
+        const lost = cur >= 0 ? (itemInfo[cur].effects || []).filter(special) : [];
+        const gain = (it.effects || []).filter(special).filter((e) => !lost.includes(e));
+        row.innerHTML = who + (curName ? `remplace <i>${escHtml(curName)}</i>` : "<i>emplacement vide</i>")
+          + (parts.length ? " → " + parts.join(", ") : "")
+          + (gain.length ? `<br><span class="up">gagne : ${gain.map(escHtml).join(" ; ")}</span>` : "")
+          + (lost.length ? `<br><span class="down">perd : ${lost.filter((e) => !(it.effects || []).includes(e)).map(escHtml).join(" ; ")}</span>` : "");
+        box.appendChild(row);
+      }
+    }
+    return box;
   }
   function hideDetail() {
     detailEl.hidden = true; detailType = -1; selKey = -1; fromHand = false;

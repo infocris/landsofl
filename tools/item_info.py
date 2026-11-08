@@ -114,6 +114,9 @@ def describe(raw, names, strings, type_id=None):
     effects.extend(PASSIVE.get(type_id, []))
     out["kind"] = kind
     out["effects"] = effects
+    # valeurs chiffrées pour comparer avec l'équipement porté (page : fiche d'objet)
+    out["might"] = p1 if func == 0x00 and mask else p2 if func == 0x0B else p1 if func in (0x02, 0x19) and mask else 0
+    out["prot"] = prot
     return out
 
 

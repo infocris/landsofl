@@ -880,3 +880,8 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
   - Façades sur 3 étages : les étages répètent la texture unie du niveau la plus proche du
     haut de la face, sans le soubassement (12 lignes), pour ne pas répéter portes et enseignes.
   - Ce rendu est choisi par nous et n'a pas été comparé au jeu.
+- **2026-11-08** : fiche d'objet, comparaison avec l'équipement porté.
+  - `items.json` gagne les champs chiffrés `might` et `prot` (`tools/item_info.py`, § 8.2).
+  - Pour chaque personnage et chaque emplacement possible, la fiche donne l'écart de force et
+    de protection, ainsi que les effets gagnés ou perdus.
+  - Les armes et boucliers sont comparés à la main principale seulement.
