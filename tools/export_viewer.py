@@ -17,6 +17,7 @@ import lolgfx
 import emc
 import item_info
 import chests
+import hidden_walls
 ITEM_NAMES = [i["name"] for i in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "items_fr.json"), encoding="utf-8"))["items"]]
 import locks as locks_mod
 import fragile as fragile_mod
@@ -564,6 +565,7 @@ def main(game_dir, maps_dir, out_dir):
         }
         # contenu des coffres (tools/chests.py) : objets donnés par le script à l'ouverture
         out["chestItems"] = chests.chest_contents(files[f"LEVEL{n}.INF"], out, ITEM_NAMES) if f"LEVEL{n}.INF" in files else {}
+        out["secrets"] = hidden_walls.secret_walls(files[f"LEVEL{n}.INF"], out) if f"LEVEL{n}.INF" in files else []
         with open(os.path.join(out_dir, f"level{n:02d}.json"), "w", encoding="utf-8") as fh:
             json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))
         index.append({"level": n, "tileset": tsname,

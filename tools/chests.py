@@ -23,6 +23,12 @@ CHEST_SYMBOL = 210
 
 def give_calls(inf):
     """-> [(cases propriétaires, [type, valeur, …])] dans l'ordre du script."""
+    return fn_calls(inf, FN_GIVE)
+
+
+def fn_calls(inf, fn, with_addr=False):
+    """Appels à la fonction fn avec un premier argument constant :
+    [(cases propriétaires, [arguments…])] (+ adresse de l'appel si with_addr)."""
     ck = emc.chunks(inf)
     ins = emc.disasm(ck)
     o = struct.unpack(f">{len(ck['ORDR']) // 2}H", ck["ORDR"])
@@ -54,11 +60,12 @@ def give_calls(inf):
 
     res = []
     for k, (a, op, p) in enumerate(ins):
-        if op == 14 and p & 0xFF == FN_GIVE:
+        if op == 14 and p & 0xFF == fn:
             n = ins[k + 1][2] if k + 1 < len(ins) and ins[k + 1][1] == 12 else 0
             src = emc.call_args(ins, k, n)
             if src and src[0][0] in (3, 4):
-                res.append((owners(a), [q if o_ in (3, 4) else None for o_, q in src]))
+                args = [q if o_ in (3, 4) else None for o_, q in src]
+                res.append((owners(a), args, a) if with_addr else (owners(a), args))
     return res
 
 

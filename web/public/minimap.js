@@ -29,7 +29,7 @@
   const FLAGS = 0x3E55C;
   let CELL = 12;               // taille d'une case en pixels (réglable : boutons − / + de la mini-carte)
   const COLORS = { wall: "#2b2b2b", floor: "#8a7f68", doorOpen: "#d08a4a", doorClosed: "#a0522d",
-    special: "#6f8f58", unknown: "#3a3550" };
+    special: "#6f8f58", unknown: "#3a3550", fake: "#2f6b5c" };
 
   const canvas = document.getElementById("mm-canvas");
   const g = canvas.getContext("2d");
@@ -71,12 +71,12 @@
   async function loadLevels() {
     const index = await getJSON("viewer/data/levels.json?v=20261109o");
     for (const l of index) {
-      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261109n`);
+      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261109p`);
       levels.push({ level: l.level, name: l.name, fr: l.frName || l.name.split(" — ")[0], faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
         labels: d.labels, places: numberPlaces(d.labels || []), groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {},
         spriteSigs: d.spriteSigs || {}, spriteConds: d.spriteConds || {}, spriteOf: null, scenes: d.scenes || {}, locks: d.locks || [],
         scripted: new Set(d.scripted || []), fragile: d.fragile || [], exits: d.exits || [],
-        walls: d.walls || {}, chestItems: d.chestItems || {}, atlasCols: d.atlasCols, faceW: d.faceW, faceH: d.faceH });
+        walls: d.walls || {}, chestItems: d.chestItems || {}, secrets: d.secrets || [], atlasCols: d.atlasCols, faceW: d.faceW, faceH: d.faceH });
       infoEl.textContent = `chargement des cartes… ${levels.length}/${index.length}`;
     }
   }
@@ -303,7 +303,22 @@
     return { color: "#ff8c00", label: `autre état (mode ${m.mode})` };
   }
 
+  // Faux murs : face dessinée comme un mur plein (texture opaque) mais qui ne bloque pas le
+  // passage (bit 0 des drapeaux à 0) ; escaliers exclus (symboles 25/26). On les traverse.
+  function isFakeFace(L, id) {
+    const w = id && L.walls[id], t = id && L.wallTypes[id];
+    return !!(w && t && w.opaque && !w.block && w.tex >= 0 && t[2] !== 25 && t[2] !== 26);
+  }
+  function fakeFaces(L, i) {
+    const out = [];
+    for (let f = 0; f < 4; f++) if (isFakeFace(L, live[i * 4 + f])) out.push(f);
+    return out;
+  }
+  // Passages secrets ouverts par script (tools/hidden_walls.py) : mur effacé par setWall
+  function secretAt(L, i) { return L.secrets.find((s) => s.y * 32 + s.x === i); }
+
   function cellClass(L, i) {
+    if (fakeFaces(L, i).length) return "fake";
     let cls = "floor", allZero = true;
     for (let k = 0; k < 4; k++) {
       const id = live[i * 4 + k];
@@ -376,6 +391,14 @@
     if (cls === "floor") return floorTile(L, img);
     if (cls === "special") return tile(L, img, "special", (t, s) => {
       t.drawImage(floorTile(L, img), 0, 0); t.fillStyle = "rgba(111,143,88,.45)"; t.fillRect(0, 0, s, s); });
+    if (cls === "fake") {
+      const tex = baseWallTex(L);
+      if (tex < 0) return null;
+      return tile(L, img, "fake", (t, s) => {
+        face(L, img, t, tex, s, [32, 16, 64, 64]);
+        t.fillStyle = "rgba(0,0,0,.6)"; t.fillRect(0, 0, s, s);
+        t.fillStyle = "rgba(94,242,194,.28)"; t.fillRect(0, 0, s, s); });
+    }
     if (cls === "wall") {
       const tex = baseWallTex(L);
       if (tex < 0) return null;
@@ -440,6 +463,35 @@
       g.beginPath(); g.moveTo(x0 + c * 0.2, y0 + c * 0.1); g.lineTo(x0 + c * 0.55, y0 + c * 0.4);
       g.lineTo(x0 + c * 0.35, y0 + c * 0.6); g.lineTo(x0 + c * 0.8, y0 + c * 0.9); g.stroke();
     }
+    // passages cachés (vert d'eau) : faux murs = côtés traversables en pointillés + flèche ;
+    // murs effacés par un script = cadre pointillé tant que le mur est debout
+    const SECRET = "#5ef2c2";
+    g.save(); g.lineWidth = Math.max(2, 2 * k); g.setLineDash([Math.max(2, CELL / 5), Math.max(1.5, CELL / 7)]);
+    for (let i = 0; i < 1024; i++) {
+      const ff = fakeFaces(L, i);
+      if (!ff.length) continue;
+      const x0 = (i % 32) * CELL + 0.5, y0 = Math.floor(i / 32) * CELL + 0.5, c = CELL - 2;
+      g.strokeStyle = SECRET;
+      for (const f of ff) {
+        const [ax, ay, bx, by] = [[x0, y0, x0 + c, y0], [x0 + c, y0, x0 + c, y0 + c], [x0, y0 + c, x0 + c, y0 + c], [x0, y0, x0, y0 + c]][f];
+        g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke();
+      }
+      // traversée : trait plein entre les côtés ouverts
+      g.save(); g.setLineDash([]); g.lineWidth = Math.max(1, k); g.strokeStyle = "rgba(94,242,194,.8)";
+      const mid = [[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]], cx = x0 + c / 2, cy = y0 + c / 2;
+      g.beginPath();
+      for (const f of ff) { g.moveTo(cx, cy); g.lineTo(x0 + mid[f][0] * c, y0 + mid[f][1] * c); }
+      g.stroke(); g.restore();
+    }
+    for (const sw of L.secrets) {
+      const i = sw.y * 32 + sw.x;
+      if (!isWallCell(L, i) || L.fragile.some((fw) => fw.x === sw.x && fw.y === sw.y)) continue;
+      const x0 = sw.x * CELL + 1.5, y0 = sw.y * CELL + 1.5, c = CELL - 4;
+      g.strokeStyle = "#000"; g.setLineDash([]); g.lineWidth = Math.max(2.5, 2.4 * k); g.strokeRect(x0, y0, c, c);
+      g.strokeStyle = SECRET; g.lineWidth = Math.max(1.5, 1.4 * k); g.setLineDash([Math.max(2, CELL / 5), Math.max(1.5, CELL / 7)]);
+      g.strokeRect(x0, y0, c, c);
+    }
+    g.restore();
     // escaliers (triangle), trous (cercle sombre), passages scriptés vers un autre niveau (losange)
     for (let i = 0; i < 1024; i++) {
       const mk = floorMark(L, i);
@@ -644,7 +696,7 @@
     return `<br><span class="t" data-place="${key}">Illustration en cours…</span>`;
   }
   const CLASS_FR = { wall: "mur", floor: "sol", doorOpen: "porte ouverte", doorClosed: "porte fermée",
-    special: "case particulière (levier, niche, décor…)", unknown: "mur inconnu" };
+    special: "case particulière (levier, niche, décor…)", unknown: "mur inconnu", fake: "faux mur" };
   function cellInfo(x, y) {
     const L = current, i = y * 32 + x, out = [];
     const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
@@ -693,6 +745,19 @@
     }
     for (const e of L.exits) if (e.teleport && e.tx === x && e.ty === y)
       out.push(`<span class="tp">Arrivée du téléporteur de la case ${e.x},${e.y}</span>`);
+    const ff = fakeFaces(L, i);
+    if (ff.length) out.push(`<span class="sc">Passage caché : faux mur, on le traverse (côté${ff.length > 1 ? "s" : ""} ${ff.map((f) => FACE_FR[f]).join(", ")})</span>`);
+    const sw = secretAt(L, i);
+    if (sw && !L.fragile.some((fw) => fw.x === x && fw.y === y)) {
+      const cond = (t) => t.item != null ? ` ${t.hand ? "en tenant" : "avec l'objet (posé ou lancé ?)"} : ${esc((itemInfo && itemInfo[t.item] && itemInfo[t.item].name) || "objet " + t.item)}` : "";
+      out.push(`<span class="sc">Passage secret${isWallCell(L, i) ? "" : " (ouvert)"} : le mur s'efface`
+        + sw.open.map((t) => t.x === x && t.y === y ? " en agissant sur ce mur" + cond(t) : ` depuis la case ${t.x},${t.y}` + cond(t)).join(" ;") + "</span>");
+      if (sw.close.length) out.push(`<span class="t">Se referme depuis la case ${sw.close.map((t) => t.x + "," + t.y).join(" ou ")}</span>`);
+    }
+    for (const s2 of L.secrets) for (const t of s2.open) if (t.x === x && t.y === y && !(s2.x === x && s2.y === y))
+      out.push(`<span class="sc">Ouvre le passage secret de la case ${s2.x},${s2.y}${t.item != null ? ` (${t.hand ? "en tenant" : "avec"} : ${esc((itemInfo && itemInfo[t.item] && itemInfo[t.item].name) || "objet " + t.item)})` : ""}</span>`);
+    for (const s2 of L.secrets) if (s2.close.some((t) => t.x === x && t.y === y))
+      out.push(`<span class="t">Referme le passage secret de la case ${s2.x},${s2.y}</span>`);
     for (const fw of L.fragile) if (fw.x === x && fw.y === y)
       out.push(isWallCell(L, i) ? `<span class="fr">Mur fragile : se casse en le frappant avec : ${esc(fw.toolName)}</span>`
         : `<span class="fr">Mur fragile (déjà cassé)</span>`);

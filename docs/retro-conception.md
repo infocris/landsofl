@@ -176,6 +176,38 @@ Trois fausses pistes écartées :
 - la fonction **0x60** (valeur, case) joue un son sur une case ;
 - la fonction **0x31** (case, ±1 ou 0) change l'état d'une porte.
 
+### 6.0 quinquies Passages cachés — déduit (2026-11-09)
+
+Les passages cachés sont de deux sortes : les faux murs et les murs effacés par un script.
+
+**Faux murs.** Ce sont des faces dont la texture est opaque, donc dessinée comme un mur
+plein, mais dont le bit 0 des drapeaux vaut 0 : la face ne bloque pas le passage. Les escaliers
+(symboles 25 et 26) sont exclus.
+- La case reste un mur sur ses autres côtés : on la traverse seulement par les côtés faux.
+- Au niveau 23 (Passerelle 1), le type 36 (drapeaux 132, symbole de carte 214) a la texture
+  de roche ordinaire. Il est posé sur 18 cases du labyrinthe central, par exemple 10,14, que
+  l'on traverse du nord au sud.
+- Le symbole 214 marque ces faces dans la plupart des niveaux : 7, 8, 10, 13 à 16, 20, 21,
+  23, 27 et 29. Il en existe d'autres : 63 (niveaux 2, 3 et 17), 22 (niveau 26) et 192 (niveau
+  24). La page ne s'appuie donc pas sur le symbole : elle se fonde sur l'opacité et le bit 0.
+
+**Murs effacés par un script** (`tools/hidden_walls.py`, champ `secrets` des niveaux).
+- Un script appelle `setWall` (0x00) avec la face -1 (les quatre faces) et le type 0 (vide)
+  sur une case qui est un mur dans la carte d'origine.
+- La condition est cherchée juste avant l'appel : `getItemParam(objet, 4)` (0x12, paramètre
+  4 = type) puis « push type ; eval == ».
+- L'objet vient de la fonction 0x53 (objet en main) ou d'un registre du script. Dans ce cas
+  il s'agit probablement d'un objet posé sur la case (déduit).
+- D'autres appels remettent un mur plein sur la même case : le passage se referme.
+- Au niveau 23, le mécanisme des cases 9,25, 4,30 et 5,29 efface les murs 9,26, 4,31 et 6,29
+  quand on tient le Gantelet des Ténèbres (254). Passer en 8,26, 3,31 ou 6,28 les remet.
+  - Le mécanisme de la case 16,24 (type 38, special 6) attend la Statuette (255). Il vide la
+    case 20,26, qui est déjà un faux mur.
+- 44 murs trouvés sur 16 niveaux.
+- Certains murs s'ouvrent depuis leur propre case (niveau 14 par exemple). Ce sont peut-être
+  des murs à frapper ou à cliquer. La page ne marque pas ceux qui sont déjà connus comme murs
+  fragiles (§ 9).
+
 ### 6.1 Coffres — vérifié visuellement (2026-11-08)
 
 Le champ `automap` d'un type de mur choisit le symbole de la carte du jeu. La valeur
@@ -935,3 +967,8 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
   - Les armes et boucliers sont comparés à la main principale seulement.
 - **2026-11-08** : contenu des coffres (fonction 0x49), 50 coffres sur 54, affiché au survol.
 - **2026-11-08** : noms français des niveaux (texte 528 + n de LANDS.FRE).
+- **2026-11-09** : passages cachés, § 6.0 quinquies.
+  - Les faux murs (faces opaques non bloquantes, 18 au niveau 23) sont teintés en vert d'eau.
+    Leurs côtés traversables sont en pointillés.
+  - Les murs effacés par un script (44 murs, `tools/hidden_walls.py`) ont un cadre pointillé.
+    L'infobulle donne le mécanisme, l'objet attendu et la case qui referme le passage.
