@@ -613,8 +613,8 @@ sinon HURZELL (le Trent) ; niveau 23, drapeau 577 = 1 → DRKCMNDR, sinon NECROS
 son mot de drapeaux (+14) à 0x8000. Un objet porté a tout à 0, sauf le niveau (+11) à 0xFF et
 le type (+12). Pour créer un objet, la page remplit la première entrée libre ainsi, puis écrit
 son numéro dans la première case vide du sac. Le jeu ne redessine sa barre qu'au prochain
-défilement (flèches), puis l'objet se comporte normalement : il s'affiche, se prend et
-s'équipe. Les objets à charges (baguettes) ou à contenu (bourse) sont créés avec 0 dans ces
+défilement (flèches). Vérifié : l'objet s'affiche alors dans la barre ; le prendre et
+l'équiper n'a pas encore été testé. Les objets à charges (baguettes) ou à contenu (bourse) sont créés avec 0 dans ces
 champs.
 
 **Expérience et niveaux (code de `MAIN.EXE`, vérifié 2026-11-08)** : la routine de gain
