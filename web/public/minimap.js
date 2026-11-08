@@ -664,15 +664,16 @@
   let lastStats = "";
   async function updateStats() {
     if (previewing) return;
-    const r = await mem.read([PARTY_RANGE(), [STATS.money, 2]]);
+    const r = await mem.read([PARTY_RANGE(), [STATS.money, 2], [XP.table, 4 * 11]]);
     if (!r) return;
     const money = r[1][0] | r[1][1] << 8;
+    xpTable = Array.from({ length: 11 }, (_, i) => (r[2][i * 4] | r[2][i * 4 + 1] << 8 | r[2][i * 4 + 2] << 16 | r[2][i * 4 + 3] << 24) >>> 0);
     const chars = partyChars(r[0]).map((c) => {
       const u16 = (k) => c.at(k) | c.at(k + 1) << 8, s16 = (k) => (u16(k) << 16) >> 16;
       const u32 = (k) => (u16(k) | u16(k + 2) << 16) >>> 0;
       let itemsMight = 0; for (let k = 0; k < 8; k++) itemsMight += u16(21 + 2 * k);
       return {
-        name: c.name, hp: [s16(55), u16(57)], mp: [s16(59), u16(61)],
+        slot: c.slot, name: c.name, hp: [s16(55), u16(57)], mp: [s16(59), u16(61)],
         force: Math.floor((u16(72) + itemsMight) * u16(68) / 256),
         prot: Math.floor((u16(74) + u16(53)) * u16(70) / 256),
         lv: [c.at(100), c.at(101), c.at(102)], xp: [u32(106), u32(110), u32(114)],
@@ -689,7 +690,12 @@
       return `<span>${label}</span><div class="bar ${cls}"><i style="width:${pct}%"></i><span>${cur} / ${max}</span></div>`;
     };
     stChars.innerHTML = st.chars.map((c) => {
-      const cls = ["Guerrier", "Voleur", "Mage"].map((n, k) => `${n} ${c.lv[k]} (${c.xp[k]} xp)`).join(" · ");
+      const cls = ["Guerrier", "Voleur", "Mage"].map((n, k) => {
+        const next = c.lv[k] < XP.maxLevel ? xpTable[c.lv[k]] : null;
+        const btn = next !== null
+          ? `<button type="button" class="lvup" data-slot="${c.slot}" data-skill="${k}" title="Monter ${n} au niveau ${c.lv[k] + 1} (comme le jeu : expérience au seuil, bonus de vie ou de magie)">+</button>` : "";
+        return `${n} ${c.lv[k]} (${c.xp[k]}${next !== null ? " / " + next : ""} xp)${btn}`;
+      }).join(" · ");
       return `<div class="st-char"><div class="nm"></div>${bar("hp", "Vie", c.hp)}${bar("mp", "Magie", c.mp)}
         <span>Force</span><span>${c.force}</span><span>Protection</span><span>${c.prot}</span>
         <div class="st-skills">${cls}</div></div>`;
@@ -697,6 +703,53 @@
     stChars.querySelectorAll(".nm").forEach((el, i) => { el.textContent = st.chars[i].name; });
   }
   setInterval(() => { updateStats().catch(() => {}); }, 1000);
+
+  // --- Triche : monter de niveau ---------------------------------------------------
+  // Le jeu ne vérifie le seuil qu'au moment d'un gain d'expérience (MAIN.EXE, § 12.2) : on
+  // reproduit donc sa montée de niveau. Seuils = table de mots de 32 bits au début du segment
+  // de données (adresse physique 0x30270) : niveau n -> n+1 quand xp >= table[n] ; niveau 10 maxi.
+  // Bonus du jeu : Guerrier vie +4..6 ; Voleur vie +2..6 ; Mage magie +(1..8 + 17) × facteur/256
+  // (mot +0x0C de la structure pointée par la fiche en +0x11 depuis le nom), puis vie +1..6.
+  // La vie et la magie actuelles augmentent autant que leur maximum.
+  const XP = { table: 0x30270, maxLevel: 10, levels: 100, xp: 106, hp: 55, hpMax: 57, mp: 59, mpMax: 61, ptr: 0x11 };
+  let xpTable = [];
+  const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  async function levelUp(slot, skill) {
+    const base = INV.char0 + slot * INV.charSize;               // adresse du nom
+    const r = await mem.read([[base, INV.charSize], [XP.table, 4 * 11]]);
+    if (!r) return;
+    const c = r[0], t = r[1];
+    const u16 = (k) => c[k] | c[k + 1] << 8;
+    const lv = c[XP.levels + skill];
+    if (lv >= XP.maxLevel) return;
+    const need = (t[lv * 4] | t[lv * 4 + 1] << 8 | t[lv * 4 + 2] << 16 | t[lv * 4 + 3] << 24) >>> 0;
+    const xpAt = XP.xp + 4 * skill;
+    const xp = (c[xpAt] | c[xpAt + 1] << 8 | c[xpAt + 2] << 16 | c[xpAt + 3] << 24) >>> 0;
+    const nx = Math.max(xp, need);
+    const writes = [[base + XP.levels + skill, new Uint8Array([lv + 1])],
+      [base + xpAt, new Uint8Array([nx & 255, nx >>> 8 & 255, nx >>> 16 & 255, nx >>> 24 & 255])]];
+    const add = (cur, max, v) => {
+      for (const k of [cur, max]) { const n = Math.min(32767, u16(k) + v); writes.push([base + k, new Uint8Array([n & 255, n >> 8])]); }
+    };
+    if (skill === 0) add(XP.hp, XP.hpMax, rnd(4, 6));
+    else if (skill === 1) add(XP.hp, XP.hpMax, rnd(2, 6));
+    else {
+      const off = u16(XP.ptr), seg = u16(XP.ptr + 2);
+      const f = (await mem.read([[seg * 16 + off + 0x0c, 2]])) || [[0, 1]];
+      const factor = (f[0][0] | f[0][1] << 8) || 256;
+      add(XP.mp, XP.mpMax, Math.floor((rnd(1, 8) + 17) * factor / 256));
+      add(XP.hp, XP.hpMax, rnd(1, 6));
+    }
+    await mem.write(writes);
+    lastStats = "";
+    updateStats().catch(() => {});
+  }
+  stChars.addEventListener("click", (e) => {
+    const b = e.target.closest(".lvup");
+    if (!b) return;
+    b.blur();
+    levelUp(+b.dataset.slot, +b.dataset.skill).catch(() => {});
+  });
 
   // --- Triches : vie / magie infinies ------------------------------------------
   // Toutes les 100 ms, vie (+55) et magie (+59) actuelles de chaque personnage du groupe sont remises

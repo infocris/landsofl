@@ -595,6 +595,25 @@ ScummVM utilise pour les sauvegardes de Lands of Lore ; il colle exactement (éq
 | +103 à +105 | modificateurs de compétence |
 | +106 / +110 / +114 | expérience des trois classes (u32 ; vaut 1 au départ, à confirmer) |
 
+**Expérience et niveaux (code de `MAIN.EXE`, vérifié 2026-11-08)** : la routine de gain
+d'expérience (`a98f`) ajoute les points à la fiche (+0x6C + 4 × classe depuis le début de la
+fiche, soit +106 depuis le nom), puis appelle en boucle la vérification de niveau (`41190`)
+tant qu'elle renvoie 1. Écrire l'expérience en mémoire ne fait donc pas monter de niveau : il
+faut un gain en jeu. La vérification compare l'expérience à une table de mots de 32 bits
+placée au début du segment de données (adresse physique 0x30270) : 0, 500, 1 500, 5 000,
+25 000, 50 000, 80 000, 120 000, 180 000, 270 000, puis 0x7FFFFFFF, d'où un niveau 10 au
+plus. Lors d'une montée de niveau, le jeu :
+- ajoute 1 au niveau (+100 + classe depuis le nom) et le drapeau 0x200 << classe dans
+  l'état du personnage ;
+- donne les bonus de la classe, ajoutés à la valeur actuelle et au maximum. Guerrier : vie
+  + hasard(4 à 6). Voleur : vie + hasard(2 à 6). Mage : magie + (hasard(1 à 8) + 17) × facteur
+  / 256, le facteur étant le mot +0x0C de la structure pointée par le pointeur lointain en
+  +0x11 depuis le nom (256 pour Michael), puis vie + hasard(1 à 6) ;
+- affiche un message (textes 0x4023 à 0x4025) et joue le son 0x76.
+
+Les boutons « + » de la page reproduisent ces effets, sauf le drapeau, le message et le
+son. Vérifié : Guerrier 1 → 2 donne vie 20 → 24 ; Mage 1 → 2 donne magie 6 → 24.
+
 **Objets réellement présents (vérifié 2026-11-08)** : chaque entrée de la table des objets
 fait 16 octets et commence 12 octets avant le type (0x31F79 − 12 = 0x31F6D). Champs :
 +0 objet suivant de la même case, +2 suivant à dessiner, +4 hauteur, +5 case, +7 x et +9 y
@@ -726,3 +745,5 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
   d'un type ambigu (ex. SCAVNGR ou RATMAN au niveau 7, selon le drapeau d'histoire 64) : on
   garde le candidat le plus proche en mémoire des sprites sûrs du niveau, car une copie
   périmée du niveau précédent peut subsister.
+- **2026-11-08** : seuils d'expérience et montée de niveau (code du jeu), boutons « + » par
+  classe dans le panneau.
