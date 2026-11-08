@@ -15,6 +15,7 @@ from pak import read_pak
 from wwcomp import cps
 import lolgfx
 import emc
+import item_info
 
 FACE_W, FACE_H = 128, 96
 ATLAS_COLS = 16
@@ -457,12 +458,11 @@ def main(game_dir, maps_dir, out_dir):
         print(f"niveau {n:2d} {tsname:9s} textures={len(textures):3d} sprites={len(sprite_imgs)}")
     with open(os.path.join(out_dir, "levels.json"), "w", encoding="utf-8") as fh:
         json.dump(index, fh, ensure_ascii=False)
-    # noms des types d'objets (inventaire de la page du jeu)
+    # fiches des types d'objets (inventaire de la page du jeu) : nom, icône, effets
     table = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "items_fr.json")
     if os.path.exists(table):
-        items = json.load(open(table, encoding="utf-8"))["items"]
         with open(os.path.join(out_dir, "items.json"), "w", encoding="utf-8") as fh:
-            json.dump([{"name": i["name"], "icon": i["shape"]} for i in items], fh, ensure_ascii=False)
+            json.dump(item_info.build(game_dir, table), fh, ensure_ascii=False)
     # icônes d'inventaire (ITEMICN.SHP, 20x20) en planche de 16 colonnes ; couleurs : palette
     # de l'interface (PLAYFLD) + couleurs 0-127 du château (les icônes n'en dépendent pas)
     icons = lolgfx.shp_frames(read_pak(os.path.join(game_dir, "STARTUP.PAK"))["ITEMICN.SHP"])

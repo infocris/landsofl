@@ -192,6 +192,45 @@
     g.closePath(); g.stroke(); g.fill();
   }
 
+  // Info-bulle au survol de la mini-carte : nature de la case, lieu, objets, monstres
+  const tipEl = document.getElementById("mm-tip");
+  const CLASS_FR = { wall: "mur", floor: "sol", doorOpen: "porte ouverte", doorClosed: "porte fermée",
+    special: "case particulière (levier, niche, décor…)", unknown: "mur inconnu" };
+  function cellInfo(x, y) {
+    const L = current, i = y * 32 + x, out = [];
+    const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+    out.push(`<b>Case ${x},${y}</b> <span class="t">· ${CLASS_FR[cellClass(L, i)]}</span>`);
+    if (lastDraw[0] === i) out.push("Vous êtes ici");
+    for (const l of L.labels) if (l.x === x && l.y === y && l.text && l.text !== "ENDROIT INVALIDE")
+      out.push(`<span class="lb">${esc(l.text)}</span>`);
+    if (L.scenes[i]) out.push(`<span class="t">Lieu avec image fixe (scène)</span>`);
+    const grp = L.groups.find((g) => g.x === x && g.y === y);
+    if (grp) {
+      const where = grp.items[0].container === "niche" ? (DIRS[grp.items[0].face] ? ` (niche, face ${DIRS[grp.items[0].face]})` : " (dans un mur)") : "";
+      out.push(`<span class="it">Objets n° ${grp.n}${where} :</span>`);
+      for (const it of grp.items) out.push(`<span class="it">• ${esc(it.name || "objet " + it.type)}${it.spawn === "event" ? " (événement)" : ""}</span>`);
+    }
+    for (const m of monsters) if (Math.floor(m.x) === x && Math.floor(m.y) === y) {
+      const nm = (L.spriteOf || {})[m.type] || (L.monsterTypes[m.type] || []).join(" / ") || `type ${m.type}`;
+      out.push(`<span class="mo">Monstre : ${esc(nm)} (regarde vers ${["le nord", "l'est", "le sud", "l'ouest"][m.dir]})</span>`);
+    }
+    return out.join("<br>");
+  }
+  canvas.addEventListener("mousemove", (e) => {
+    if (!current) { tipEl.hidden = true; return; }
+    const r = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - r.left) / r.width * 32), y = Math.floor((e.clientY - r.top) / r.height * 32);
+    if (x < 0 || y < 0 || x > 31 || y > 31) { tipEl.hidden = true; return; }
+    tipEl.innerHTML = cellInfo(x, y);
+    tipEl.hidden = false;
+    const w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+    let left = e.clientX + 14, top = e.clientY + 14;
+    if (left + w > innerWidth - 4) left = e.clientX - w - 14;
+    if (top + h > innerHeight - 4) top = e.clientY - h - 14;
+    tipEl.style.left = Math.max(4, left) + "px"; tipEl.style.top = Math.max(4, top) + "px";
+  });
+  canvas.addEventListener("mouseleave", () => { tipEl.hidden = true; });
+
   { let c = 12; try { c = +localStorage.getItem("minimapCell") || 12; } catch (e) {} setCell(c); }
 
   let busy = false;
@@ -332,7 +371,7 @@
   const ICON = 20, ICON_COLS = 16, SCALE = 1.5;
   const invBar = document.getElementById("inv-bar"), invHand = document.getElementById("inv-hand"),
     invChars = document.getElementById("inv-chars"), invCount = document.getElementById("inv-count");
-  getJSON("viewer/data/items.json").then((d) => { itemInfo = d; }, () => {});
+  getJSON("viewer/data/items.json?v=20261108k").then((d) => { itemInfo = d; }, () => {});
 
   function slot(type, label) {
     const d = document.createElement("div");
@@ -340,13 +379,45 @@
     if (type >= 0 && itemInfo) {
       const it = itemInfo[type] || { name: `objet ${type}`, icon: -1 };
       d.classList.add("full");
-      d.title = label ? `${label} : ${it.name}` : it.name;
-      if (it.icon >= 0) {
-        const s = ICON * SCALE;
-        d.style.backgroundPosition = `-${(it.icon % ICON_COLS) * s}px -${Math.floor(it.icon / ICON_COLS) * s}px`;
-      }
+      d.title = (label ? `${label} : ${it.name}` : it.name) + " — cliquer pour la fiche";
+      d.dataset.type = type;
+      d.addEventListener("click", () => showDetail(type, label, d));
+      setIcon(d, it.icon);
     } else if (label) d.title = `${label} : vide`;
     return d;
+  }
+  function setIcon(d, icon) {
+    if (icon < 0) return;
+    const s = ICON * SCALE;
+    d.style.backgroundPosition = `-${(icon % ICON_COLS) * s}px -${Math.floor(icon / ICON_COLS) * s}px`;
+  }
+
+  // Fiche d'un objet (clic sur une case) : données de tools/item_info.py
+  const detailEl = document.getElementById("inv-detail");
+  let detailType = -1;
+  function showDetail(type, label, cell) {
+    document.querySelectorAll("#inv .slot.sel").forEach((e) => e.classList.remove("sel"));
+    if (detailType === type && !detailEl.hidden && cell && cell.classList.contains("sel")) { hideDetail(); return; }
+    detailType = type;
+    if (cell) cell.classList.add("sel");
+    const it = itemInfo[type] || { name: `objet ${type}`, icon: -1, effects: [] };
+    const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+    const icon = el("div", "slot full"); setIcon(icon, it.icon);
+    const close = el("button", "x", "✕"); close.type = "button"; close.title = "Fermer"; close.onclick = hideDetail;
+    const lines = [...(it.effects || [])];
+    if (it.wear) lines.push(`Se porte : ${it.wear}`);
+    if (it.value) lines.push(`Valeur : ${it.value} (supposée)`);
+    const ul = el("ul"); for (const l of lines) ul.appendChild(el("li", null, l));
+    detailEl.replaceChildren(icon, el("div", "nm", it.name), close,
+      el("div", "kd", (it.kind || "Objet") + (label ? ` · ${label}` : "") + ` · type ${type}`));
+    if (lines.length) detailEl.appendChild(ul);
+    if (it.text) detailEl.appendChild(el("div", "txt", it.text));
+    detailEl.appendChild(el("div", "note", "Valeurs lues dans la table des objets du jeu ; sens des champs déduit (doc § 8.2)."));
+    detailEl.hidden = false;
+  }
+  function hideDetail() {
+    detailEl.hidden = true; detailType = -1;
+    document.querySelectorAll("#inv .slot.sel").forEach((e) => e.classList.remove("sel"));
   }
 
   // Fiches du groupe lues d'un bloc [char0 - 2, 4 × 130] : personnages actifs (drapeau 1, nom valide)
@@ -361,6 +432,8 @@
   }
   const PARTY_RANGE = () => [INV.char0 - 2, INV.chars * INV.charSize];
 
+  // rôle des 11 emplacements d'équipement, déduit des masques de la table des objets (§ 8.2)
+  const EQUIP_NAMES = ["arme", "bouclier", "arme (2)", "bouclier (2)", "tête", "corps", "cou", "poignets", "pieds", "anneau", "anneau (2)"];
   let lastInv = "";
   async function updateInventory() {
     if (!itemInfo || previewing) return;
@@ -381,11 +454,12 @@
     invBar.replaceChildren(...barTypes.map((t, k) => slot(t, `case ${k + 1}`)));
     invCount.textContent = `${barTypes.filter((t) => t >= 0).length} / ${INV.barSlots} cases occupées`;
     invHand.replaceChildren(slot(handType, "en main"));
+    document.querySelectorAll("#inv .slot.sel").forEach((e) => e.classList.remove("sel"));
     invChars.replaceChildren();
     for (const c of party) {
       const b = document.createElement("div"); b.className = "inv-sub"; b.textContent = `${c.name} — équipement`;
       const row = document.createElement("div"); row.className = "inv-grid";
-      row.append(...c.eq.map((t, k) => slot(t, `emplacement ${k + 1}`)));
+      row.append(...c.eq.map((t, k) => slot(t, `${c.name}, ${EQUIP_NAMES[k] || "emplacement " + (k + 1)}`)));
       invChars.append(b, row);
     }
   }

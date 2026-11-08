@@ -51,7 +51,31 @@
   .slot { width: 30px; height: 30px; box-sizing: border-box; border: 1px solid #3a3226; background-color: #17130e;
     image-rendering: pixelated; }
   .slot.full { background-color: #2a2217; border-color: #6d5a3a;
-    background-image: url("viewer/data/item_icons.png"); background-size: 480px auto; background-repeat: no-repeat; }
+    background-image: url("viewer/data/item_icons.png"); background-size: 480px auto; background-repeat: no-repeat;
+    cursor: pointer; }
+  .slot.full:hover { border-color: #c9a227; }
+  .slot.sel { outline: 2px solid #c9a227; outline-offset: -1px; }
+  #inv-detail { margin-top: 8px; padding: 8px; border: 1px solid #554a36; border-radius: 6px; background: #17130e;
+    display: grid; grid-template-columns: 30px 1fr auto; gap: 2px 8px; align-items: start; }
+  #inv-detail[hidden] { display: none; }
+  #inv-detail .slot { grid-row: span 3; cursor: default; }
+  #inv-detail .nm { color: #e8dcc0; font-weight: 600; font-size: 13px; }
+  #inv-detail .kd { color: #a39578; grid-column: 2; }
+  #inv-detail .x { grid-row: 1; grid-column: 3; background: none; border: 0; color: #a39578; cursor: pointer; font-size: 14px; padding: 0 2px; }
+  #inv-detail ul { grid-column: 2 / 4; margin: 2px 0 0; padding-left: 16px; }
+  #inv-detail .txt { grid-column: 1 / 4; margin-top: 4px; padding: 6px 8px; background: #e8dcc0; color: #2a2217;
+    font: italic 12px/1.4 Georgia, serif; border-radius: 3px; white-space: pre-wrap; }
+  #inv-detail .note { grid-column: 1 / 4; color: #7d7058; font-size: 11px; margin-top: 2px; }
+  #mm-tip { position: fixed; z-index: 2000; pointer-events: none; max-width: 300px; padding: 6px 8px;
+    background: rgba(12, 10, 8, .94); border: 1px solid #6d5a3a; border-radius: 6px; color: #e8dcc0;
+    font: 12px/1.4 system-ui, sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,.6); }
+  #mm-tip[hidden] { display: none; }
+  #mm-tip b { color: #c9a227; }
+  #mm-tip .t { color: #a39578; }
+  #mm-tip .it { color: #28dce6; }
+  #mm-tip .mo { color: #ff8c00; }
+  #mm-tip .lb { color: #ff6b6b; font-weight: 600; }
+  #mm-canvas { cursor: crosshair; }
   #mm.hidden { display: none; }
   #mm-title { font-weight: 600; color: #c9a227; display: flex; align-items: center; gap: 6px; }
   #mm-title button { font: 600 13px/1 system-ui, sans-serif; width: 24px; height: 22px; padding: 0;
@@ -116,12 +140,14 @@
     <div id="inv-bar" class="inv-grid"></div>
     <div id="inv-handrow">En main <span id="inv-hand"></span></div>
     <div id="inv-chars"></div>
+    <div id="inv-detail" hidden></div>
   </div>
   <div id="mm-items-title">Objets du niveau (positions de départ)</div>
   <ol id="mm-items"></ol>
 </aside>
 <button id="v3dtoggle" type="button" title="Afficher/masquer la vue 3D (F10)">3D</button>
 <button id="persp" type="button" title="Perspective de la vue 3D : celle du jeu d'origine ou une perspective réelle"></button>
+<div id="mm-tip" hidden></div>
 <button id="mmtoggle" type="button" title="Afficher/masquer la mini-carte (F9)">Carte</button>
 <button id="qload" type="button" title="Recharger l'état enregistré avec F6 (QUICK.SAV)" hidden>F7 · charger l'état</button>
 <button id="zqsd" type="button" title="Activer/désactiver les touches ZQSD (F8)"></button>
@@ -318,6 +344,6 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261108j"></script>
+<script src="minimap.js?v=20261108k"></script>
 </body>
 </html>

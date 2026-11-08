@@ -218,7 +218,45 @@ Fonctions du moteur identifiées :
   entrées de 13 octets, et son index est le type d'objet utilisé par la fonction `0x11`.
 - **Contenu d'une entrée** : octets 0–1 = numéro de texte du nom (0x4000 + index dans
   `LANDS.FRE`) ; octet 2 = numéro d'**icône** dans `ITEMICN.SHP` (`STARTUP.PAK`,
-  138 icônes de 20×20, palette de l'interface) ; le reste est inconnu.
+  138 icônes de 20×20, palette de l'interface) ; les octets suivants sont décrits
+  ci-dessous.
+- **Champs 3–12** (lecture faite par `tools/item_info.py`, qui produit les fiches de la page) :
+
+  | Octets | Champ | Statut |
+  |---|---|---|
+  | 3–4 | drapeaux (0x0100 sur toutes les clés, 0x0002 sur les objets métalliques ?) | inconnu |
+  | 5–6 | emplacements d'équipement autorisés, un bit par emplacement (voir § 12.2) | **vérifié** sur Michael |
+  | 7 | action quand on utilise l'objet = point d'entrée de `ITEM.INF` (0xFF = aucune) | déduit + script lu pour 4 |
+  | 8 | force de l'arme ; sinon 1er paramètre de l'action | **vérifié** (Poignard = 10) |
+  | 9 | 2e paramètre (force des armes à distance, max du soin…) | déduit |
+  | 10 | protection | **vérifié** (Chemise 5 + Sandales 1) |
+  | 11–12 | valeur (Onguent 20, Poignard Incrusté 3000) : probablement le prix | supposé |
+
+  **Vérification** (2026-11-08) : avec Poignard en emplacement 1, Chemise en 6 et Sandales
+  en 9, la fiche de Michael contient `itemsMight[1] = 10` et `itemProtection = 6`.
+- **Actions (octet 7)** :
+
+  | Valeur | Objets | Paramètres |
+  |---|---|---|
+  | 0x00 | armes de corps à corps | octet 8 = force |
+  | 0x01 | armures, anneau d'Ambre | — |
+  | 0x02 / 0x19 | flèches, carreaux, pierres, os (0x19 = empoisonné) | octet 8 = dégâts |
+  | 0x04 | Onguent, Aloès, Ginseng | soin aléatoire entre octet 8 et octet 9 |
+  | 0x0B | arcs, arbalètes, étoiles | octet 8 = type de munition, octet 9 = force |
+  | 0x0C | messages, Mandat du Roi | octets 8–9 = n° de texte (0x4000 + index `LANDS.FRE`) |
+  | 0x0E | parchemins de sort | octet 8 = n° de sort |
+  | 0x14 | baguettes, Bâton d'ébène | octet 8 = n° de sort |
+  | 0xFF | clés, joyaux, figurines | aucune action |
+
+  Numéros de sort, d'après les noms des parchemins : 2 Gel, 3 Boules de feu, 4 Poing
+  mortel, 5 Brume fatale, 6 Foudre, 7 Vortex ; le 9 (Bâton d'ébène) reste inconnu.
+- **Script des soins** (`ITEM.INF`, point d'entrée 4, lu en désassemblant) : l'objet ne sert
+  que si la vie n'est pas au maximum, ou si le personnage est empoisonné (bit 0x80 de son
+  état) et que l'objet est le Ginseng (type 218). Le script tire un nombre au hasard entre
+  les deux paramètres et soigne d'autant. Avec le Ginseng, il retire aussi le poison
+  (message 0x4056 « Les effets du poison se dissipent… »). L'Onguent (216) joue un son de
+  plus. Fonctions du script : `0x12` = paramètre d'objet, `0x13` = valeur de la fiche du
+  personnage, `0x03` = tirage au hasard, `0x61` = soin (**déduit**).
   - **Vérification de l'octet 2** : Onguent = 30, Ginseng = 42, Aloès = 43 donnent bien la
     potion, la feuille et l'herbe affichées dans la barre du jeu. La page du jeu s'en sert
     pour l'aperçu graphique de l'inventaire.
@@ -480,7 +518,7 @@ ScummVM utilise pour les sauvegardes de Lands of Lore ; il colle exactement (éq
 | +64 / +66 | dégâts subis / coup d'arme |
 | +68 / +70 | multiplicateurs de force / protection (÷256 ; 384 = ×1,5, 320 = ×1,25) |
 | +72 / +74 | force / protection de base |
-| +78 | équipement, 11 × u16 (n° d'objet du jeu) |
+| +78 | équipement, 11 × u16 (n° d'objet du jeu). Rôles déduits des masques de la table des objets (§ 8.2) : 1 arme, 2 bouclier, 3 arme, 4 bouclier, 5 tête, 6 corps, 7 cou, 8 poignets, 9 pieds, 10–11 anneaux |
 | +100 à +102 | niveaux Guerrier / Voleur / Mage |
 | +103 à +105 | modificateurs de compétence |
 | +106 / +110 / +114 | expérience des trois classes (u32 ; vaut 1 au départ, à confirmer) |
@@ -591,3 +629,6 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-08** : compression des textes, table des objets (en RAM), objets placés et
   niches murales ; inventaire, objet en main et équipement du premier personnage en RAM ;
   monstres en temps réel ; structure des cases de la grille vivante ; scripts par case.
+- **2026-11-08** : champs de la table des objets (emplacements, action, force, protection,
+  valeur), script des soins de `ITEM.INF`, rôles des 11 emplacements d'équipement ; fiche
+  d'objet au clic dans l'inventaire et info-bulle au survol de la mini-carte.
