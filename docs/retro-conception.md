@@ -405,7 +405,8 @@ La RAM fait 16 Mo (`memsize=16`).
 | `0x3E4F6` | 48 × u16 | barre d'inventaire commune : n° d'objet du jeu (0 = vide) |
 | `0x3E558` | u16 | objet tenu en main (curseur) |
 | `0x31F79` | 400 × 16 octets | objets du jeu : l'entrée n commence par le **type** d'objet (u16, index de la table des objets § 8.2) ; le reste est inconnu (case, niveau…) |
-| `0x3389F` | fiche de personnage | premier personnage : nom (ASCII, 11 octets), puis à +78 l'équipement (11 × u16, n° d'objet du jeu ; ordre des emplacements inconnu) |
+| `0x3389F` | fiche de personnage | premier personnage, champs relatifs au nom (voir ci-dessous) |
+| `0x3E6F0` | u16 | couronnes d'argent du groupe (**probable** : seule valeur 41 du bloc de données du groupe ; à confirmer en dépensant) |
 | `0x8AA05` | 285 × 13 octets | table des types d'objets (§ 8.2) |
 | `0x5D6B5` | u8 | mode : 5 en exploration, 1 pendant l'image fixe d'un lieu (observé deux fois : entrée, sortie, nouvelle entrée) |
 
@@ -447,6 +448,38 @@ identiques.
 - **Direction** : séquence N→E→S→E→N ; une seule adresse dans les 16 Mo suit 0,1,2,1,0.
 - **Grille** : on cherche 12 cases consécutives du niveau 1 avec un pas de 4 à 32 octets ;
   un seul résultat (pas de 10).
+
+**Fiche de personnage** (positions relatives au nom). L'ordre des champs est celui que
+ScummVM utilise pour les sauvegardes de Lands of Lore ; il colle exactement (équipement à
++78, et la fiche affichée se recalcule). En petit-boutiste, souvent à des adresses impaires.
+
+| Position | Champ |
+|---|---|
+| −2 | drapeaux (1 = actif) |
+| +0 | nom (11 octets) |
+| +11 | race / classe / sexe |
+| +12 | identifiant (s16) |
+| +21 | bonus de force des objets, 8 × u16 (poignard = 10) |
+| +37 | modificateurs de protection, 8 × u16 (256 = ×1) |
+| +53 | protection des objets |
+| +55 / +57 | vie actuelle (s16) / maximale |
+| +59 / +61 | magie actuelle (s16) / maximale |
+| +64 / +66 | dégâts subis / coup d'arme |
+| +68 / +70 | multiplicateurs de force / protection (÷256 ; 384 = ×1,5, 320 = ×1,25) |
+| +72 / +74 | force / protection de base |
+| +78 | équipement, 11 × u16 (n° d'objet du jeu) |
+| +100 à +102 | niveaux Guerrier / Voleur / Mage |
+| +103 à +105 | modificateurs de compétence |
+| +106 / +110 / +114 | expérience des trois classes (u32 ; vaut 1 au départ, à confirmer) |
+
+Calcul des valeurs affichées, vérifié sur la fiche du jeu :
+
+- **Force** = (force de base + Σ bonus des objets) × multiplicateur ÷ 256, soit
+  (5 + 10) × 1,5 = 22 ;
+- **Protection** = (protection de base + protection des objets) × multiplicateur ÷ 256,
+  soit (2 + 6) × 1,25 = 10.
+
+Retirer le poignard fait passer le bonus de +23 de 10 à 0, et la Force affichée baisse.
 
 **Inventaire** (trouvé par différences). On prend la potion de la barre en main, puis on
 la repose. Un seul mot passe de n à 0 puis revient à n (la case de la barre, 0x3E4F6), et

@@ -11,6 +11,8 @@
     stride: 10,
     sceneFlag: 0x5D6B5,  // u8 : 5 en exploration, 1 pendant l'image fixe d'un lieu (observé)
   };
+  // Caractéristiques (§ 12.2) : fiche de personnage, champs relatifs au nom ; argent du groupe
+  const STATS = { money: 0x3E6F0 };   // couronnes d'argent (u16, probable : vaut 41 au départ)
   // Inventaire (§ 12.2 bis de la documentation)
   const INV = {
     bar: 0x3E4F6, barSlots: 48,      // u16 : n° d'objet du jeu (0 = vide), barre commune
@@ -366,6 +368,43 @@
       sprite: L && L.spriteOf ? L.spriteOf[m.type] || "(aucun : type inconnu du niveau)" : "(en cours)",
       possibles: L ? (L.monsterTypes[m.type] || []).join("/") : "" }));
   }
+  // --- Caractéristiques --------------------------------------------------------
+  const stMoney = document.getElementById("st-money"), stChars = document.getElementById("st-chars");
+  let lastStats = "";
+  async function updateStats() {
+    if (previewing) return;
+    const r = await mem.read([[INV.char0 - 2, 130], [STATS.money, 2]]);
+    if (!r) return;
+    const c = r[0], o = 2;                                   // c[o + k] = octet au nom + k
+    const u16 = (k) => c[o + k] | c[o + k + 1] << 8, s16 = (k) => (u16(k) << 16) >> 16;
+    const u32 = (k) => (u16(k) | u16(k + 2) << 16) >>> 0;
+    let name = ""; for (let k = 0; k < INV.nameLen && c[o + k]; k++) name += String.fromCharCode(c[o + k]);
+    const money = r[1][0] | r[1][1] << 8;
+    if (!/^[A-Za-z' -]{2,}$/.test(name)) return;
+    let itemsMight = 0; for (let k = 0; k < 8; k++) itemsMight += u16(21 + 2 * k);
+    const st = {
+      name, money,
+      hp: [s16(55), u16(57)], mp: [s16(59), u16(61)],
+      force: Math.floor((u16(72) + itemsMight) * u16(68) / 256),
+      prot: Math.floor((u16(74) + u16(53)) * u16(70) / 256),
+      lv: [c[o + 100], c[o + 101], c[o + 102]], xp: [u32(106), u32(110), u32(114)],
+    };
+    const key = JSON.stringify(st);
+    if (key === lastStats) return;
+    lastStats = key;
+    stMoney.textContent = `${money} couronnes`;
+    const bar = (cls, label, [cur, max]) => {
+      const pct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0;
+      return `<span>${label}</span><div class="bar ${cls}"><i style="width:${pct}%"></i><span>${cur} / ${max}</span></div>`;
+    };
+    const cls = ["Guerrier", "Voleur", "Mage"].map((n, k) => `${n} ${st.lv[k]} (${st.xp[k]} xp)`).join(" · ");
+    stChars.innerHTML = `<div class="st-char"><div class="nm"></div>${bar("hp", "Vie", st.hp)}${bar("mp", "Magie", st.mp)}
+      <span>Force</span><span>${st.force}</span><span>Protection</span><span>${st.prot}</span>
+      <div class="st-skills">${cls}</div></div>`;
+    stChars.querySelector(".nm").textContent = name;
+  }
+  setInterval(() => { updateStats().catch(() => {}); }, 1000);
+
   window.LoLMinimap = { attach() {}, preview, monsters: debugMonsters };
 
   setInterval(() => { updateInventory().catch(() => {}); }, 1000);
