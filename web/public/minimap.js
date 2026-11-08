@@ -9,6 +9,7 @@
     dir: 0x3E4EF,     // u16 : 0 N, 1 E, 2 S, 3 O
     grid: 0x3E713,    // grille vivante du niveau : 1024 cases de 10 octets, octets 0..3 = murs N E S O
     stride: 10,
+    sceneFlag: 0x5D6B5,  // u8 : 5 en exploration, 1 pendant l'image fixe d'un lieu (observé)
   };
   // Inventaire (§ 12.2 bis de la documentation)
   const INV = {
@@ -52,7 +53,7 @@
       const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json`);
       levels.push({ level: l.level, name: l.name, faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
         labels: d.labels, groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {},
-        spriteSigs: d.spriteSigs || {}, spriteOf: null });
+        spriteSigs: d.spriteSigs || {}, spriteOf: null, scenes: d.scenes || {} });
       infoEl.textContent = `chargement des cartes… ${levels.length}/${index.length}`;
     }
   }
@@ -192,11 +193,12 @@
 
   async function update() {
     const r = await mem.read([[ADDR.block, 2], [ADDR.dir, 2], [ADDR.grid, 1024 * ADDR.stride],
-      [MON.x0 - 2, MON.size * MON.count]]);
+      [MON.x0 - 2, MON.size * MON.count], [ADDR.sceneFlag, 1]]);
     if (!r) { titleEl.textContent = "Mini-carte"; infoEl.textContent = "en attente du jeu…"; return; }
     const block = r[0][0] | r[0][1] << 8, dir = r[1][0] | r[1][1] << 8;
     const hash = readGrid(r[2]);
     monsters = readMonsters(r[3]);
+    const inScene = r[4][0] === 1;
     const now = performance.now();
     if (hash !== lastHash && now - lastIdentify > 500) {
       const found = identify();
@@ -226,6 +228,7 @@
       li.classList.toggle("near", Number.isFinite(c) && Math.abs((c % 32) - x) <= 1 && Math.abs(Math.floor(c / 32) - y) <= 1);
     }
     draw(block, dir);
+    sendSceneTo3d(inScene ? current.scenes[block] || "" : null, near ? near.text : "");
     sendGridTo3d(current.level, hash);
     sendMonstersTo3d(current);
     sendTo3d(current.level, x, y, dir);
@@ -251,6 +254,15 @@
       }
       L.spriteOf = spriteOf;
     } finally { resolving = false; }
+  }
+
+  // Image fixe d'un lieu : null = exploration ; "" = scène sans image connue.
+  let lastSceneSent;
+  function sendSceneTo3d(image, label) {
+    const key = `${image}|${label}`;
+    if (key === lastSceneSent || !frame3d || !frame3d.contentWindow) return;
+    lastSceneSent = key;
+    frame3d.contentWindow.postMessage({ type: "lol-scene", image, label }, location.origin);
   }
 
   let lastMonSent = "";
@@ -280,7 +292,7 @@
     lastSent = key;
     frame3d.contentWindow.postMessage({ type: "lol-pos", level, x, y, dir }, location.origin);
   }
-  if (frame3d) frame3d.addEventListener("load", () => { lastSent = ""; lastGridSent = ""; lastMonSent = ""; });
+  if (frame3d) frame3d.addEventListener("load", () => { lastSent = ""; lastGridSent = ""; lastMonSent = ""; lastSceneSent = undefined; });
 
   // Aperçu d'un niveau sans le jeu (tests, console) : LoLMinimap.preview(2, 5, 2, 1)
   let previewing = false;

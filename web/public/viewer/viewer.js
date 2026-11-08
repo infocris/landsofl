@@ -379,6 +379,18 @@
   levelSel.addEventListener("change", () => { loadLevel(+levelSel.value, false); levelSel.blur(); });
   addEventListener("resize", () => { resize(); dirty = true; });
 
+  // Mode intégré : image fixe d'un lieu (auberge, échoppe…) à la place du rendu 3D.
+  const sceneEl = document.getElementById("scene");
+  addEventListener("message", (e) => {
+    if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-scene") return;
+    const { image, label } = e.data;
+    if (image === null) { sceneEl.hidden = true; dirty = true; return; }
+    const img = sceneEl.querySelector("img");
+    if (image) { img.src = "data/scenes/" + image; img.hidden = false; } else img.hidden = true;
+    document.getElementById("scene-label").textContent = label || (image ? "" : "Lieu");
+    sceneEl.hidden = false;
+  });
+
   // Mode intégré : monstres à leurs positions réelles.
   let liveMonsters = [];
   addEventListener("message", (e) => {

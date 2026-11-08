@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pak import read_pak
 from wwcomp import cps
 import lolgfx
+import emc
 
 FACE_W, FACE_H = 128, 96
 ATLAS_COLS = 16
@@ -268,6 +269,53 @@ def pick_start(level):
     return best[1], best[2], best[3]
 
 
+FN_LOAD_SCENE = 0x29   # (n° de texte de l'image .CPS, page) : image fixe d'un lieu
+
+
+def level_scenes(files, n):
+    """Case -> image du lieu, d'après les appels 0x29 du script d'événements (.INF).
+
+    Le script de la case n (table ORDR) est celui exécuté quand le groupe s'y trouve ;
+    pour les lieux, c'est la case devant l'entrée (second point x2/y2 de l'annotation)."""
+    ck = emc.chunks(files[f"LEVEL{n}.INF"])
+    T = emc.texts(ck)
+    o = ck["ORDR"]
+    entries = struct.unpack(f">{len(o) // 2}H", o)
+    owners = sorted((addr, i) for i, addr in enumerate(entries) if addr != 0xFFFF and i < 1024)
+    out = {}
+    for addr, fn, args in emc.calls(ck):
+        if fn & 0xFF != FN_LOAD_SCENE or not args or args[0] is None or not 0 <= args[0] < len(T):
+            continue
+        name = T[args[0]]
+        if not name.upper().endswith(".CPS"):
+            continue
+        block = None
+        for start, b in owners:
+            if start <= addr:
+                block = b
+        if block is not None:
+            out.setdefault(str(block), name.upper())
+    return out
+
+
+def scene_image(game_dir, name):
+    """Décor du lieu : coin 176x120 de l'image .CPS, avec sa propre palette."""
+    for pak in sorted(os.listdir(game_dir)):
+        if not pak.upper().endswith(".PAK"):
+            continue
+        f = pak_cache(game_dir, pak)
+        if f and name in f:
+            d, pal = cps(f[name])
+            if len(d) < 64000 or len(pal) < 768:
+                return None
+            img = Image(176, 120)
+            for y in range(120):
+                for x in range(176):
+                    img.put(x, y, rgb(pal, d[y * 320 + x]))
+            return img
+    return None
+
+
 _PAKS = {}
 
 
@@ -364,6 +412,18 @@ def main(game_dir, maps_dir, out_dir):
             sheet.blit(img, r[0], 0)
         sheet.save(os.path.join(out_dir, f"level{n:02d}_spr.png"))
 
+        # images des lieux (scènes fixes)
+        scenes = level_scenes(files, n)
+        os.makedirs(os.path.join(out_dir, "scenes"), exist_ok=True)
+        for name in set(scenes.values()):
+            path = os.path.join(out_dir, "scenes", name.replace(".CPS", ".png"))
+            if not os.path.exists(path):
+                img = scene_image(game_dir, name)
+                if img:
+                    img.save(path)
+        scenes = {b: nm.replace(".CPS", ".png") for b, nm in scenes.items()
+                  if os.path.exists(os.path.join(out_dir, "scenes", nm.replace(".CPS", ".png")))}
+
         sx_, sy_, sa_ = pick_start(level)
         out = {
             "level": n, "tileset": tsname,
@@ -381,6 +441,7 @@ def main(game_dir, maps_dir, out_dir):
             "monsterTypes": {str(m["type"]): m["sprites"] for m in level["monsters"]
                              if m["type"] is not None and m["sprites"]},
             "spriteSigs": sprite_sigs,
+            "scenes": scenes,   # case -> image du lieu (data/scenes/)
             "labels": [{k: l[k] for k in ("x", "y", "text")} for l in level["labels"]],
             "items": [{k: it.get(k) for k in ("x", "y", "xOffs", "yOffs", "type", "name", "spawn", "container", "face")}
                       for it in level.get("items", [])],

@@ -196,6 +196,19 @@ Fonctions du moteur identifiées :
   45 cases ont un script, dont la fontaine (13,13) et les seuils des portes. C'est là
   que se trouvent les interactions (entrer dans une case, cliquer sur un mur, poser un
   objet…). Le type d'événement est un paramètre du script, encore à décoder.
+- **Images des lieux** : la fonction `0x29` (n° de texte d'un `.CPS`, page) charge l'image
+  fixe d'un lieu (auberge, échoppe, salle du trône…). Elle est appelée dans le script de
+  la case devant l'entrée, qui est le second point (x2, y2) de l'annotation. Au niveau 1 :
+  `NATHNIAL.CPS` en 16,14 (herboristerie), `VICTOR.CPS` en 16,12, `GERIM.CPS` en 10,13,
+  `CONFRONT.CPS` en 17,8.
+  - **Format** : l'image est une planche de 320×200 avec sa propre palette. Le décor
+    occupe le coin 176×120, au format de la vue ; le reste contient les images
+    d'animation du personnage.
+  - **Couverture** : 14 cases au total sur les 29 niveaux. D'autres lieux (Yvel, niveau 22)
+    sont chargés autrement, ce qui reste à trouver.
+  - **En mémoire** : `NATHNIAL.CPS` se retrouvait entier en RAM, en 0x4D5C0, mais ce
+    tampon ne change pas à l'entrée dans la scène. Il ne permet donc pas de détecter le
+    mode.
 - **Niveau 1** : aucun objet placé par script. L'équipement de départ vient
   d'ailleurs (inconnu).
 
@@ -394,6 +407,7 @@ La RAM fait 16 Mo (`memsize=16`).
 | `0x31F79` | 400 × 16 octets | objets du jeu : l'entrée n commence par le **type** d'objet (u16, index de la table des objets § 8.2) ; le reste est inconnu (case, niveau…) |
 | `0x3389F` | fiche de personnage | premier personnage : nom (ASCII, 11 octets), puis à +78 l'équipement (11 × u16, n° d'objet du jeu ; ordre des emplacements inconnu) |
 | `0x8AA05` | 285 × 13 octets | table des types d'objets (§ 8.2) |
+| `0x5D6B5` | u8 | mode : 5 en exploration, 1 pendant l'image fixe d'un lieu (observé deux fois : entrée, sortie, nouvelle entrée) |
 
 Les adresses dépendent de l'endroit où DOS charge `MAIN.EXE`. Elles sont stables tant que
 le bundle, la configuration DOSBox et l'`autoexec` ne changent pas.
