@@ -371,6 +371,9 @@ def main(game_dir, maps_dir, out_dir):
             "sprites": sprites,
             "monsters": [{k: m[k] for k in ("x", "y", "xOffs", "yOffs", "direction", "sprites", "spawn")}
                          for m in level["monsters"]],
+            # type de monstre -> sprite (positions réelles lues en mémoire par la page du jeu)
+            "monsterTypes": {str(m["type"]): m["sprites"][0] for m in level["monsters"]
+                             if m["type"] is not None and m["sprites"]},
             "labels": [{k: l[k] for k in ("x", "y", "text")} for l in level["labels"]],
             "items": [{k: it.get(k) for k in ("x", "y", "xOffs", "yOffs", "type", "name", "spawn", "container", "face")}
                       for it in level.get("items", [])],

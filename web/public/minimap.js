@@ -17,6 +17,9 @@
     items: 0x31F79, itemSize: 16, maxItems: 400,   // u16 au début de chaque entrée : type d'objet
     char0: 0x3389F, nameLen: 11, equipOffset: 78, equipSlots: 11,   // équipement : 11 × u16 à +78
   };
+  // Monstres du niveau courant (§ 12.2) : table de 30 entrées de 46 octets ; positions
+  // relatives au champ x : case u16 à -2, x/y u16 (case*256 + décalage), direction*2 à +9, type à +13
+  const MON = { x0: 0x31871, size: 46, count: 30 };
   const CELL = 12;
   const COLORS = { wall: "#2b2b2b", floor: "#8a7f68", doorOpen: "#d08a4a", doorClosed: "#a0522d",
     special: "#6f8f58", unknown: "#3a3550" };
@@ -48,7 +51,7 @@
     for (const l of index) {
       const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json`);
       levels.push({ level: l.level, name: l.name, faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
-        labels: d.labels, groups: groupItems(d.items || []) });
+        labels: d.labels, groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {} });
       infoEl.textContent = `chargement des cartes… ${levels.length}/${index.length}`;
     }
   }
@@ -148,6 +151,14 @@
       g.fillStyle = "#28dce6";
       g.strokeText(String(it.n), tx, ty); g.fillText(String(it.n), tx, ty);
     }
+    // monstres : position réelle et direction
+    for (const m of monsters) {
+      const mx = m.x * CELL, my = m.y * CELL, a = [-Math.PI / 2, 0, Math.PI / 2, Math.PI][m.dir];
+      g.fillStyle = "#ff8c00"; g.strokeStyle = "#000"; g.lineWidth = 1;
+      g.beginPath(); g.arc(mx, my, 3.2, 0, 2 * Math.PI); g.fill(); g.stroke();
+      g.strokeStyle = "#ff8c00"; g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(mx, my); g.lineTo(mx + Math.cos(a) * 5.5, my + Math.sin(a) * 5.5); g.stroke();
+    }
     // groupe : flèche orientée
     const cx = (block % 32) * CELL + CELL / 2, cy = Math.floor(block / 32) * CELL + CELL / 2;
     const a = [-Math.PI / 2, 0, Math.PI / 2, Math.PI][dir & 3];
@@ -166,11 +177,25 @@
     busy = true;
     try { await update(); } finally { busy = false; }
   }
+  let monsters = [];
+  function readMonsters(bytes) {
+    const out = [];
+    for (let i = 0; i < MON.count; i++) {
+      const a = i * MON.size + 2;                 // bytes commence à x0 - 2
+      const block = bytes[a - 2] | bytes[a - 1] << 8, x = bytes[a] | bytes[a + 1] << 8, y = bytes[a + 2] | bytes[a + 3] << 8;
+      if (!block || block > 1023 || (x >> 8) !== (block & 31) || (y >> 8) !== (block >> 5)) continue;
+      out.push({ x: x / 256, y: y / 256, dir: (bytes[a + 9] >> 1) & 3, type: bytes[a + 13] });
+    }
+    return out;
+  }
+
   async function update() {
-    const r = await mem.read([[ADDR.block, 2], [ADDR.dir, 2], [ADDR.grid, 1024 * ADDR.stride]]);
+    const r = await mem.read([[ADDR.block, 2], [ADDR.dir, 2], [ADDR.grid, 1024 * ADDR.stride],
+      [MON.x0 - 2, MON.size * MON.count]]);
     if (!r) { titleEl.textContent = "Mini-carte"; infoEl.textContent = "en attente du jeu…"; return; }
     const block = r[0][0] | r[0][1] << 8, dir = r[1][0] | r[1][1] << 8;
     const hash = readGrid(r[2]);
+    monsters = readMonsters(r[3]);
     const now = performance.now();
     if (hash !== lastHash && now - lastIdentify > 500) {
       const found = identify();
@@ -201,7 +226,17 @@
     }
     draw(block, dir);
     sendGridTo3d(current.level, hash);
+    sendMonstersTo3d(current);
     sendTo3d(current.level, x, y, dir);
+  }
+
+  let lastMonSent = "";
+  function sendMonstersTo3d(L) {
+    const list = monsters.map((m) => ({ ...m, sprite: L.monsterTypes[m.type] || null }));
+    const key = L.level + JSON.stringify(list);
+    if (key === lastMonSent || !frame3d || !frame3d.contentWindow) return;
+    lastMonSent = key;
+    frame3d.contentWindow.postMessage({ type: "lol-monsters", level: L.level, list }, location.origin);
   }
 
   // État des murs et des portes : la grille vivante est envoyée à la vue 3D quand elle change.
@@ -221,7 +256,7 @@
     lastSent = key;
     frame3d.contentWindow.postMessage({ type: "lol-pos", level, x, y, dir }, location.origin);
   }
-  if (frame3d) frame3d.addEventListener("load", () => { lastSent = ""; lastGridSent = ""; });
+  if (frame3d) frame3d.addEventListener("load", () => { lastSent = ""; lastGridSent = ""; lastMonSent = ""; });
 
   // Aperçu d'un niveau sans le jeu (tests, console) : LoLMinimap.preview(2, 5, 2, 1)
   let previewing = false;

@@ -6,7 +6,8 @@
 <title>Lands of Lore</title>
 <link rel="stylesheet" href="js-dos.css">
 <script src="js-dos.js"></script>
-<script src="memscan.js"></script>
+<!-- ?v= : à changer à chaque modification des scripts (évite les copies en cache) -->
+<script src="memscan.js?v=20261108a"></script>
 <style>
   html, body { margin: 0; height: 100%; background: #000; }
   body { display: flex; }
@@ -72,14 +73,14 @@
 <body>
 <div id="left">
   <div id="dos"></div>
-  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1" title="Vue 3D synchronisée"></iframe></div>
+  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261108a" title="Vue 3D synchronisée"></iframe></div>
 </div>
 <aside id="mm" aria-label="Mini-carte">
   <div id="mm-title">Mini-carte</div>
   <div id="mm-info">chargement…</div>
   <canvas id="mm-canvas"></canvas>
   <div id="mm-label"></div>
-  <div id="mm-legend"><i style="background:#8a7f68"></i>sol<i style="background:#2b2b2b;outline:1px solid #555"></i>mur<i style="background:#a0522d"></i>porte fermée<i style="background:#d08a4a"></i>ouverte<i style="background:#d22"></i>lieu<i style="background:#28dce6"></i>objets</div>
+  <div id="mm-legend"><i style="background:#8a7f68"></i>sol<i style="background:#2b2b2b;outline:1px solid #555"></i>mur<i style="background:#a0522d"></i>porte fermée<i style="background:#d08a4a"></i>ouverte<i style="background:#d22"></i>lieu<i style="background:#28dce6"></i>objets<i style="background:#ff8c00;border-radius:50%"></i>monstres</div>
   <div id="inv">
     <div class="inv-head"><span class="inv-title">Inventaire</span><span id="inv-count">en attente du jeu…</span></div>
     <div id="inv-bar" class="inv-grid"></div>
@@ -266,6 +267,6 @@
   }));
 })();
 </script>
-<script src="minimap.js"></script>
+<script src="minimap.js?v=20261108a"></script>
 </body>
 </html>

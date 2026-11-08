@@ -191,6 +191,11 @@ Fonctions du moteur identifiées :
   été trouvé. Le décalage indique la face (0 = Ouest/Nord, 255 = Est/Sud), donc la case
   depuis laquelle on voit la niche. Souvent, le mur porte une décoration de type spécial 6
   avec le drapeau 0x87 (**déduit** : niche).
+- **Scripts par case** : dans `LEVELn.INF`, la table `ORDR` a 1 027 entrées, et l'entrée
+  n < 1024 est le point d'entrée du script de la case n (`0xFFFF` = aucun). Au niveau 1,
+  45 cases ont un script, dont la fontaine (13,13) et les seuils des portes. C'est là
+  que se trouvent les interactions (entrer dans une case, cliquer sur un mur, poser un
+  objet…). Le type d'événement est un paramètre du script, encore à décoder.
 - **Niveau 1** : aucun objet placé par script. L'équipement de départ vient
   d'ailleurs (inconnu).
 
@@ -381,7 +386,8 @@ La RAM fait 16 Mo (`memsize=16`).
 |---|---|---|
 | `0x3E4E0` | u16 | case du groupe = `y*32 + x` (copie probable en `0x3B3DC`) |
 | `0x3E4EF` | u16 | direction : 0 N, 1 E, 2 S, 3 O |
-| `0x3E713` | 1024 × 10 octets | grille vivante du niveau ; octets 0–3 = murs N, E, S, O (identifiants de `.CMZ`, modifiés quand une porte s'ouvre) ; octets 4–9 inconnus |
+| `0x3E713` | 1024 × 10 octets | grille vivante du niveau. Octets 0–3 : murs N, E, S, O (identifiants de `.CMZ`, modifiés quand une porte s'ouvre). Octets 4–5 et 6–7 : têtes de listes des objets et monstres de la case (`0x8000 + n°` = monstre n). Octet 8 : direction (5 par défaut, **déduit**). Octet 9 : drapeaux, à 0 partout en début de partie (emplacement probable des marques de l'automap, **non vérifié**) |
+| `0x3186F` | 30 × 46 octets | monstres du niveau courant. Champs relatifs à x (`0x31871 + 46·n`) : case u16 à −2 ; x, y u16 = case·256 + décalage ; destination x, y à +5 ; direction·2 à +9 ; type de monstre à +13. Entrée vide = case 0 |
 
 | `0x3E4F6` | 48 × u16 | barre d'inventaire commune : n° d'objet du jeu (0 = vide) |
 | `0x3E558` | u16 | objet tenu en main (curseur) |
@@ -391,6 +397,17 @@ La RAM fait 16 Mo (`memsize=16`).
 
 Les adresses dépendent de l'endroit où DOS charge `MAIN.EXE`. Elles sont stables tant que
 le bundle, la configuration DOSBox et l'`autoexec` ne changent pas.
+
+**Monstres** : trouvés en cherchant les coordonnées fines des gardes du niveau 1
+(`x = 13·256 + 128`, `y = 18·256 + 128`…). L'écart entre deux gardes (46 octets) donne la
+taille d'une entrée. Les directions lues (0, 4, 6, 6) correspondent aux directions de
+départ 0, 2, 3, 3 du script, multipliées par 2. Les PNJ des dialogues ne sont pas des
+entités de la carte : seuls les gardes du château sont des « monstres ».
+
+**Cases explorées** : aucune marque trouvée. Après quelques pas, aucun octet de la grille
+ne change, et la RAM ne laisse pas apparaître de tableau des cases vues.
+**Hypothèse** : la carte automatique ne se remplit qu'une fois la carte obtenue dans
+l'aventure. À vérifier à ce moment-là, sur l'octet 9 de chaque case.
 
 **Niveau courant** : je n'ai pas trouvé de variable. La mini-carte compare la grille
 vivante aux 29 grilles d'origine et retient le niveau qui a plus de 900 cases sur 1024
@@ -483,4 +500,5 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
     sauvegardes du jeu, bouton F7 ajouté à la page ;
   - clic droit : premiers constats.
 - **2026-11-08** : compression des textes, table des objets (en RAM), objets placés et
-  niches murales ; inventaire, objet en main et équipement du premier personnage en RAM.
+  niches murales ; inventaire, objet en main et équipement du premier personnage en RAM ;
+  monstres en temps réel ; structure des cases de la grille vivante ; scripts par case.

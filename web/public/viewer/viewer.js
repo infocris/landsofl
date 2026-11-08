@@ -142,8 +142,8 @@
     const planeX = -dirY * Math.tan(FOV / 2), planeY = dirX * Math.tan(FOV / 2);
     castFloorCeiling(dirX, dirY, planeX, planeY);
     const cols = L.atlasCols, fw = L.faceW, fh = L.faceH;
-    // en mode intégré, pas de monstres : on ne connaît que leurs positions de départ
-    const sprites = EMBED ? [] : projectSprites(dirX, dirY, planeX, planeY);
+    // en mode intégré : monstres à leurs positions réelles (envoyées par la page du jeu)
+    const sprites = projectSprites(dirX, dirY, planeX, planeY);
     const items = [];   // éléments de la colonne : [distance, type, …]
 
     for (let x = 0; x < W; x++) {
@@ -235,15 +235,16 @@
   function projectSprites(dirX, dirY, planeX, planeY) {
     const out = [];
     const inv = 1 / (planeX * dirY - dirX * planeY);
-    for (const m of L.monsters) {
-      const ids = L.sprites[m.sprites[0]];
+    const source = EMBED ? liveMonsters.filter((m) => m.level === L.level) : L.monsters;
+    for (const m of source) {
+      const ids = L.sprites[EMBED ? m.sprite : m.sprites[0]];
       if (!ids) continue;
-      const mx = m.x + (m.xOffs ?? 128) / 256, my = m.y + (m.yOffs ?? 128) / 256;
+      const mx = EMBED ? m.x : m.x + (m.xOffs ?? 128) / 256, my = EMBED ? m.y : m.y + (m.yOffs ?? 128) / 256;
       const dx = mx - player.x, dy = my - player.y;
       const tx = inv * (dirY * dx - dirX * dy);
       const tz = inv * (-planeY * dx + planeX * dy);
       if (tz < 0.15) continue;
-      const facing = DIR_ANGLE[DIR_INDEX[m.direction] ?? 2];
+      const facing = EMBED ? DIR_ANGLE[m.dir & 3] : DIR_ANGLE[DIR_INDEX[m.direction] ?? 2];
       let rel = Math.atan2(-dy, -dx) - facing;
       rel = Math.atan2(Math.sin(rel), Math.cos(rel));
       let pose = 1, mirror = rel < 0;
@@ -377,6 +378,14 @@
   });
   levelSel.addEventListener("change", () => { loadLevel(+levelSel.value, false); levelSel.blur(); });
   addEventListener("resize", () => { resize(); dirty = true; });
+
+  // Mode intégré : monstres à leurs positions réelles.
+  let liveMonsters = [];
+  addEventListener("message", (e) => {
+    if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-monsters") return;
+    liveMonsters = e.data.list.map((m) => ({ ...m, level: e.data.level }));
+    dirty = true;
+  });
 
   // Mode intégré : grille vivante du jeu (portes ouvertes ou fermées…), par niveau.
   const liveGrids = new Map();
