@@ -17,6 +17,7 @@ import lolgfx
 import emc
 import item_info
 import locks as locks_mod
+import fragile as fragile_mod
 
 FACE_W, FACE_H = 128, 96
 ATLAS_COLS = 16
@@ -337,6 +338,7 @@ def pak_cache(game_dir, name):
 
 def main(game_dir, maps_dir, out_dir):
     locks_by_level = locks_mod.all_locks(game_dir)
+    fragile_by_level = fragile_mod.all_fragile(game_dir, maps_dir)
     os.makedirs(out_dir, exist_ok=True)
     playfld = cps(read_pak(os.path.join(game_dir, "GENERAL.PAK"))["PLAYFLD.CPS"])[1]
     tilesets, index = {}, []
@@ -453,6 +455,7 @@ def main(game_dir, maps_dir, out_dir):
             "spriteSigs": sprite_sigs,
             "scenes": scenes,   # case -> image du lieu (data/scenes/)
             "locks": locks_by_level.get(n, []),   # serrures : case + clé (tools/locks.py)
+            "fragile": fragile_by_level.get(n, []),   # murs fragiles (tools/fragile.py)
             "scripted": scripted_cells(files, n),  # cases dont le script réagit (clic sur un mur…)
             "labels": [{k: l[k] for k in ("x", "y", "text")} for l in level["labels"]],
             "items": [{k: it.get(k) for k in ("x", "y", "xOffs", "yOffs", "type", "name", "spawn", "container", "face")}

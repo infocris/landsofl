@@ -68,11 +68,11 @@
   async function loadLevels() {
     const index = await getJSON("viewer/data/levels.json");
     for (const l of index) {
-      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261108o`);
+      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261108p`);
       levels.push({ level: l.level, name: l.name, faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
         labels: d.labels, places: numberPlaces(d.labels || []), groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {},
         spriteSigs: d.spriteSigs || {}, spriteOf: null, scenes: d.scenes || {}, locks: d.locks || [],
-        scripted: new Set(d.scripted || []) });
+        scripted: new Set(d.scripted || []), fragile: d.fragile || [] });
       infoEl.textContent = `chargement des cartes… ${levels.length}/${index.length}`;
     }
   }
@@ -201,6 +201,8 @@
     return null;
   }
 
+  function isWallCell(L, i) { const c = cellClass(L, i); return c === "wall" || c === "special" || c === "unknown"; }
+
   function cellClass(L, i) {
     let cls = "floor", allZero = true;
     for (let k = 0; k < 4; k++) {
@@ -249,6 +251,14 @@
         g.fillStyle = "#c77dff"; g.beginPath();
         g.arc(rx + rw / 2, ry + rh / 2, Math.max(1.5, 1.6 * k), 0, 2 * Math.PI); g.fill();
       }
+    }
+    // murs fragiles (à casser au Marteau…) : fissure orange, tant que le mur est debout
+    g.strokeStyle = "#ff7a1a"; g.lineWidth = Math.max(1.5, 1.6 * k);
+    for (const fw of L.fragile) {
+      if (!isWallCell(L, fw.y * 32 + fw.x)) continue;
+      const x0 = fw.x * CELL, y0 = fw.y * CELL, c = CELL - 1;
+      g.beginPath(); g.moveTo(x0 + c * 0.2, y0 + c * 0.1); g.lineTo(x0 + c * 0.55, y0 + c * 0.4);
+      g.lineTo(x0 + c * 0.35, y0 + c * 0.6); g.lineTo(x0 + c * 0.8, y0 + c * 0.9); g.stroke();
     }
     // serrures : petite clé dorée dans le coin de la case
     g.strokeStyle = "#ffd700"; g.fillStyle = "#ffd700"; g.lineWidth = Math.max(1, k);
@@ -325,6 +335,9 @@
       if (kind === "lever") out.push(`<span class="sw">Levier, face ${FACE_FR[f]} (état ${L.wallTypes[live[i * 4 + f]][1] === 2 ? "A" : "B"})</span>`);
       else if (kind) out.push(`<span class="bt">Élément cliquable (bouton, serrure, décor…), face ${FACE_FR[f]}</span>`);
     }
+    for (const fw of L.fragile) if (fw.x === x && fw.y === y)
+      out.push(isWallCell(L, i) ? `<span class="fr">Mur fragile : se casse en le frappant avec : ${esc(fw.toolName)}</span>`
+        : `<span class="fr">Mur fragile (déjà cassé)</span>`);
     for (const l of L.locks) if (l.x === x && l.y === y)
       out.push(`<span class="ky">Serrure : ${esc(l.name)}${owned.has(l.key) ? " ✔ dans l'inventaire" : ""}${l.how === "direct" ? "" : " (probable)"}</span>`);
     for (const m of monsters) if (Math.floor(m.x) === x && Math.floor(m.y) === y) {

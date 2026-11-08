@@ -217,6 +217,21 @@ Fonctions du moteur identifiées :
   mais 32 faces de type 1, toutes sur des cases à script. La mini-carte affiche les leviers
   et, quand la case a un script, les éléments de type 1 ou 4. L'état d'un levier se lit dans
   la grille vivante, puisque l'identifiant du mur change quand on l'actionne.
+- **Murs fragiles** (`tools/fragile.py`) : au niveau 6, en marchant en 8,7 puis en 11,13,
+  on lit « Ce mur me semble assez fragile » puis « Ce mur est également branlant ». Les
+  murs juste au sud (8,8 et 11,14) se cassent en les frappant avec le **Marteau**
+  (objet 59). Le script du niveau compte les coups dans une variable (fonctions `0x2d`
+  lire et `0x2e` écrire, **déduit**). Au premier coup, il change l'apparence du mur
+  (fonction `0x00` : case, face, type) ; au coup suivant, il appelle un sous-programme
+  qui supprime le mur (`0x00` avec face -1 et type 0). Au niveau 9, la case 20,13 réagit à
+  l'événement 0x400, celui de l'attaque, avec le Marteau, et casse le mur 20,14. Murs
+  trouvés : niveau 6 en 8,8 et 11,14 ; niveau 9 en 22,8 et 20,14 (Marteau) ; niveau 15 en
+  6,1 (Pioche). Les « pierres branlantes » du niveau 9 (23,15) s'ouvrent par un simple
+  clic (événement 0x40).
+- **Événements des scripts de case** (registre 0, **déduit**) : 0x40 = clic sur le mur,
+  0x400 = attaque sur la case ; les autres valeurs rencontrées (0x01, 0x02, 0x04, 0x08,
+  0x10, 0x80, 0x100, 0x200, 0x4000) restent à identifier. Messages du niveau :
+  fonction `0x5e` (type, 0, n° de texte du `.FRE` du niveau).
 - **Images des lieux** : la fonction `0x29` (n° de texte d'un `.CPS`, page) charge l'image
   fixe d'un lieu (auberge, échoppe, salle du trône…). Elle est appelée dans le script de
   la case devant l'entrée, qui est le second point (x2, y2) de l'annotation. Au niveau 1 :
@@ -667,3 +682,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
   dans la fiche des clés.
 - **2026-11-08** : objets réellement présents (listes des cases dans la grille vivante),
   leviers et éléments cliquables sur la mini-carte, transitions douces de la vue 3D.
+- **2026-11-08** : murs fragiles (Marteau) des cavernes du Draracle, sur la mini-carte.
