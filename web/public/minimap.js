@@ -958,9 +958,10 @@
     invChars = document.getElementById("inv-chars"), invCount = document.getElementById("inv-count");
   getJSON("viewer/data/items.json?v=20261109k").then((d) => { itemInfo = d; if (current) renderItemList(current); }, () => {});
 
-  function slot(type, label) {
+  function slot(type, label, loc) {
     const d = document.createElement("div");
     d.className = "slot";
+    if (loc !== undefined) { d.dataset.loc = loc; if (MANAGE) dragTarget(d, loc, type >= 0); }
     if (type >= 0 && itemInfo) {
       const it = itemInfo[type] || { name: `objet ${type}`, icon: -1 };
       d.classList.add("full");
@@ -1010,6 +1011,7 @@
     if (cmp) detailEl.appendChild(cmp);
     if (it.text) detailEl.appendChild(el("div", "txt", it.text));
     detailEl.appendChild(el("div", "note", "Valeurs lues dans la table des objets du jeu ; sens des champs déduit (doc § 8.2)."));
+    if (MANAGE && cell && cell.dataset.loc !== undefined) detailEl.appendChild(actions(type, it, +cell.dataset.loc));
     detailEl.hidden = false;
   }
   // Comparaison avec l'équipement porté par chaque personnage, pour les emplacements où
@@ -1079,7 +1081,7 @@
     const barTypes = [];
     for (let k = 0; k < INV.barSlots; k++) barTypes.push(typeOf(bar[k * 2] | bar[k * 2 + 1] << 8));
     const handType = typeOf(hand[0] | hand[1] << 8);
-    const party = partyChars(ch).map((c) => ({ name: c.name,
+    const party = partyChars(ch).map((c) => ({ name: c.name, slot: c.slot,
       eq: Array.from({ length: INV.equipSlots }, (_, k) => typeOf(c.at(INV.equipOffset + 2 * k) | c.at(INV.equipOffset + 2 * k + 1) << 8)) }));
     owned = new Set([...barTypes, handType, ...party.flatMap((c) => c.eq)].filter((t) => t >= 0));
     const key = JSON.stringify([barTypes, handType, party]);
@@ -1087,15 +1089,15 @@
     if (key === lastInv) return;          // on ne reconstruit la grille que si elle a changé
     lastInv = key;
 
-    invBar.replaceChildren(...barTypes.map((t, k) => slot(t, `case ${k + 1}`)));
+    invBar.replaceChildren(...barTypes.map((t, k) => slot(t, `case ${k + 1}`, k)));
     invCount.textContent = `${barTypes.filter((t) => t >= 0).length} / ${INV.barSlots} cases occupées`;
-    invHand.replaceChildren(slot(handType, "en main"));
+    invHand.replaceChildren(slot(handType, "en main", LOC_HAND));
     document.querySelectorAll("#inv .slot.sel").forEach((e) => e.classList.remove("sel"));
     invChars.replaceChildren();
     for (const c of party) {
       const b = document.createElement("div"); b.className = "inv-sub"; b.textContent = `${c.name} — équipement`;
       const row = document.createElement("div"); row.className = "inv-grid";
-      row.append(...c.eq.map((t, k) => slot(t, `${c.name}, ${EQUIP_NAMES[k] || "emplacement " + (k + 1)}`)));
+      row.append(...c.eq.map((t, k) => slot(t, `${c.name}, ${EQUIP_NAMES[k] || "emplacement " + (k + 1)}`, LOC_EQ(c.slot, k))));
       invChars.append(b, row);
     }
     // objet pris en main dans le jeu : sélectionné comme si on avait cliqué dessus ;
@@ -1105,6 +1107,81 @@
       else if (fromHand) hideDetail();
     } else if (fromHand && handType >= 0) invHand.firstChild.classList.add("sel");
     lastHand = handType;
+  }
+
+  // --- Gestion de l'inventaire (version ScummVM) ------------------------------------
+  // Le moteur exécute les commandes avec ses propres fonctions (scripts des objets équipés,
+  // recalcul des caractéristiques, affichage) : voir tools/scummvm_web.py. Avec DOSBox, écrire
+  // directement en mémoire ne lancerait pas ces scripts : la gestion n'y est pas proposée.
+  // Emplacements : 0..47 sac, 100 main, 200 + perso * 11 + emplacement d'équipement.
+  const MANAGE = window.LOL_ENGINE === "scummvm";
+  const LOC_HAND = 100, LOC_EQ = (c, k) => 200 + c * 11 + k;
+  const hintEl = document.getElementById("inv-hint");
+  if (MANAGE && hintEl) hintEl.textContent = "Glisser une case sur une autre pour déplacer ou échanger ; cliquer un objet pour d'autres actions.";
+  const CMD_ERR = { 1: "Impossible : cet objet ne va pas à cet emplacement.", 2: "Le sac est plein.", 3: "Cet emplacement est vide." };
+  function invMessage(t) {
+    if (!hintEl) return;
+    hintEl.textContent = t;
+    clearTimeout(invMessage.t);
+    invMessage.t = setTimeout(() => { hintEl.textContent = MANAGE ? "Glisser une case sur une autre pour déplacer ou échanger ; cliquer un objet pour d'autres actions." : ""; }, 4000);
+  }
+  async function invCmd(c) {
+    const r = await mem.cmd(c);
+    if (!r) { invMessage("Le jeu ne répond pas (menu ouvert ?) : réessaie en exploration."); return false; }
+    if (r.code) { invMessage(CMD_ERR[r.code] || `Refusé (code ${r.code}).`); return false; }
+    lastInv = "";
+    setTimeout(() => updateInventory().catch(() => {}), 250);
+    return true;
+  }
+  let dragFrom = -1;
+  function dragTarget(d, loc, full) {
+    if (full) {
+      d.draggable = true;
+      d.addEventListener("dragstart", (e) => { dragFrom = loc; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(loc)); });
+      d.addEventListener("dragend", () => { dragFrom = -1; document.querySelectorAll("#inv .slot.drop").forEach((x) => x.classList.remove("drop")); });
+    }
+    d.addEventListener("dragover", (e) => { if (dragFrom >= 0 && dragFrom !== loc) { e.preventDefault(); d.classList.add("drop"); } });
+    d.addEventListener("dragleave", () => d.classList.remove("drop"));
+    d.addEventListener("drop", (e) => {
+      e.preventDefault(); d.classList.remove("drop");
+      const from = dragFrom; dragFrom = -1;
+      if (from >= 0 && from !== loc) { hideDetail(); invCmd({ op: "move", a: from, b: loc }); }
+    });
+  }
+  function firstFreeBag() {
+    if (!lastInvData) return -1;
+    return lastInvData.barTypes.findIndex((t) => t < 0);
+  }
+  function actions(type, it, loc) {
+    const box = document.createElement("div"); box.className = "acts";
+    const btn = (text, title, fn, cls) => {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = text; b.title = title;
+      if (cls) b.className = cls;
+      b.addEventListener("click", (e) => { e.currentTarget.blur(); fn(b); });
+      box.appendChild(b);
+    };
+    const move = (to) => { hideDetail(); invCmd({ op: "move", a: loc, b: to }); };
+    if (loc !== LOC_HAND)
+      btn("Prendre en main", "Mettre l'objet dans la main (échangé avec l'objet tenu, s'il y en a un)", () => move(LOC_HAND));
+    if (loc >= LOC_HAND)
+      btn("Ranger dans le sac", "Mettre l'objet dans la première case libre du sac", () => {
+        const k = firstFreeBag();
+        if (k < 0) invMessage(CMD_ERR[2]); else move(k);
+      });
+    // équiper : premier emplacement permis et libre du personnage, sinon échange avec l'objet porté
+    const allowed = (it.slots || []).filter((k) => k >= 0 && k < INV.equipSlots);
+    if (allowed.length && lastInvData)
+      for (const c of lastInvData.party) {
+        const k = allowed.find((s) => c.eq[s] < 0) ?? allowed[0];
+        const to = LOC_EQ(c.slot, k);
+        if (to === loc) continue;
+        btn(`Équiper : ${c.name}`, `${c.name}, ${EQUIP_NAMES[k] || "emplacement " + (k + 1)}` + (c.eq[k] >= 0 ? " (échange avec l'objet porté)" : ""), () => move(to));
+      }
+    btn("Supprimer", "Détruire l'objet (deuxième clic pour confirmer)", (b) => {
+      if (!b.classList.contains("confirm")) { b.classList.add("confirm"); b.textContent = "Confirmer la suppression"; return; }
+      hideDetail(); invCmd({ op: "delete", a: loc });
+    }, "del");
+    return box;
   }
 
   // --- Création d'objets dans le sac -------------------------------------------
@@ -1126,6 +1203,11 @@
     let t = parseInt(v, 10);
     if (!(t > 0) && itemInfo) t = itemInfo.findIndex((it) => it.name.toLowerCase() === v.toLowerCase());
     if (!(t > 0 && itemInfo && t < itemInfo.length)) { addMsg.textContent = "Objet inconnu : choisis-le dans la liste."; return; }
+    if (MANAGE) {
+      const ok = await invCmd({ op: "create", a: t });
+      if (ok) addMsg.textContent = `${itemInfo[t].name} créé dans le sac.`;
+      return;
+    }
     const r = await mem.read([[ITEMS.base, ITEMS.size * INV.maxItems], [INV.bar, INV.barSlots * 2]]);
     if (!r) { addMsg.textContent = "Jeu indisponible."; return; }
     const [table, bar] = r;

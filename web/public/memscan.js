@@ -75,6 +75,16 @@
         setTimeout(() => { if (this.pending.delete(id)) resolve(null); }, timeout);
       });
     }
+    // Commande d'inventaire (version ScummVM seulement, voir tools/scummvm_web.py) :
+    // { op: "move" | "delete" | "create", a, b } -> { code } (0 fait), ou null sans réponse.
+    cmd(c, timeout = 3000) {
+      const id = ++this.seq;
+      return new Promise((resolve) => {
+        this.pending.set(id, resolve);
+        this.ch.postMessage({ id, cmd: c });
+        setTimeout(() => { if (this.pending.delete(id)) resolve(null); }, timeout);
+      });
+    }
     read(ranges, timeout = 1000) {
       const id = ++this.seq;
       return new Promise((resolve) => {

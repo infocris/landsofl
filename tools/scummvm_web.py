@@ -35,6 +35,7 @@ avec ces octets sur le canal « lol-mem », comme l'émulateur DOSBox : minimap.
 changement. La page lol.html reprend web/public/index.html (panneau, vue 3D), avec ScummVM dans
 un cadre à la place de js-dos. Les fichiers absents de web/scummvm sont servis depuis web/public.
 Les triches (écritures en mémoire) ne sont pas disponibles : leurs commandes sont masquées.
+L'inventaire se gère par commandes exécutées par le moteur (déplacer, supprimer, créer).
 
 Usage : python3 -I tools/scummvm_web.py [port]   (8001 par défaut)
         python3 -I tools/scummvm_web.py import   (copie un nouveau build dans web/scummvm)
@@ -153,6 +154,7 @@ LAUNCH_JS = r"""<script>
 // l'émulateur DOSBox (zéros hors des zones). Recherches : rien trouvé ; écritures : refusées.
 (() => {
   let zones = null;
+  Module.lolCmdDone = (id, code) => ch.postMessage({ id, data: { code } });
   Module.lolState = (bytes) => {
     const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), out = [];
     for (let o = 0; o + 8 <= bytes.length; ) {
@@ -176,6 +178,11 @@ LAUNCH_JS = r"""<script>
       });
       ch.postMessage({ id: d.id, data });
     } else if (d.find && zones) ch.postMessage({ id: d.id, found: d.find.map(() => -1) });
+    else if (d.cmd && zones) {
+      // commandes d'inventaire : exécutées par le moteur dans sa boucle (webRunCommands)
+      const op = { move: 1, delete: 2, create: 3 }[d.cmd.op] || 0;
+      (Module.lolCmds = Module.lolCmds || []).push([op, d.cmd.a | 0, d.cmd.b | 0, d.id]);
+    }
     else ch.postMessage({ id: d.id, error: zones ? "non disponible avec ScummVM" : "jeu pas encore lancé" });
   };
 })();
@@ -183,6 +190,7 @@ LAUNCH_JS = r"""<script>
 
 # Page principale : celle de la version DOSBox (web/public/index.html), ScummVM dans un cadre
 PAGE_JS = r"""<script>
+window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes au moteur
 (() => {
   // Mini-carte et vue 3D : affichage mémorisé (mêmes réglages que la version DOSBox)
   const mm = document.getElementById("mm"), v3d = document.getElementById("v3d");
@@ -227,9 +235,10 @@ PAGE_JS = r"""<script>
 </script>"""
 
 PAGE_CSS = """<style>
-  /* version ScummVM : jeu dans un cadre ; pas de triches ni de création d'objets (pas d'écriture en mémoire) */
+  /* version ScummVM : jeu dans un cadre ; pas de triches (pas d'écriture en mémoire),
+     inventaire géré par commandes au moteur */
   iframe#dos { border: 0; display: block; width: 100%; background: #000; }
-  #cheats, #inv-add, #zqsd, #qload { display: none !important; }
+  #cheats, #zqsd, #qload { display: none !important; }
 </style>
 </head>"""
 

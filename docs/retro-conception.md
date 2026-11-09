@@ -753,6 +753,32 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     modifié.
   - Vérifié (test automatisé, son coupé) : « Niveau 1 — Gladstone », case 13,17 Nord,
     41 couronnes ; après D puis Z : case 14,17 Est. La vue 3D et les caractéristiques suivent.
+- **Gestion de l'inventaire depuis le panneau** (2026-11-10, version ScummVM seulement).
+  - Équiper un objet ne se résume pas à écrire son numéro. Le jeu (`clickedCharInventorySlot`,
+    `gui_lol.cpp`) recalcule les caractéristiques (`recalcCharacterStats`), lance le script de
+    l'objet retiré (`runItemScript(…, 0x100)`) et celui de l'objet posé (`0x80`) : effets
+    passifs, force et protection. Une écriture en mémoire laisserait le personnage incohérent.
+  - La page envoie donc des **commandes** que le moteur exécute dans sa boucle
+    (`webRunCommands`, appelée par `webPublishState`) avec ses propres fonctions :
+    - déplacer (échange si la case visée est occupée), supprimer (`deleteItem`), créer
+      (`makeItem` puis `addItemToInventory`) ;
+    - emplacements : 0 à 47 sac, 100 main (`setHandItem`, curseur compris),
+      200 + perso × 11 + emplacement d'équipement ;
+    - un objet ne va sur un emplacement d'équipement que si le masque de son type le permet
+      (`_itemProperties[…].type`, bit de l'emplacement), comme dans le jeu ;
+    - réponses : 0 fait, 1 impossible, 2 sac plein, 3 emplacement vide.
+  - Transport : `LoLMem.RemoteMemory.cmd()` sur le canal `lol-mem` → `lol-game.html`
+    (`Module.lolCmds`) → moteur → `Module.lolCmdDone`.
+  - Le moteur ne gardait pas la taille de la table des types d'objets : ajout de
+    `_webNumItemProperties` (fixé par `olol_allocItemPropertiesBuffer`).
+  - Panneau (`minimap.js`, actif si `window.LOL_ENGINE === "scummvm"`) : glisser une case sur
+    une autre (sac, main, équipement) ; dans la fiche d'un objet, « Prendre en main »,
+    « Ranger dans le sac », « Équiper : <personnage> », « Supprimer » (deux clics) ; « Créer un
+    objet » passe par la commande. Avec DOSBox, rien ne change (pas de scripts d'objet en
+    écrivant la mémoire).
+  - Vérifié (test automatisé, son coupé) : heaume de nain (type 17) créé dans le sac, équipé
+    sur Michael (tête), rangé, glissé dans la main (le jeu affiche « Heaume de nain pris(e). »
+    et le curseur le porte), supprimé ; anneau Bezel (225) glissé sur la tête : refusé.
 - **Vérifié** (test automatisé, son coupé, WebGL logiciel SwiftShader) : le jeu est détecté
   « CD/DOS/French ». L'intro, le menu titre (« Nouvelle Partie ») et la sélection du
   personnage s'affichent en français.
@@ -1125,3 +1151,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-09** : ScummVM web compilé et lancé à part (port 8001), jusqu'à la sélection du personnage (§ 10 bis).
 - **2026-11-10** : ScummVM web : touches reçues plusieurs fois (abonnements clavier de SDL3 en double) corrigé dans le lanceur ; mini-carte, vue 3D et panneau branchés sur l'état publié par le moteur (§ 10 bis).
 - **2026-11-10** : ScummVM web versionné dans `web/scummvm` (origine dans `VERSION.txt`, modification du moteur sur la branche locale `lol-web`) (§ 10 bis).
+- **2026-11-10** : ScummVM web : gestion de l'inventaire depuis le panneau (commandes exécutées par le moteur : déplacer, équiper, supprimer, créer) (§ 10 bis).

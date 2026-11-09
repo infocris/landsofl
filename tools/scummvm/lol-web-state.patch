@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..fa4c5d58 100644
+index 392e4c2d..1398e4d3 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -39,6 +39,10 @@
@@ -13,7 +13,7 @@ index 392e4c2d..fa4c5d58 100644
  namespace Kyra {
  
  const char *const LoLEngine::kMouseKeymapName = "lolmouse";
-@@ -929,6 +933,91 @@ void LoLEngine::startupNew() {
+@@ -929,6 +933,193 @@ void LoLEngine::startupNew() {
  	_screen->showMouse();
  }
  
@@ -27,7 +27,10 @@ index 392e4c2d..fa4c5d58 100644
 +	static uint32 lastTime = 0;
 +	static Common::Array<byte> buf;
 +	const uint32 now = _system->getMillis();
-+	if (now - lastTime < 150)
++	const bool changed = EM_ASM_INT({ return Module.lolCmds && Module.lolCmds.length ? 1 : 0; });
++	if (changed)
++		webRunCommands();
++	if (now - lastTime < 150 && !changed)
 +		return;
 +	lastTime = now;
 +	buf.clear();
@@ -102,10 +105,109 @@ index 392e4c2d..fa4c5d58 100644
 +#endif
 +}
 +
++// Version web : commandes d'inventaire de la page (Module.lolCmds : [op, a, b, id]…), exécutées
++// avec les fonctions du jeu (scripts des objets équipés, recalcul des caractéristiques, affichage).
++// Emplacements : 0..47 sac, 100 main, 200 + perso * 11 + emplacement d'équipement.
++// op 1 : déplacer a vers b (échange si b est occupé) ; op 2 : supprimer l'objet de a ;
++// op 3 : créer un objet de type a dans le sac. Résultat (Module.lolCmdDone(id, code)) :
++// 0 fait, 1 emplacement ou objet impossible, 2 sac plein, 3 emplacement vide.
++void LoLEngine::webRunCommands() {
++#ifdef __EMSCRIPTEN__
++	while (EM_ASM_INT({ return Module.lolCmds.length; })) {
++		const int op = EM_ASM_INT({ return Module.lolCmds[0][0]; });
++		const int a = EM_ASM_INT({ return Module.lolCmds[0][1]; });
++		const int b = EM_ASM_INT({ return Module.lolCmds[0][2]; });
++		const int id = EM_ASM_INT({ return Module.lolCmds.shift()[3]; });
++		const int res = webInventoryCommand(op, a, b);
++		EM_ASM({ if (Module.lolCmdDone) Module.lolCmdDone($0, $1); }, id, res);
++	}
++#endif
++}
++
++Item LoLEngine::webItemAt(int loc) {
++	if (loc >= 0 && loc < 48)
++		return _inventory[loc];
++	if (loc == 100)
++		return _itemInHand;
++	if (loc >= 200 && loc < 244)
++		return _characters[(loc - 200) / 11].items[(loc - 200) % 11];
++	return 0;
++}
++
++void LoLEngine::webSetItemAt(int loc, Item item) {
++	if (loc >= 0 && loc < 48) {
++		_inventory[loc] = item;
++	} else if (loc == 100) {
++		setHandItem(item);
++	} else if (loc >= 200 && loc < 244) {
++		const int c = (loc - 200) / 11, k = (loc - 200) % 11;
++		const Item old = _characters[c].items[k];
++		_characters[c].items[k] = item;
++		recalcCharacterStats(c);
++		if (old)
++			runItemScript(c, old, 0x100, 0, 0);	// retiré (comme clickedCharInventorySlot)
++		if (item)
++			runItemScript(c, item, 0x80, 0, 0);	// équipé
++		gui_drawCharPortraitWithStats(c);
++		if ((_updateFlags & 2) && c == _selectedCharacter) {
++			gui_drawCharInventoryItem(k);
++			gui_changeCharacterStats(c);
++		}
++	}
++}
++
++int LoLEngine::webInventoryCommand(int op, int a, int b) {
++	auto validLoc = [&](int loc) {
++		return (loc >= 0 && loc < 48) || loc == 100 || (loc >= 200 && loc < 244 && (_characters[(loc - 200) / 11].flags & 1));
++	};
++	auto fits = [&](int loc, Item item) {	// l'objet peut-il aller à cet emplacement ?
++		if (!item || loc < 200)
++			return true;
++		return (_itemProperties[_itemsInPlay[item].itemPropertyIndex].type & (1 << ((loc - 200) % 11))) != 0;
++	};
++
++	if (op == 3) {
++		if (a <= 0 || a >= _webNumItemProperties)
++			return 1;
++		const Item item = makeItem(a, 0, 0);
++		if (!item)
++			return 1;
++		if (!addItemToInventory(item)) {
++			deleteItem(item);
++			return 2;
++		}
++		gui_drawInventory();
++		return 0;
++	}
++	if (!validLoc(a))
++		return 1;
++	const Item ia = webItemAt(a);
++	if (!ia)
++		return 3;
++	if (op == 2) {
++		webSetItemAt(a, 0);
++		deleteItem(ia);
++		gui_drawInventory();
++		return 0;
++	}
++	if (op != 1 || !validLoc(b) || a == b)
++		return 1;
++	const Item ib = webItemAt(b);
++	if (!fits(b, ia) || !fits(a, ib))
++		return 1;
++	// retirer d'abord (scripts « retiré »), puis poser
++	webSetItemAt(a, 0);
++	webSetItemAt(b, 0);
++	webSetItemAt(b, ia);
++	webSetItemAt(a, ib);
++	gui_drawInventory();
++	return 0;
++}
++
  void LoLEngine::runLoop() {
  	// Initialize debugger since how it should be fully usable
  	static_cast<Debugger_LoL *>(getDebugger())->initialize();
-@@ -957,6 +1046,7 @@ void LoLEngine::runLoop() {
+@@ -957,6 +1148,7 @@ void LoLEngine::runLoop() {
  		gui_updateInput();
  
  		update();
@@ -114,14 +216,38 @@ index 392e4c2d..fa4c5d58 100644
  		updatePlayTimer();
  
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index 2cfadf37..b2cb2da8 100644
+index 2cfadf37..270d2635 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
-@@ -315,6 +315,7 @@ private:
+@@ -315,6 +315,11 @@ private:
  
  	// main loop
  	void runLoop();
 +	void webPublishState();	// version web : état du jeu aux adresses du jeu DOS, pour la mini-carte
++	void webRunCommands();	// version web : commandes d'inventaire envoyées par la page
++	int webInventoryCommand(int op, int a, int b);
++	Item webItemAt(int loc);
++	void webSetItemAt(int loc, Item item);
  	void update() override;
  
  	// mouse
+@@ -1072,6 +1077,7 @@ private:
+ 
+ 	LoLItem *_itemsInPlay;
+ 	ItemProperty *_itemProperties;
++	int _webNumItemProperties = 0;	// version web : taille de _itemProperties
+ 
+ 	Item _itemInHand;
+ 	Item _inventory[48];
+diff --git a/engines/kyra/script/script_lol.cpp b/engines/kyra/script/script_lol.cpp
+index 30c59a77..bde6ac2a 100644
+--- a/engines/kyra/script/script_lol.cpp
++++ b/engines/kyra/script/script_lol.cpp
+@@ -235,6 +235,7 @@ int LoLEngine::olol_allocItemPropertiesBuffer(EMCState *script) {
+ 	debugC(3, kDebugLevelScriptFuncs, "LoLEngine::olol_allocItemPropertiesBuffer(%p) (%d)", (const void *)script, stackPos(0));
+ 	delete[] _itemProperties;
+ 	_itemProperties = new ItemProperty[stackPos(0)];
++	_webNumItemProperties = stackPos(0);
+ 	return 1;
+ }
+ 

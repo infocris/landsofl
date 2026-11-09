@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lands of Lore (ScummVM)</title>
 <!-- ?v= : à changer à chaque modification des scripts (évite les copies en cache) -->
-<script src="memscan.js?v=20261108g"></script>
+<script src="memscan.js?v=20261110a"></script>
 <style>
   html, body { margin: 0; height: 100%; background: #000; }
   /* pas de retour arrière par balayage horizontal du pavé tactile (Chrome, Edge) */
@@ -86,6 +86,16 @@
     cursor: pointer; }
   .slot.full:hover { border-color: #c9a227; }
   .slot.sel { outline: 2px solid #c9a227; outline-offset: -1px; }
+  /* gestion de l'inventaire (version ScummVM) : glisser-déposer et actions de la fiche */
+  .slot.drop { outline: 2px dashed #28dce6; outline-offset: -1px; }
+  #inv-detail .acts { grid-column: 1 / 4; display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  #inv-detail .acts button { font: 11px system-ui, sans-serif; padding: 2px 7px; border-radius: 4px; cursor: pointer;
+    border: 1px solid #6d5a3a; background: #2a2217; color: #e8dcc0; }
+  #inv-detail .acts button:hover { border-color: #c9a227; }
+  #inv-detail .acts button.del { border-color: #8a3a2a; color: #ffb4a0; }
+  #inv-detail .acts button.del.confirm { background: #8a3a2a; color: #fff; }
+  #inv-hint { color: #a39578; font-size: 11px; margin-top: 4px; }
+  #inv-hint:empty { display: none; }
   #inv-detail { margin-top: 8px; padding: 8px; border: 1px solid #554a36; border-radius: 6px; background: #17130e;
     display: grid; grid-template-columns: 30px 1fr auto; gap: 2px 8px; align-items: start; }
   #inv-detail[hidden] { display: none; }
@@ -167,9 +177,10 @@
     line-height: 1.15; text-align: center; opacity: .85; background: rgba(20, 14, 8, .75); }
 </style>
 <style>
-  /* version ScummVM : jeu dans un cadre ; pas de triches ni de création d'objets (pas d'écriture en mémoire) */
+  /* version ScummVM : jeu dans un cadre ; pas de triches (pas d'écriture en mémoire),
+     inventaire géré par commandes au moteur */
   iframe#dos { border: 0; display: block; width: 100%; background: #000; }
-  #cheats, #inv-add, #zqsd, #qload { display: none !important; }
+  #cheats, #zqsd, #qload { display: none !important; }
 </style>
 </head>
 <body>
@@ -197,6 +208,7 @@
     <div id="inv-bar" class="inv-grid"></div>
     <div id="inv-handrow">En main <span id="inv-hand"></span></div>
     <div id="inv-chars"></div>
+    <div id="inv-hint"></div>
     <div id="inv-add"><input id="inv-add-name" list="inv-add-list" placeholder="Créer un objet : nom ou numéro…" autocomplete="off">
       <datalist id="inv-add-list"></datalist><button type="button" id="inv-add-btn">Créer</button><span id="inv-add-msg"></span></div>
     <div id="inv-detail" hidden></div>
@@ -211,6 +223,7 @@
 <button id="qload" type="button" title="Recharger l'état enregistré avec F6 (QUICK.SAV)" hidden>F7 · charger l'état</button>
 <button id="zqsd" type="button" title="Activer/désactiver les touches ZQSD (F8)"></button>
 <script>
+window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes au moteur
 (() => {
   // Mini-carte et vue 3D : affichage mémorisé (mêmes réglages que la version DOSBox)
   const mm = document.getElementById("mm"), v3d = document.getElementById("v3d");
@@ -253,6 +266,6 @@
   sendPersp();
 })();
 </script>
-<script src="minimap.js?v=20261109p"></script>
+<script src="minimap.js?v=20261110a"></script>
 </body>
 </html>
