@@ -699,6 +699,9 @@ La RAM fait 16 Mo (`memsize=16`).
 | `0x3E6F0` | u16 | couronnes d'argent du groupe (**vérifié** : après écriture de 141, un clic sur le tas de pièces affiche « Vous avez 141 couronnes d'argent ». Le chiffre dessiné sur le tas n'est redessiné qu'à la transaction suivante) |
 | `0x8AA05` | 285 × 13 octets | table des types d'objets (§ 8.2) |
 | `0x5D6B5` | u8 | mode : 5 en exploration, 1 pendant l'image fixe d'un lieu (observé deux fois : entrée, sortie, nouvelle entrée) |
+| `0x39D5A` | u8 | **jeu en pause** quand le bit 3 (`0x08`) est à 0 : 15 en jeu, 7 dans le menu disquette et sur la fiche d'un personnage (observé, voir ci-dessous) |
+| `0x3E4E6` | u8 | écran affiché (bits, **déduit**) : 0 en jeu, 4 dans le menu disquette, 12 sur la fiche d'un personnage |
+| `0x387B0` | table, entrées de 19 octets | minuteries du jeu (**déduit**) : leur champ u16 en `0x387B0 + 19·n` avance d'environ 64 par seconde en jeu, et se fige en pause |
 
 Les adresses dépendent de l'endroit où DOS charge `MAIN.EXE`. Elles sont stables tant que
 le bundle, la configuration DOSBox et l'`autoexec` ne changent pas.
@@ -717,6 +720,17 @@ de RAM un extrait de 32 octets de chaque fichier possible (octets 400 à 431 du 
 décompressé) : seul le sprite chargé s'y trouve (vérifié : `GUARD.SHP` en 0x7C7B2 au
 niveau 1, `BOAR.SHP` et `THUG.SHP` absents). Cette recherche passe par une commande
 `find` ajoutée au canal du worker.
+
+**Pause** (2026-11-09, test automatisé, son coupé) : on a comparé des copies des 640 premiers
+Ko de RAM, prises en jeu, dans le menu disquette, puis à nouveau en jeu.
+- Les champs de la table des minuteries (`0x387B0`, une entrée tous les 19 octets) avancent
+  en jeu et se figent dans le menu. Ils se figent aussi sur la fiche d'un personnage.
+- Parmi les octets qui ne changent que pendant ces écrans, `0x39D5A` vaut 15 en jeu et 7 dans
+  les deux écrans. Il reste à 15 pendant les déplacements (79 lectures, 1 par 0,1 s, pendant 6
+  pas et rotations). On le lit comme un bit « minuteries actives » (**déduit**).
+- `0x3E4E6` distingue les deux écrans (4 et 12) : c'est plutôt l'écran affiché.
+- Non testé : dialogues, image fixe d'un lieu, combat, carte automatique.
+- Le repos (Zzz) n'a pas pu être testé : le jeu répond « Personne n'est fatigué ».
 
 **Cases explorées** : aucune marque trouvée. Après quelques pas, aucun octet de la grille
 ne change, et la RAM ne laisse pas apparaître de tableau des cases vues.
@@ -972,3 +986,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
     Leurs côtés traversables sont en pointillés.
   - Les murs effacés par un script (44 murs, `tools/hidden_walls.py`) ont un cadre pointillé.
     L'infobulle donne le mécanisme, l'objet attendu et la case qui referme le passage.
+- **2026-11-09** : pause du jeu détectée, `0x39D5A` bit 3 et minuteries figées (§ 12.2).
