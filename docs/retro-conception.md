@@ -987,3 +987,6 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
   - Les murs effacés par un script (44 murs, `tools/hidden_walls.py`) ont un cadre pointillé.
     L'infobulle donne le mécanisme, l'objet attendu et la case qui referme le passage.
 - **2026-11-09** : pause du jeu détectée, `0x39D5A` bit 3 et minuteries figées (§ 12.2).
+  - La page lit cet octet toutes les 250 ms. En pause, le bouton ZQSD est caché et la
+    conversion ZQSD est suspendue jusqu'au retour en jeu, ce qui permet de taper ces lettres
+    dans un nom de sauvegarde. Vérifié avec le menu disquette et la fiche d'un personnage.

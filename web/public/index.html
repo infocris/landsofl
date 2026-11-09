@@ -162,6 +162,7 @@
     background: rgba(0,0,0,.6); color: #aaa; cursor: pointer; opacity: .6;
   }
   #zqsd:hover { opacity: 1; }
+  #zqsd.paused { display: none; }
   #zqsd[data-on="true"] { color: #fff; border-color: #c9a227; }
   /* placé à droite des flèches de déplacement du jeu (position calculée dans placeZqsd) */
   #zqsd.ingame { right: auto !important; bottom: auto; transform: translateY(-50%); padding: .35em .6em;
@@ -229,6 +230,27 @@
 
   const btn = document.getElementById("zqsd");
   function renderBtn() { btn.innerHTML = "ZQSD<br>" + (remapOn ? "oui" : "non"); btn.dataset.on = remapOn; }
+
+  // Pause du jeu (menu disquette, fiche d'un personnage…) : bit 3 de l'octet 0x39D5A à 0
+  // (docs/retro-conception.md, § 12.2). En pause, le bouton est caché et les touches ne sont
+  // plus converties (on peut taper Z, Q, S, D dans un nom de sauvegarde), jusqu'au retour en jeu.
+  const PAUSE_BYTE = 0x39D5A;
+  let paused = false, pauseMem = null, pauseBusy = false;
+  function setPaused(p) {
+    if (p === paused) return;
+    paused = p;
+    btn.classList.toggle("paused", p);
+    if (p) { if (emu) held.forEach((dos) => emu.sendKeyEvent(dos, false)); held.clear(); }
+  }
+  setInterval(async () => {
+    if (pauseBusy || !emu || !window.LoLMem) return;
+    pauseBusy = true;
+    try {
+      pauseMem = pauseMem || new LoLMem.RemoteMemory();
+      const r = await pauseMem.read([[PAUSE_BYTE, 1]], 500);
+      if (r && r[0]) setPaused(!(r[0][0] & 0x08));        // pas de réponse : état inchangé
+    } finally { pauseBusy = false; }
+  }, 250);
   function setRemap(on) {
     remapOn = on;
     try { localStorage.setItem("zqsd", on ? "on" : "off"); } catch (e) {}
@@ -267,7 +289,7 @@
       e.preventDefault(); e.stopPropagation();
       return;
     }
-    if (!remapOn || !emu || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (!remapOn || paused || !emu || e.ctrlKey || e.metaKey || e.altKey) return;
     const dos = KEY_MAP[e.code];
     if (dos === undefined) return;
     if (down) { emu.sendKeyEvent(dos, true); held.set(e.code, dos); }
