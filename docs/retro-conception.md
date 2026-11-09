@@ -656,9 +656,31 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
 | 0x5E | message | `playCharacterScriptChat` : réplique d'un personnage |
 | 0x60 | son sur une case | `playEnvironmentalSfx` ✔ |
 
-**Version web** : ScummVM a un portage WebAssembly (Emscripten,
-`dists/emscripten/build.sh`), qualifié de démonstration. Il dépend d'Asyncify, ce qui le
-ralentit.
+**Version web, à part de la version DOSBox** (`tools/scummvm_web.py`, 2026-11-09).
+- **Compilation.** Le portage WebAssembly (Emscripten 4.0.10, `dists/emscripten/build.sh`) est
+  compilé avec le seul moteur Kyra : `setup configure make dist --disable-all-engines
+  --enable-engine=kyra,lol`. Le résultat (`scummvm.wasm`, 13 Mo) est dans
+  `third_party/scummvm/build-emscripten`.
+  - `kyra.dat` est copié automatiquement.
+  - Le script de compilation appelle `wget`, absent du Mac : un petit remplaçant fondé sur
+    `curl` suffit.
+- **Fichiers du jeu.** ScummVM attend la disposition du CD d'origine : `GENERAL.PAK`,
+  `STARTUP.PAK`, `INTRO1-9.PAK`, `INTROVOC.PAK` et `HISTORY.PAK` dans un dossier par langue
+  (`FRE/`).
+  - L'installation les a mis à plat et a sorti les polices de l'intro (`NEW8P.FNT`,
+    `NEW6P.FNT`, `INTRO.FNT`) dans `STARTIN.PAK`.
+  - Le script construit `data/games/lol` : des liens vers les fichiers du jeu, plus un
+    `FRE/STARTUP.PAK` qui réunit `STARTUP.PAK` et `STARTIN.PAK`. Le dossier du jeu n'est pas
+    modifié.
+- **Lancement.** `python3 -I tools/scummvm_web.py` sert la page sur le port 8001, puis :
+  `http://localhost:8001/scummvm.html#--path=/data/games/lol --language=fr --auto-detect`.
+  - Sans `--language=fr`, le jeu est détecté en anglais et cherche `ENG/`.
+- **Vérifié** (test automatisé, son coupé, WebGL logiciel SwiftShader) : le jeu est détecté
+  « CD/DOS/French ». L'intro, le menu titre (« Nouvelle Partie ») et la sélection du
+  personnage s'affichent en français.
+- Le rendu passe par OpenGL (WebGL) : sans WebGL, ScummVM s'arrête.
+- Les sauvegardes et les réglages restent dans le navigateur (IndexedDB), à part de la
+  version DOSBox.
 
 ## 11. Outils et sorties
 
@@ -1022,3 +1044,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
     conversion ZQSD est suspendue jusqu'au retour en jeu, ce qui permet de taper ces lettres
     dans un nom de sauvegarde. Vérifié avec le menu disquette et la fiche d'un personnage.
 - **2026-11-09** : sources de ScummVM récupérées, fonctions des scripts confrontées (§ 10 bis).
+- **2026-11-09** : ScummVM web compilé et lancé à part (port 8001), jusqu'à la sélection du personnage (§ 10 bis).
