@@ -10,8 +10,14 @@ les a mis à plat et a séparé les polices de l'intro dans STARTIN.PAK. On cons
 build-emscripten/data/games/lol, des liens vers les fichiers du jeu, plus un dossier FRE/ dont
 le STARTUP.PAK réunit STARTUP.PAK et STARTIN.PAK. Le dossier du jeu n'est pas modifié.
 
+Déplacements ZQSD : le scummvm.ini servi (copié dans le navigateur au premier lancement, puis
+gardé dans IndexedDB) déclare la cible « lol-fr » et ajoute aux actions de déplacement du jeu
+(clavier « lolkeyb » de ScummVM) les touches Z avancer, S reculer, Q / D pas de côté,
+A / E tourner, en plus des touches d'origine. Le jeu désactive lui-même ce clavier pendant la
+saisie d'un nom de sauvegarde (gui_lol.cpp), et ses actions ne servent qu'en exploration.
+
 Usage : python3 -I tools/scummvm_web.py [port]   (8001 par défaut)
-Puis : http://localhost:8001/scummvm.html#--path=/data/games/lol --language=fr --auto-detect
+Puis : http://localhost:8001/scummvm.html#lol-fr
 """
 import functools, http.server, os, struct, subprocess, sys
 
@@ -45,6 +51,20 @@ def write_pak(path, files):
         f.write(head + struct.pack("<I", off) + b"\0" + body)
 
 
+# Touches ajoutées aux actions de déplacement (identifiants des actions : engines/kyra/engine/lol.cpp)
+ZQSD = {"MVF": "UP z", "MVB": "DOWN s", "SLL": "LEFT q", "SLR": "RIGHT d", "TL": "HOME a", "TR": "PAGEUP e"}
+TARGET = "lol-fr"
+
+
+def write_ini():
+    lines = ["[scummvm]", "", f"[{TARGET}]", "gameid=lol", "engineid=kyra",
+             "description=Lands of Lore: The Throne of Chaos (CD/DOS/French)",
+             "path=/data/games/lol", "language=fr", "platform=pc"]
+    lines += [f"keymap_lolkeyb_{a}={keys}" for a, keys in ZQSD.items()]
+    with open(os.path.join(BUILD, "scummvm.ini"), "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def prepare():
     if not os.path.exists(os.path.join(BUILD, "scummvm.wasm")):
         sys.exit("ScummVM web n'est pas compilé (voir l'en-tête de ce script).")
@@ -63,6 +83,7 @@ def prepare():
         os.remove(out)
     write_pak(out, merged)
     # index.json de chaque dossier, lus par le système de fichiers HTTP de ScummVM
+    write_ini()
     subprocess.run([sys.executable, os.path.join(SVM, "dists", "emscripten", "build-make_http_index.py"),
                     os.path.join(BUILD, "data")], check=True, stdout=subprocess.DEVNULL)
 
@@ -70,6 +91,6 @@ def prepare():
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8001
     prepare()
-    print(f"http://localhost:{port}/scummvm.html#--path=/data/games/lol%20--language=fr%20--auto-detect")
+    print(f"http://localhost:{port}/scummvm.html#{TARGET}")
     handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=BUILD)
     http.server.ThreadingHTTPServer(("127.0.0.1", port), handler).serve_forever()

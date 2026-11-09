@@ -673,8 +673,23 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     `FRE/STARTUP.PAK` qui réunit `STARTUP.PAK` et `STARTIN.PAK`. Le dossier du jeu n'est pas
     modifié.
 - **Lancement.** `python3 -I tools/scummvm_web.py` sert la page sur le port 8001, puis :
-  `http://localhost:8001/scummvm.html#--path=/data/games/lol --language=fr --auto-detect`.
-  - Sans `--language=fr`, le jeu est détecté en anglais et cherche `ENG/`.
+  `http://localhost:8001/scummvm.html#lol-fr`.
+  - La cible `lol-fr` vient du `scummvm.ini` écrit par le script : chemin du jeu, `language=fr`.
+    Sans la langue, le jeu est détecté en anglais et cherche `ENG/`.
+  - Le navigateur ne télécharge ce `scummvm.ini` qu'au premier lancement, puis garde sa copie
+    dans IndexedDB. Pour reprendre une nouvelle version du fichier, il faut effacer les
+    données du site `localhost:8001`.
+- **Déplacements ZQSD** (vérifié 2026-11-09). Le moteur expose ses touches par le
+  « keymapper » de ScummVM : clavier `lolkeyb`, actions `MVF`, `MVB`, `SLL`, `SLR`, `TL`, `TR`
+  (`engine/lol.cpp`). Par défaut : flèches haut et bas, flèches gauche et droite (pas de
+  côté), Origine et Page préc. (tourner).
+  - Le `scummvm.ini` ajoute Z, S, Q, D, A et E : `keymap_lolkeyb_MVF=UP z`, etc.
+  - Le jeu désactive ce clavier pendant la saisie d'un nom de sauvegarde (`gui_lol.cpp`), ce qui
+    remplace la détection de pause de la version DOSBox.
+  - Test : Z avance, E tourne à droite, D fait un pas à droite. Dans le nom de sauvegarde, les
+    lettres s'écrivent.
+  - Les touches suivent la disposition du clavier (code de touche), pas la position physique
+    comme dans la version DOSBox. Sur un clavier AZERTY, c'est la même chose.
 - **Vérifié** (test automatisé, son coupé, WebGL logiciel SwiftShader) : le jeu est détecté
   « CD/DOS/French ». L'intro, le menu titre (« Nouvelle Partie ») et la sélection du
   personnage s'affichent en français.
