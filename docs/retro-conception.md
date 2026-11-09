@@ -629,6 +629,37 @@ mur « encadrement » (centré, aligné en bas de l'ouverture).
 - Découpage des vues de côté et lointaines du `.VMP` (inutile pour le visualiseur libre).
 - `.TIM`, `.WSA` (animations), sons.
 
+## 10 bis. Référence : ScummVM (moteur réécrit, GPL)
+
+Le moteur « Kyra » de ScummVM réimplémente Lands of Lore 1 en C++, à partir de la
+rétro-ingénierie de l'exécutable d'origine. Il reconnaît la version CD française.
+- **Sources** : clone partiel dans `third_party/scummvm`, non versionné et lu seulement
+  (`engines/kyra`, `common`). Révision 250505e du 2026-11-09.
+- **Fichiers utiles** : `engines/kyra/script/script_lol.cpp` (fonctions des scripts .INF,
+  table d'opcodes `olol_*`, 175 entrées), `engine/lol.cpp`, `timer_lol.cpp`, `items_lol.cpp`,
+  `scene_lol.cpp`, `sprites_lol.cpp`, `gui/gui_lol.cpp`.
+
+Ce n'est pas le code d'origine : les adresses mémoire de nos lectures (§ 12) n'y figurent
+pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos déductions :
+
+| N° | Notre déduction | ScummVM |
+|---|---|---|
+| 0x00 / 0x01 | écrire / lire un mur | `setWallType` / `getWallType` ✔ |
+| 0x07 / 0x08 | écrire / tester un drapeau d'histoire | `setGameFlag` / `testGameFlag` ✔ |
+| 0x12 | paramètre d'un objet (4 = type) | `getItemPara` ✔ |
+| 0x31 | état d'une porte | `triggerDoorSwitch` ✔ |
+| 0x39 | effet du téléporteur | `fadeClearSceneWindow` : fondu de la vue, pas propre aux téléporteurs |
+| 0x3C | changement de niveau | `loadNewLevel` ✔ |
+| 0x49 | donner un objet | `createHandItem` : l'objet est créé **dans la main** |
+| 0x53 | objet en main | `getItemInHand` ✔ |
+| 0x57 | son | `playSoundEffect` ✔ |
+| 0x5E | message | `playCharacterScriptChat` : réplique d'un personnage |
+| 0x60 | son sur une case | `playEnvironmentalSfx` ✔ |
+
+**Version web** : ScummVM a un portage WebAssembly (Emscripten,
+`dists/emscripten/build.sh`), qualifié de démonstration. Il dépend d'Asyncify, ce qui le
+ralentit.
+
 ## 11. Outils et sorties
 
 | Outil | Rôle | Sortie |
@@ -990,3 +1021,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
   - La page lit cet octet toutes les 250 ms. En pause, le bouton ZQSD est caché et la
     conversion ZQSD est suspendue jusqu'au retour en jeu, ce qui permet de taper ces lettres
     dans un nom de sauvegarde. Vérifié avec le menu disquette et la fiche d'un personnage.
+- **2026-11-09** : sources de ScummVM récupérées, fonctions des scripts confrontées (§ 10 bis).

@@ -16,3 +16,6 @@ web/node_modules/
 __pycache__/
 web/server.log
 .DS_Store
+
+# Sources tierces récupérées pour lecture (ScummVM, GPL) : non versionnées
+third_party/
