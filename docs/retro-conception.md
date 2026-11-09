@@ -673,23 +673,34 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     `FRE/STARTUP.PAK` qui réunit `STARTUP.PAK` et `STARTIN.PAK`. Le dossier du jeu n'est pas
     modifié.
 - **Lancement.** `python3 -I tools/scummvm_web.py` sert la page sur le port 8001, puis :
-  `http://localhost:8001/scummvm.html#lol-fr`.
+  `http://localhost:8001/lol.html`.
   - La cible `lol-fr` vient du `scummvm.ini` écrit par le script : chemin du jeu, `language=fr`.
     Sans la langue, le jeu est détecté en anglais et cherche `ENG/`.
   - Le navigateur ne télécharge ce `scummvm.ini` qu'au premier lancement, puis garde sa copie
-    dans IndexedDB. Pour reprendre une nouvelle version du fichier, il faut effacer les
-    données du site `localhost:8001`.
+    dans IndexedDB. Le lanceur `lol.html` remet à jour la section `[lol-fr]` (ci-dessous).
 - **Déplacements ZQSD** (vérifié 2026-11-09). Le moteur expose ses touches par le
   « keymapper » de ScummVM : clavier `lolkeyb`, actions `MVF`, `MVB`, `SLL`, `SLR`, `TL`, `TR`
   (`engine/lol.cpp`). Par défaut : flèches haut et bas, flèches gauche et droite (pas de
   côté), Origine et Page préc. (tourner).
-  - Le `scummvm.ini` ajoute Z, S, Q, D, A et E : `keymap_lolkeyb_MVF=UP z`, etc.
+  - ScummVM web lit la **position physique** des touches avec des noms QWERTY. Sur un clavier
+    AZERTY, Z arrive comme « w », Q comme « a » et A comme « q ».
+  - Le `scummvm.ini` ajoute donc, aux positions AZERTY : Z avancer (`w`), S reculer (`s`),
+    Q / D tourner (`a`, `d`), A / E pas de côté (`q`, `e`).
+  - Exemple : `keymap_lolkeyb_MVF=UP w`.
+  - Rotations et pas de côté sont inversés par rapport à la version DOSBox, à la demande de
+    l'utilisateur.
   - Le jeu désactive ce clavier pendant la saisie d'un nom de sauvegarde (`gui_lol.cpp`), ce qui
     remplace la détection de pause de la version DOSBox.
-  - Test : Z avance, E tourne à droite, D fait un pas à droite. Dans le nom de sauvegarde, les
-    lettres s'écrivent.
-  - Les touches suivent la disposition du clavier (code de touche), pas la position physique
-    comme dans la version DOSBox. Sur un clavier AZERTY, c'est la même chose.
+  - Test avec un clavier AZERTY simulé (code physique + lettre AZERTY) : Z avance, Q tourne,
+    D tourne dans l'autre sens, A fait un pas de côté à gauche.
+  - Dans le nom de sauvegarde, les lettres s'écrivent : le clavier du jeu est bien désactivé.
+- **Lanceur `lol.html`.** Le navigateur garde son `scummvm.ini` dans IndexedDB (base
+  `/home/web_user`, magasin `FILE_DATA`). S'il avait été créé avant la cible `lol-fr`,
+  ScummVM s'arrêtait (`exit(1)`).
+  - `lol.html` est généré à partir de `scummvm.html`. Avant de charger `scummvm.js`, il
+    remplace la section `[lol-fr]` du fichier gardé par celle du serveur.
+  - Vérifié : section retirée à la main, rechargement, la section revient avec les touches et
+    le jeu démarre.
 - **Vérifié** (test automatisé, son coupé, WebGL logiciel SwiftShader) : le jeu est détecté
   « CD/DOS/French ». L'intro, le menu titre (« Nouvelle Partie ») et la sélection du
   personnage s'affichent en français.

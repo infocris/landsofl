@@ -12,12 +12,17 @@ le STARTUP.PAK réunit STARTUP.PAK et STARTIN.PAK. Le dossier du jeu n'est pas m
 
 Déplacements ZQSD : le scummvm.ini servi (copié dans le navigateur au premier lancement, puis
 gardé dans IndexedDB) déclare la cible « lol-fr » et ajoute aux actions de déplacement du jeu
-(clavier « lolkeyb » de ScummVM) les touches Z avancer, S reculer, Q / D pas de côté,
-A / E tourner, en plus des touches d'origine. Le jeu désactive lui-même ce clavier pendant la
+(clavier « lolkeyb » de ScummVM) les touches aux positions ZQSD d'un clavier AZERTY : Z avancer,
+S reculer, Q / D tourner, A / E pas de côté, en plus des touches d'origine. Le jeu désactive lui-même ce clavier pendant la
 saisie d'un nom de sauvegarde (gui_lol.cpp), et ses actions ne servent qu'en exploration.
 
+Le navigateur ne télécharge scummvm.ini qu'une fois : s'il en garde déjà un (IndexedDB, base
+« /home/web_user »), la cible lol-fr peut y manquer et ScummVM s'arrête (exit 1). La page
+lol.html, générée à partir de scummvm.html, remplace donc la section [lol-fr] du fichier gardé
+par celle du serveur avant de charger scummvm.js. Le reste du fichier (réglages) est conservé.
+
 Usage : python3 -I tools/scummvm_web.py [port]   (8001 par défaut)
-Puis : http://localhost:8001/scummvm.html#lol-fr
+Puis : http://localhost:8001/lol.html
 """
 import functools, http.server, os, struct, subprocess, sys
 
@@ -52,7 +57,11 @@ def write_pak(path, files):
 
 
 # Touches ajoutées aux actions de déplacement (identifiants des actions : engines/kyra/engine/lol.cpp)
-ZQSD = {"MVF": "UP z", "MVB": "DOWN s", "SLL": "LEFT q", "SLR": "RIGHT d", "TL": "HOME a", "TR": "PAGEUP e"}
+# ScummVM web lit la position physique des touches avec des noms QWERTY : sur un clavier AZERTY,
+# Z arrive comme « w », Q comme « a », A comme « q ». On nomme donc les touches en QWERTY pour
+# garder les positions ZQSD (comme la version DOSBox, qui se fonde sur event.code).
+# Q / D (AZERTY) tournent, A / E font un pas de côté (choix de l'utilisateur, 2026-11-09).
+ZQSD = {"MVF": "UP w", "MVB": "DOWN s", "TL": "HOME a", "TR": "PAGEUP d", "SLL": "LEFT q", "SLR": "RIGHT e"}
 TARGET = "lol-fr"
 
 
@@ -63,6 +72,49 @@ def write_ini():
     lines += [f"keymap_lolkeyb_{a}={keys}" for a, keys in ZQSD.items()]
     with open(os.path.join(BUILD, "scummvm.ini"), "w") as f:
         f.write("\n".join(lines) + "\n")
+
+
+# Lanceur : met à jour la section [lol-fr] du scummvm.ini gardé par le navigateur, puis charge ScummVM
+LAUNCH_JS = r"""<script>
+(() => {
+  if (!location.hash) history.replaceState(null, "", "#__TARGET__");
+  const DB = "/home/web_user", KEY = DB + "/scummvm.ini", SEC = "[__TARGET__]";
+  const start = () => { const s = document.createElement("script"); s.src = "scummvm.js"; document.body.appendChild(s); };
+  const section = (t) => { const i = t.indexOf(SEC); if (i < 0) return ""; const j = t.indexOf("\n[", i + 1); return j < 0 ? t.slice(i) : t.slice(i, j + 1); };
+  fetch("scummvm.ini", { cache: "no-store" }).then((r) => r.text()).then((ini) => new Promise((done) => {
+    const ours = section(ini);
+    const req = indexedDB.open(DB);
+    req.onupgradeneeded = () => req.transaction.abort();          // pas encore de réglages : ScummVM téléchargera le fichier
+    req.onerror = () => done();
+    req.onsuccess = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("FILE_DATA")) { db.close(); return done(); }
+      const st = db.transaction("FILE_DATA", "readwrite").objectStore("FILE_DATA");
+      const get = st.get(KEY);
+      get.onsuccess = () => {
+        const rec = get.result;
+        if (rec && rec.contents && ours) {
+          const old = new TextDecoder().decode(rec.contents);
+          const cur = section(old);
+          const txt = cur ? old.replace(cur, ours) : old.replace(/\n*$/, "\n\n") + ours;
+          if (txt !== old) st.put({ ...rec, timestamp: new Date(), contents: new TextEncoder().encode(txt) }, KEY);
+        }
+      };
+      st.transaction.oncomplete = st.transaction.onerror = () => { db.close(); done(); };
+    };
+  })).catch(() => {}).then(start);
+})();
+</script>"""
+
+
+def write_launcher():
+    html = open(os.path.join(BUILD, "scummvm.html"), encoding="utf-8").read()
+    tag = "<script async src=scummvm.js></script>"
+    if tag not in html:
+        sys.exit("scummvm.html : balise de chargement de scummvm.js introuvable.")
+    html = html.replace(tag, LAUNCH_JS.replace("__TARGET__", TARGET))
+    html = html.replace("<title>ScummVM</title>", "<title>Lands of Lore (ScummVM)</title>")
+    open(os.path.join(BUILD, "lol.html"), "w", encoding="utf-8").write(html)
 
 
 def prepare():
@@ -84,6 +136,7 @@ def prepare():
     write_pak(out, merged)
     # index.json de chaque dossier, lus par le système de fichiers HTTP de ScummVM
     write_ini()
+    write_launcher()
     subprocess.run([sys.executable, os.path.join(SVM, "dists", "emscripten", "build-make_http_index.py"),
                     os.path.join(BUILD, "data")], check=True, stdout=subprocess.DEVNULL)
 
@@ -91,6 +144,6 @@ def prepare():
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8001
     prepare()
-    print(f"http://localhost:{port}/scummvm.html#{TARGET}")
+    print(f"http://localhost:{port}/lol.html")
     handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=BUILD)
     http.server.ThreadingHTTPServer(("127.0.0.1", port), handler).serve_forever()
