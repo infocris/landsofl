@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lands of Lore (ScummVM)</title>
+<!-- ?v= : à changer à chaque modification des scripts (évite les copies en cache) -->
+<script src="memscan.js?v=20261108g"></script>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; }
+  /* pas de retour arrière par balayage horizontal du pavé tactile (Chrome, Edge) */
+  html, body { overscroll-behavior: none; }
+  body { display: flex; }
+  /* colonne de gauche : jeu, puis vue 3D synchronisée */
+  #left { flex: 1; min-width: 0; height: 100vh; display: flex; flex-direction: column; }
+  #dos { flex: 3; min-height: 0; }
+  #v3d { flex: 2; min-height: 160px; border-top: 1px solid #3a3226; background: #000; }
+  #v3d.hidden { display: none; }
+  #v3d iframe { width: 100%; height: 100%; border: 0; display: block; }
+  :root { --mm-size: 384px; --mm-w: max(420px, calc(var(--mm-size) + 36px)); }
+  #mm { width: var(--mm-w); flex: none; box-sizing: border-box; padding: 12px; background: #0f0d0a;
+    border-left: 1px solid #3a3226; color: #e8dcc0; font: 13px/1.4 system-ui, sans-serif;
+    display: flex; flex-direction: column; gap: 8px; height: 100vh; overflow-y: auto; overflow-x: hidden; }
+  #mm-items { margin: 0; padding: 0; list-style: none; overflow-y: auto; flex: 1; min-height: 60px;
+    border-top: 1px solid #3a3226; padding-top: 6px; font-size: 12px; }
+  #mm-items li { display: flex; gap: 6px; padding: 2px 0; color: #cfc3a6; }
+  #mm-items li.near { color: #fff; background: rgba(40, 220, 230, .12); }
+  #mm-items b { flex: none; min-width: 1.8em; text-align: right; color: #28dce6; }
+  #mm-items span.pos { margin-left: auto; color: #7d7058; flex: none; }
+  #mm-items i.cat { flex: none; width: 16px; height: 16px; background: url("viewer/data/item_icons.png") no-repeat;
+    background-size: 256px auto; image-rendering: auto; }
+  #mm-items-title { color: #a39578; font-size: 12px; }
+  #mm-places { margin: 0; padding: 4px 0 0; list-style: none; font-size: 12px; max-height: 132px; overflow-y: auto;
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px 10px; flex: none; }
+  #mm-places li { display: flex; gap: 6px; padding: 1px 2px; color: #cfc3a6; cursor: default; border-radius: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #mm-places li:hover { background: rgba(255, 215, 0, .12); }
+  #mm-places li.near { color: #fff; background: rgba(221, 34, 34, .22); }
+  #mm-places b { flex: none; min-width: 1.6em; text-align: center; color: #fff; background: #d22; border-radius: 2px;
+    font-size: 11px; line-height: 1.5; }
+  #mm-places span { overflow: hidden; text-overflow: ellipsis; }
+  #mm-places-title { color: #a39578; font-size: 12px; border-top: 1px solid #3a3226; padding-top: 6px; }
+  #stats { border-top: 1px solid #3a3226; padding-top: 6px; font-size: 12px; color: #cfc3a6; }
+  #st-money { color: #e8dcc0; }
+  #cheats { display: flex; gap: 14px; margin-top: 4px; color: #a39578; font-size: 11px; }
+  #cheats input { accent-color: #c9a227; vertical-align: -2px; }
+  #cheats button { margin-left: auto; font: 11px/1 system-ui, sans-serif; padding: 3px 7px; cursor: pointer;
+    background: #1d1912; color: #e8dcc0; border: 1px solid #6d5a3a; border-radius: 4px; }
+  .st-char { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin-top: 3px; align-items: center; }
+  .st-char .nm { grid-column: 1 / -1; color: #a39578; font-weight: 600; cursor: pointer; user-select: none; display: flex; gap: 8px; align-items: baseline; }
+  .st-char .nm::before { content: "▾"; color: #c9a227; width: 10px; }
+  .st-char .nm .sum { display: none; font-weight: 400; color: #cfc3a6; }
+  .st-char.folded .nm::before { content: "▸"; }
+  .st-char.folded .nm .sum { display: inline; }
+  .st-char.folded > :not(.nm) { display: none; }
+  .bar { position: relative; height: 10px; background: #17130e; border: 1px solid #3a3226; }
+  .bar i { position: absolute; inset: 0 auto 0 0; display: block; }
+  .bar span { position: absolute; inset: -2px 4px; font-size: 10px; line-height: 12px; color: #fff; text-shadow: 0 0 2px #000; }
+  .bar.hp i { background: #2f8f3a; } .bar.mp i { background: #2f4f9f; }
+  .lvup { margin-left: 3px; padding: 0 4px; font: 600 10px/13px system-ui, sans-serif; border: 1px solid #6d5a3a;
+    border-radius: 3px; background: #1d1912; color: #c9a227; cursor: pointer; vertical-align: 1px; }
+  .lvup:hover { background: #2a2217; color: #fff; }
+  .st-skills { grid-column: 1 / -1; color: #cfc3a6; }
+  #inv { border-top: 1px solid #3a3226; padding-top: 6px; font-size: 12px; color: #cfc3a6; }
+  #inv .inv-title { color: #c9a227; font-weight: 600; margin-bottom: 2px; }
+  #inv .inv-head { display: flex; align-items: baseline; gap: 8px; }
+  #inv .inv-actions { margin-left: auto; display: flex; gap: 4px; }
+  #inv-add { display: flex; gap: 4px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+  #inv-add input { flex: 1; min-width: 160px; font: 12px system-ui, sans-serif; padding: 3px 6px; background: #17130e;
+    color: #e8dcc0; border: 1px solid #554a36; border-radius: 4px; }
+  #inv-add button { font: 11px/1 system-ui, sans-serif; padding: 4px 8px; border: 1px solid #c9a227; border-radius: 4px;
+    background: #1d1912; color: #e8dcc0; cursor: pointer; }
+  #inv-add-msg { color: #a39578; font-size: 11px; width: 100%; }
+  #inv-add-msg:empty { display: none; }
+  #inv .inv-actions button { font: 11px/1 system-ui, sans-serif; padding: 3px 6px; border: 1px solid #554a36;
+    border-radius: 4px; background: #1d1912; color: #e8dcc0; cursor: pointer; }
+  #inv .inv-actions button:hover { background: #2a2217; }
+  #inv-count, #inv .inv-sub { color: #a39578; font-size: 11px; }
+  #inv .inv-sub { margin-top: 6px; }
+  .inv-grid { display: grid; grid-template-columns: repeat(12, 30px); gap: 2px; margin-top: 3px; }
+  #inv-handrow { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: #a39578; font-size: 11px; }
+  .slot { width: 30px; height: 30px; box-sizing: border-box; border: 1px solid #3a3226; background-color: #17130e;
+    image-rendering: pixelated; }
+  .slot.full { background-color: #2a2217; border-color: #6d5a3a;
+    background-image: url("viewer/data/item_icons.png"); background-size: 480px auto; background-repeat: no-repeat;
+    cursor: pointer; }
+  .slot.full:hover { border-color: #c9a227; }
+  .slot.sel { outline: 2px solid #c9a227; outline-offset: -1px; }
+  #inv-detail { margin-top: 8px; padding: 8px; border: 1px solid #554a36; border-radius: 6px; background: #17130e;
+    display: grid; grid-template-columns: 30px 1fr auto; gap: 2px 8px; align-items: start; }
+  #inv-detail[hidden] { display: none; }
+  #inv-detail .slot { grid-row: span 3; cursor: default; }
+  #inv-detail .nm { color: #e8dcc0; font-weight: 600; font-size: 13px; }
+  #inv-detail .kd { color: #a39578; grid-column: 2; }
+  #inv-detail .x { grid-row: 1; grid-column: 3; background: none; border: 0; color: #a39578; cursor: pointer; font-size: 14px; padding: 0 2px; }
+  #inv-detail ul { grid-column: 2 / 4; margin: 2px 0 0; padding-left: 16px; }
+  #inv-detail .txt { grid-column: 1 / 4; margin-top: 4px; padding: 6px 8px; background: #e8dcc0; color: #2a2217;
+    font: italic 12px/1.4 Georgia, serif; border-radius: 3px; white-space: pre-wrap; }
+  #inv-detail .note { grid-column: 1 / 4; color: #7d7058; font-size: 11px; margin-top: 2px; }
+  #mm-tip { position: fixed; z-index: 2000; pointer-events: none; max-width: 300px; padding: 6px 8px;
+    background: rgba(12, 10, 8, .94); border: 1px solid #6d5a3a; border-radius: 6px; color: #e8dcc0;
+    font: 12px/1.4 system-ui, sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,.6); }
+  #mm-tip[hidden] { display: none; }
+  #mm-tip b { color: #c9a227; }
+  #mm-tip .t { color: #a39578; }
+  #mm-tip .it { color: #28dce6; }
+  #mm-tip .mo { color: #ff8c00; }
+  #mm-tip .lb { color: #ff6b6b; font-weight: 600; }
+  #mm-tip .ky { color: #ffd700; }
+  #mm-tip .sw { color: #7cfc00; }
+  #mm-tip .fr { color: #ff7a1a; }
+  #mm-tip .ch { color: #e0b070; }
+  #mm-tip .st { color: #8fe3ff; }
+  #mm-tip .tp { color: #ff8ae6; }
+  #mm-tip .sc { color: #5ef2c2; }
+  #inv-detail .cmp { grid-column: 1 / -1; margin-top: 6px; padding-top: 5px; border-top: 1px solid #3a3226; font-size: 11px; }
+  #inv-detail .cmp-h { color: #c9a227; font-weight: 600; margin-bottom: 3px; }
+  #inv-detail .cmp-r { margin: 2px 0; color: #d8ccb0; }
+  #inv-detail .cmp .up { color: #4ade80; } #inv-detail .cmp .down { color: #ff6b6b; } #inv-detail .cmp .eq { color: #a39578; }
+  #mm-tip img.pl { display: block; width: 264px; margin: 5px 0 2px; image-rendering: pixelated; border: 1px solid #3a3226; }
+  #mm-tip .bt { color: #c77dff; }
+  #mm-canvas { cursor: crosshair; }
+  #mm.hidden { display: none; }
+  #mm-title { font-weight: 600; color: #c9a227; display: flex; align-items: center; gap: 6px; }
+  #mm-title button { font: 600 13px/1 system-ui, sans-serif; width: 24px; height: 22px; padding: 0;
+    border: 1px solid #554a36; border-radius: 4px; background: #1d1912; color: #e8dcc0; cursor: pointer; }
+  #mm-title button:first-of-type { margin-left: auto; }
+  #mm-title button:disabled { opacity: .35; cursor: default; }
+  #mm-title #mm-tex { width: 28px; }
+  #mm-title #mm-tex.on { border-color: #c9a227; color: #c9a227; }
+  #mm-info { color: #a39578; min-height: 1.4em; }
+  #mm-canvas { width: var(--mm-size); height: var(--mm-size); align-self: center; border: 1px solid #3a3226; flex: none; }
+  #mm-label { color: #c9a227; font-weight: 600; letter-spacing: .04em; min-height: 1.4em; }
+  #mm-legend { color: #a39578; font-size: 11px; }
+  #mm-legend i { display: inline-block; width: 9px; height: 9px; margin: 0 3px 0 8px; vertical-align: -1px; }
+  #mm-legend i:first-child { margin-left: 0; }
+  #mmtoggle { position: fixed; right: 12px; bottom: 48px; z-index: 1000;
+    font: 12px/1 system-ui, sans-serif; padding: 6px 10px; border: 1px solid #555; border-radius: 6px;
+    background: rgba(0,0,0,.6); color: #aaa; cursor: pointer; }
+  #qload { position: fixed; right: 12px; bottom: 84px; z-index: 1000;
+    font: 12px/1 system-ui, sans-serif; padding: 6px 10px; border: 1px solid #c9a227; border-radius: 6px;
+    background: rgba(0,0,0,.6); color: #fff; cursor: pointer; }
+  #qload[hidden] { display: none; }
+  /* boutons à gauche du panneau quand il est ouvert */
+  body:has(#mm:not(.hidden)) #zqsd, body:has(#mm:not(.hidden)) #mmtoggle,
+  body:has(#mm:not(.hidden)) #qload, body:has(#mm:not(.hidden)) #v3dtoggle { right: calc(var(--mm-w) + 12px); }
+  #persp { position: fixed; right: 12px; bottom: 156px; z-index: 1000;
+    font: 12px/1 system-ui, sans-serif; padding: 6px 10px; border: 1px solid #555; border-radius: 6px;
+    background: rgba(0,0,0,.6); color: #ddd; cursor: pointer; }
+  body:has(#mm:not(.hidden)) #persp { right: calc(var(--mm-w) + 12px); }
+  body:has(#v3d.hidden) #persp { display: none; }
+  #v3dtoggle { position: fixed; right: 12px; bottom: 120px; z-index: 1000;
+    font: 12px/1 system-ui, sans-serif; padding: 6px 10px; border: 1px solid #555; border-radius: 6px;
+    background: rgba(0,0,0,.6); color: #aaa; cursor: pointer; }
+  @media (max-width: 800px) { #mm { display: none; } #zqsd, #mmtoggle, #qload, #v3dtoggle { right: 12px !important; } }
+  #zqsd {
+    position: fixed; right: 12px; bottom: 12px; z-index: 1000;
+    font: 12px/1 system-ui, sans-serif; padding: 6px 10px;
+    border: 1px solid #555; border-radius: 6px;
+    background: rgba(0,0,0,.6); color: #aaa; cursor: pointer; opacity: .6;
+  }
+  #zqsd:hover { opacity: 1; }
+  #zqsd.paused { display: none; }
+  #zqsd[data-on="true"] { color: #fff; border-color: #c9a227; }
+  /* placé à droite des flèches de déplacement du jeu (position calculée dans placeZqsd) */
+  #zqsd.ingame { right: auto !important; bottom: auto; transform: translateY(-50%); padding: .35em .6em;
+    line-height: 1.15; text-align: center; opacity: .85; background: rgba(20, 14, 8, .75); }
+</style>
+<style>
+  /* version ScummVM : jeu dans un cadre ; pas de triches ni de création d'objets (pas d'écriture en mémoire) */
+  iframe#dos { border: 0; display: block; width: 100%; background: #000; }
+  #cheats, #inv-add, #zqsd, #qload { display: none !important; }
+</style>
+</head>
+<body>
+<div id="left">
+  <iframe id="dos" src="lol-game.html#lol-fr" title="Lands of Lore (ScummVM)" allow="autoplay; fullscreen"></iframe>
+  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261109o" title="Vue 3D synchronisée"></iframe></div>
+</div>
+<aside id="mm" aria-label="Mini-carte">
+  <div id="mm-title"><span>Mini-carte</span><button id="mm-tex" type="button" title="Cases illustrées avec les textures du lieu / couleurs simples">▦</button><button id="mm-smaller" type="button" title="Réduire la mini-carte">−</button><button id="mm-bigger" type="button" title="Agrandir la mini-carte">+</button></div>
+  <div id="mm-info">chargement…</div>
+  <canvas id="mm-canvas"></canvas>
+  <div id="mm-label"></div>
+  <div id="mm-legend"><i style="background:#8a7f68"></i>sol<i style="background:#2b2b2b;outline:1px solid #555"></i>mur<i style="background:#a0522d"></i>porte fermée<i style="background:#d08a4a"></i>ouverte<i style="background:#d22"></i>lieu<i style="background:#28dce6"></i>objets<i style="background:none;border:2px solid #ffd700;border-radius:50%;width:5px;height:5px"></i>serrure<i style="background:#8b5a2b;border-top:2px solid #ffd700;height:5px"></i>coffre<i style="background:#8fe3ff;clip-path:polygon(50% 0,100% 100%,0 100%)"></i>monte<i style="background:#c58cff;clip-path:polygon(0 0,100% 0,50% 100%)"></i>descend<i style="background:#111;border:1px solid #9a9a9a;border-radius:50%"></i>trou<i style="background:#fff;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)"></i>passage<i style="background:radial-gradient(circle,#fff 0,#ff4fd8 40%,#5a0078 100%);border-radius:50%"></i>téléporteur<i style="background:#7cfc00;height:4px"></i>levier<i style="background:#c77dff;border-radius:50%;width:6px;height:6px"></i>cliquable<i style="background:linear-gradient(135deg,transparent 40%,#ff7a1a 40%,#ff7a1a 60%,transparent 60%)"></i>mur fragile<i style="background:#2f6b5c;outline:1px dashed #5ef2c2;outline-offset:-1px"></i>passage caché<i style="background:#4ade80;border-radius:50%"></i>paisible<i style="background:#ff3b30;border-radius:50%"></i>hostile<i style="background:#ff8c00;border-radius:50%"></i>autre</div>
+  <div id="mm-places-title">Lieux du niveau</div>
+  <ol id="mm-places"></ol>
+  <div id="stats">
+    <div class="inv-head"><span class="inv-title">Caractéristiques</span><span id="st-money"></span></div>
+    <div id="st-chars"></div>
+    <div id="cheats"><label><input type="checkbox" id="cheat-hp"> Vie infinie</label>
+      <label><input type="checkbox" id="cheat-mp"> Magie infinie</label>
+      <button type="button" id="cheat-money" title="Ajoute 100 couronnes d'argent au groupe">+100 couronnes</button></div>
+  </div>
+  <div id="inv">
+    <div class="inv-head"><span class="inv-title">Inventaire</span><span id="inv-count">en attente du jeu…</span><span class="inv-actions"><button type="button" id="inv-copy" title="Copier le contenu de l'inventaire en texte">Copier</button><button type="button" id="inv-save" title="Enregistrer le contenu de l'inventaire dans un fichier texte">.txt</button></span></div>
+    <div id="inv-bar" class="inv-grid"></div>
+    <div id="inv-handrow">En main <span id="inv-hand"></span></div>
+    <div id="inv-chars"></div>
+    <div id="inv-add"><input id="inv-add-name" list="inv-add-list" placeholder="Créer un objet : nom ou numéro…" autocomplete="off">
+      <datalist id="inv-add-list"></datalist><button type="button" id="inv-add-btn">Créer</button><span id="inv-add-msg"></span></div>
+    <div id="inv-detail" hidden></div>
+  </div>
+  <div id="mm-items-title">Objets du niveau</div>
+  <ol id="mm-items"></ol>
+</aside>
+<button id="v3dtoggle" type="button" title="Afficher/masquer la vue 3D (F10)">3D</button>
+<button id="persp" type="button" title="Perspective de la vue 3D : celle du jeu d'origine ou une perspective réelle"></button>
+<div id="mm-tip" hidden></div>
+<button id="mmtoggle" type="button" title="Afficher/masquer la mini-carte (F9)">Carte</button>
+<button id="qload" type="button" title="Recharger l'état enregistré avec F6 (QUICK.SAV)" hidden>F7 · charger l'état</button>
+<button id="zqsd" type="button" title="Activer/désactiver les touches ZQSD (F8)"></button>
+<script>
+(() => {
+  // Mini-carte et vue 3D : affichage mémorisé (mêmes réglages que la version DOSBox)
+  const mm = document.getElementById("mm"), v3d = document.getElementById("v3d");
+  const game = document.getElementById("dos");
+  function toggle(el, key, force) {
+    const show = force !== undefined ? force : el.classList.contains("hidden");
+    el.classList.toggle("hidden", !show);
+    try { localStorage.setItem(key, show ? "on" : "off"); } catch (e) {}
+    window.dispatchEvent(new Event("resize"));
+  }
+  try { if (localStorage.getItem("minimap") === "off") mm.classList.add("hidden"); } catch (e) {}
+  try { if (localStorage.getItem("view3d") === "off") v3d.classList.add("hidden"); } catch (e) {}
+  const toggleMap = (f) => toggle(mm, "minimap", f), toggle3d = (f) => toggle(v3d, "view3d", f);
+  // Boutons : on rend ensuite la main au jeu (sinon le clavier reste sur la page)
+  const back = (e) => { e.currentTarget.blur(); game.focus(); };
+  document.getElementById("mmtoggle").addEventListener("click", (e) => { toggleMap(); back(e); });
+  document.getElementById("v3dtoggle").addEventListener("click", (e) => { toggle3d(); back(e); });
+  // F9 / F10 aussi depuis le jeu (le cadre a le clavier) : écouteur ajouté dans sa fenêtre
+  const keys = (e) => {
+    if (e.code === "F9") { toggleMap(); e.preventDefault(); e.stopPropagation(); }
+    if (e.code === "F10") { toggle3d(); e.preventDefault(); e.stopPropagation(); }
+  };
+  addEventListener("keydown", keys, true);
+  game.addEventListener("load", () => { try { game.contentWindow.addEventListener("keydown", keys, true); } catch (e) {} game.focus(); });
+  // Perspective de la vue 3D : « jeu » ou « réelle »
+  const perspBtn = document.getElementById("persp");
+  let perspMode = "jeu";
+  try { perspMode = localStorage.getItem("persp") || "jeu"; } catch (e) {}
+  function sendPersp() {
+    perspBtn.textContent = "Perspective : " + (perspMode === "jeu" ? "jeu" : "réelle");
+    const f = document.getElementById("v3d-frame");
+    if (f && f.contentWindow) f.contentWindow.postMessage({ type: "lol-persp", mode: perspMode }, location.origin);
+  }
+  perspBtn.addEventListener("click", (e) => {
+    perspMode = perspMode === "jeu" ? "reelle" : "jeu";
+    try { localStorage.setItem("persp", perspMode); } catch (err) {}
+    sendPersp(); back(e);
+  });
+  document.getElementById("v3d-frame").addEventListener("load", sendPersp);
+  sendPersp();
+})();
+</script>
+<script src="minimap.js?v=20261109p"></script>
+</body>
+</html>

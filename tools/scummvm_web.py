@@ -1,13 +1,19 @@
 """ScummVM web (WebAssembly), à part de la version DOSBox : prépare le jeu et sert la page.
 
-Prérequis : ScummVM compilé pour le web dans third_party/scummvm/build-emscripten
-(moteur Kyra seul, voir docs/retro-conception.md, § 10 bis) :
+Le site ScummVM est versionné dans web/scummvm (comme les émulateurs de la version DOSBox dans
+web/public/emulators) : scummvm.wasm/.js, données de ScummVM, licences (doc/), pages générées.
+Origine exacte : web/scummvm/VERSION.txt. Les fichiers du jeu (data/games) ne sont pas versionnés.
+
+Recompiler (facultatif) : dans third_party/scummvm (clone de github.com/scummvm/scummvm, branche
+locale lol-web = commit noté dans VERSION.txt + tools/scummvm/lol-web-state.patch), moteur Kyra seul
+(voir docs/retro-conception.md, § 10 bis) :
   ./dists/emscripten/build.sh setup configure make dist --disable-all-engines --enable-engine=kyra,lol
+puis copier le résultat dans web/scummvm : python3 -I tools/scummvm_web.py import
 
 ScummVM attend la disposition du CD d'origine : fichiers de l'intro dans un dossier par langue
 (FRE/GENERAL.PAK, FRE/STARTUP.PAK, INTRO1-9.PAK…). L'installation (extracted-cd/app/C/LOLCD)
 les a mis à plat et a séparé les polices de l'intro dans STARTIN.PAK. On construit donc, dans
-build-emscripten/data/games/lol, des liens vers les fichiers du jeu, plus un dossier FRE/ dont
+web/scummvm/data/games/lol, des liens vers les fichiers du jeu, plus un dossier FRE/ dont
 le STARTUP.PAK réunit STARTUP.PAK et STARTIN.PAK. Le dossier du jeu n'est pas modifié.
 
 Déplacements ZQSD : le scummvm.ini servi (copié dans le navigateur au premier lancement, puis
@@ -18,22 +24,23 @@ saisie d'un nom de sauvegarde (gui_lol.cpp), et ses actions ne servent qu'en exp
 
 Le navigateur ne télécharge scummvm.ini qu'une fois : s'il en garde déjà un (IndexedDB, base
 « /home/web_user »), la cible lol-fr peut y manquer et ScummVM s'arrête (exit 1). La page
-lol.html, générée à partir de scummvm.html, remplace donc la section [lol-fr] du fichier gardé
+lol-game.html, générée à partir de scummvm.html, remplace donc la section [lol-fr] du fichier gardé
 par celle du serveur avant de charger scummvm.js. Le reste du fichier (réglages) est conservé.
 
 Mini-carte, vue 3D et panneau, comme la version DOSBox : le moteur, modifié par
-tools/scummvm/lol-web-state.patch (à appliquer dans third_party/scummvm avant de compiler),
+tools/scummvm/lol-web-state.patch (déjà compilé dans web/scummvm/scummvm.wasm),
 publie toutes les 150 ms l'état du jeu rangé comme dans la mémoire du jeu DOS, aux mêmes
 adresses (grille, monstres, objets, groupe, drapeaux…). La page du jeu (lol-game.html) répond
 avec ces octets sur le canal « lol-mem », comme l'émulateur DOSBox : minimap.js fonctionne sans
 changement. La page lol.html reprend web/public/index.html (panneau, vue 3D), avec ScummVM dans
-un cadre à la place de js-dos. Les fichiers absents du build sont servis depuis web/public.
+un cadre à la place de js-dos. Les fichiers absents de web/scummvm sont servis depuis web/public.
 Les triches (écritures en mémoire) ne sont pas disponibles : leurs commandes sont masquées.
 
 Usage : python3 -I tools/scummvm_web.py [port]   (8001 par défaut)
+        python3 -I tools/scummvm_web.py import   (copie un nouveau build dans web/scummvm)
 Puis : http://localhost:8001/lol.html  (jeu seul : lol-game.html)
 """
-import functools, http.server, os, re, struct, subprocess, sys
+import datetime, functools, http.server, json, os, re, shutil, struct, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
@@ -42,7 +49,9 @@ from pak import read_pak
 GAME = os.path.join(ROOT, "extracted-cd", "app", "C", "LOLCD")
 SVM = os.path.join(ROOT, "third_party", "scummvm")
 BUILD = os.path.join(SVM, "build-emscripten")
-DEST = os.path.join(BUILD, "data", "games", "lol")
+SITE = os.path.join(ROOT, "web", "scummvm")          # version servie et versionnée
+DEST = os.path.join(SITE, "data", "games", "lol")
+PATCH = os.path.join(ROOT, "tools", "scummvm", "lol-web-state.patch")
 PUBLIC = os.path.join(ROOT, "web", "public")
 INTRO = ["GENERAL.PAK", "INTROVOC.PAK", "INTRO1.PAK", "INTRO2.PAK", "INTRO3.PAK", "INTRO4.PAK", "INTRO5.PAK",
          "INTRO6.PAK", "INTRO7.PAK", "INTRO8.PAK", "INTRO9.PAK", "HISTORY.PAK"]
@@ -80,7 +89,7 @@ def write_ini():
              "description=Lands of Lore: The Throne of Chaos (CD/DOS/French)",
              "path=/data/games/lol", "language=fr", "platform=pc"]
     lines += [f"keymap_lolkeyb_{a}={keys}" for a, keys in ZQSD.items()]
-    with open(os.path.join(BUILD, "scummvm.ini"), "w") as f:
+    with open(os.path.join(SITE, "scummvm.ini"), "w") as f:
         f.write("\n".join(lines) + "\n")
 
 
@@ -226,13 +235,13 @@ PAGE_CSS = """<style>
 
 
 def write_launcher():
-    html = open(os.path.join(BUILD, "scummvm.html"), encoding="utf-8").read()
+    html = open(os.path.join(SITE, "scummvm.html"), encoding="utf-8").read()
     tag = "<script async src=scummvm.js></script>"
     if tag not in html:
         sys.exit("scummvm.html : balise de chargement de scummvm.js introuvable.")
     html = html.replace(tag, LAUNCH_JS.replace("__TARGET__", TARGET))
     html = html.replace("<title>ScummVM</title>", "<title>Lands of Lore (ScummVM)</title>")
-    open(os.path.join(BUILD, "lol-game.html"), "w", encoding="utf-8").write(html)
+    open(os.path.join(SITE, "lol-game.html"), "w", encoding="utf-8").write(html)
 
 
 def write_page():
@@ -251,23 +260,23 @@ def write_page():
         html, n = re.subn(pat, lambda m: rep, html, count=1, flags=re.S)
         if n != 1:
             sys.exit(f"web/public/index.html : motif introuvable ({pat[:40]}…)")
-    open(os.path.join(BUILD, "lol.html"), "w", encoding="utf-8").write(html)
+    open(os.path.join(SITE, "lol.html"), "w", encoding="utf-8").write(html)
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
-    """Fichiers du build ScummVM, sinon ceux de web/public (mini-carte, vue 3D, données des niveaux)."""
+    """Fichiers de web/scummvm, sinon ceux de web/public (mini-carte, vue 3D, données des niveaux)."""
     def translate_path(self, path):
         p = super().translate_path(path)
         if not os.path.exists(p):
-            alt = os.path.join(PUBLIC, os.path.relpath(p, BUILD))
+            alt = os.path.join(PUBLIC, os.path.relpath(p, SITE))
             if os.path.exists(alt):
                 return alt
         return p
 
 
 def prepare():
-    if not os.path.exists(os.path.join(BUILD, "scummvm.wasm")):
-        sys.exit("ScummVM web n'est pas compilé (voir l'en-tête de ce script).")
+    if not os.path.exists(os.path.join(SITE, "scummvm.wasm")):
+        sys.exit("web/scummvm/scummvm.wasm absent (voir l'en-tête de ce script : import).")
     if os.path.islink(DEST):
         os.remove(DEST)
     os.makedirs(os.path.join(DEST, "FRE"), exist_ok=True)
@@ -286,13 +295,63 @@ def prepare():
     write_ini()
     write_launcher()
     write_page()
-    subprocess.run([sys.executable, os.path.join(SVM, "dists", "emscripten", "build-make_http_index.py"),
-                    os.path.join(BUILD, "data")], check=True, stdout=subprocess.DEVNULL)
+    write_http_index(os.path.join(SITE, "data"))
+
+
+def write_http_index(folder):
+    """index.json de chaque dossier (nom -> taille, ou {} pour un sous-dossier), comme
+    dists/emscripten/build-make_http_index.py : lu par le système de fichiers HTTP de ScummVM."""
+    tree = {}
+    for name in sorted(os.listdir(folder)):
+        if name == "index.json" or name.startswith("."):
+            continue
+        path = os.path.join(folder, name)
+        if os.path.isdir(path):
+            write_http_index(path)
+            tree[name] = {}
+        else:
+            tree[name] = os.stat(path).st_size
+    with open(os.path.join(folder, "index.json"), "w", encoding="utf-8") as f:
+        json.dump(tree, f)
+
+
+GENERATED = {"lol.html", "lol-game.html", "scummvm.ini", "index.json", "VERSION.txt"}
+
+
+def import_build():
+    """Copie le build de third_party/scummvm/build-emscripten dans web/scummvm (sans les jeux)."""
+    if not os.path.exists(os.path.join(BUILD, "scummvm.wasm")):
+        sys.exit("third_party/scummvm/build-emscripten/scummvm.wasm absent : compiler d'abord.")
+    for dirpath, dirnames, filenames in os.walk(BUILD):
+        rel = os.path.relpath(dirpath, BUILD)
+        if rel == os.path.join("data", "games") or rel.startswith(os.path.join("data", "games") + os.sep):
+            dirnames[:] = []
+            continue
+        os.makedirs(os.path.join(SITE, rel), exist_ok=True)
+        for name in filenames:
+            if name in GENERATED:
+                continue
+            shutil.copy2(os.path.join(dirpath, name), os.path.join(SITE, rel, name))
+    git = lambda *a: subprocess.run(["git", "-C", SVM, *a], capture_output=True, text=True).stdout.strip()
+    base = git("merge-base", "HEAD", "origin/master")
+    with open(os.path.join(SITE, "VERSION.txt"), "w", encoding="utf-8") as f:
+        f.write("ScummVM (GPL v3, licences dans doc/), portage WebAssembly, moteur Kyra seul.\n"
+                f"Source : https://github.com/scummvm/scummvm, commit {base} "
+                f"({git('log', '-1', '--format=%cs', base)})\n"
+                f"Modification : tools/scummvm/lol-web-state.patch (branche locale {git('rev-parse', '--abbrev-ref', 'HEAD')}, "
+                f"commit {git('rev-parse', '--short', 'HEAD')})\n"
+                "Compilation : dists/emscripten/build.sh setup configure make dist --disable-all-engines "
+                "--enable-engine=kyra,lol (Emscripten 4.0.10)\n"
+                f"Importé le {datetime.date.today().isoformat()}\n")
+    print("build copié dans web/scummvm ; vérifier VERSION.txt")
 
 
 if __name__ == "__main__":
+    if sys.argv[1:] == ["import"]:
+        import_build()
+        sys.exit()
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8001
     prepare()
     print(f"http://localhost:{port}/lol.html")
-    handler = functools.partial(Handler, directory=BUILD)
+    handler = functools.partial(Handler, directory=SITE)
     http.server.ThreadingHTTPServer(("127.0.0.1", port), handler).serve_forever()

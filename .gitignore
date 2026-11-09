@@ -19,3 +19,6 @@ web/server.log
 
 # Sources tierces récupérées pour lecture (ScummVM, GPL) : non versionnées
 third_party/
+
+# ScummVM web (versionné dans web/scummvm) : fichiers du jeu liés localement, non versionnés
+web/scummvm/data/games/

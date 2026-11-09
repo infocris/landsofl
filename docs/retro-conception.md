@@ -664,12 +664,23 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
   - `kyra.dat` est copié automatiquement.
   - Le script de compilation appelle `wget`, absent du Mac : un petit remplaçant fondé sur
     `curl` suffit.
+- **Version versionnée** (2026-11-10). Le site ScummVM est dans le dépôt, `web/scummvm`, comme
+  les émulateurs de la version DOSBox (`web/public/emulators`), ~25 Mo :
+  - `scummvm.wasm` et `scummvm.js`, données de ScummVM (`data/`, dont `kyra.dat`), licences
+    (`doc/`), pages générées (`lol.html`, `lol-game.html`, `scummvm.ini`) ;
+  - `VERSION.txt` : commit d'origine de ScummVM, modification appliquée, commande de
+    compilation ;
+  - les fichiers du jeu (`data/games`) restent locaux (liens, non versionnés).
+  - La modification du moteur est committée sur la branche locale `lol-web` du clone
+    `third_party/scummvm`, et gardée dans le dépôt en patch (`tools/scummvm/lol-web-state.patch`).
+  - Après une recompilation : `python3 -I tools/scummvm_web.py import` copie le build dans
+    `web/scummvm` et réécrit `VERSION.txt`.
 - **Fichiers du jeu.** ScummVM attend la disposition du CD d'origine : `GENERAL.PAK`,
   `STARTUP.PAK`, `INTRO1-9.PAK`, `INTROVOC.PAK` et `HISTORY.PAK` dans un dossier par langue
   (`FRE/`).
   - L'installation les a mis à plat et a sorti les polices de l'intro (`NEW8P.FNT`,
     `NEW6P.FNT`, `INTRO.FNT`) dans `STARTIN.PAK`.
-  - Le script construit `data/games/lol` : des liens vers les fichiers du jeu, plus un
+  - Le script construit `web/scummvm/data/games/lol` : des liens vers les fichiers du jeu, plus un
     `FRE/STARTUP.PAK` qui réunit `STARTUP.PAK` et `STARTIN.PAK`. Le dossier du jeu n'est pas
     modifié.
 - **Lancement.** `python3 -I tools/scummvm_web.py` sert la page sur le port 8001, puis :
@@ -1113,3 +1124,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-09** : sources de ScummVM récupérées, fonctions des scripts confrontées (§ 10 bis).
 - **2026-11-09** : ScummVM web compilé et lancé à part (port 8001), jusqu'à la sélection du personnage (§ 10 bis).
 - **2026-11-10** : ScummVM web : touches reçues plusieurs fois (abonnements clavier de SDL3 en double) corrigé dans le lanceur ; mini-carte, vue 3D et panneau branchés sur l'état publié par le moteur (§ 10 bis).
+- **2026-11-10** : ScummVM web versionné dans `web/scummvm` (origine dans `VERSION.txt`, modification du moteur sur la branche locale `lol-web`) (§ 10 bis).

@@ -1,0 +1,86 @@
+<!doctypehtml><html lang=en-us><head><meta charset=utf-8><meta content="text/html; charset=utf-8"http-equiv=Content-Type><meta content="width=device-width,initial-scale=1,viewport-fit=cover"name=viewport><link href=manifest.json rel=manifest><link href=scummvm-192.png rel=apple-touch-icon><title>Lands of Lore (ScummVM)</title><style>body{margin:0;padding:none;background-color:#000}.emscripten{padding-right:0;margin-left:auto;margin-right:auto;display:block}textarea.emscripten{font-family:monospace;width:80%}div.emscripten{text-align:center}div.emscripten_border{border:1px solid #000;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}canvas.emscripten{border:0 none;background:url("logo.svg");background-position:center;background-repeat:no-repeat;background-color:#c60;position:absolute;top:0;left:0;margin:0;width:100%;height:100%;overflow:hidden;display:block}@media (orientation:landscape){canvas.emscripten{background-size:auto 33%}}@media (orientation:portrait){canvas.emscripten{background-size:80% auto}}#progress{top:0;left:0;height:10px;width:100%;overflow:hidden;display:block;position:absolute;z-index:2;border:0;background:#c60}progress::-moz-progress-bar{background:#f6e08a}progress::-webkit-progress-value{background:#f6e08a}progress{color:#f6e08a}#status{position:absolute;bottom:5em;right:0;padding:5px;text-align:right;border-top-left-radius:1em;border-bottom-left-radius:1em;padding-left:1em;padding-right:1em;z-index:3;border:3px solid #000;border-right:none;background:#f6e08a;font:bold large/1.4 "Trebuchet MS",Verdana,Tahoma,Sans-Serif}#status.error{background:red}</style></head><body><div class=emscripten><progress hidden id=progress max=100 value=0></progress></div><div class=emscripten id=status>Downloading ScummVM...</div><div class=emscripten_border><canvas class=emscripten id=canvas oncontextmenu=event.preventDefault() tabindex=-1></canvas></div><hr><textarea class=emscripten id=output rows=8></textarea><script>var statusElement=document.getElementById("status"),progressElement=document.getElementById("progress");function loadingDoneMessage(){return document.getElementById("progress").style.zIndex=0,"All downloads complete."}var Module={preRun:[],postRun:[],print:function(){var e=document.getElementById("output");return e&&(e.value=""),function(t){arguments.length>1&&(t=Array.prototype.slice.call(arguments).join(" ")),console.log(t),e&&(e.value+=t+"\n",e.scrollTop=e.scrollHeight)}}(),printErr:function(e){arguments.length>1&&(e=Array.prototype.slice.call(arguments).join(" ")),console.error(e)},canvas:function(){var e=document.getElementById("canvas");return e.addEventListener("webglcontextlost",(function(e){alert("WebGL context lost. You will need to reload the page."),e.preventDefault()}),!1),e}(),setStatus:function(e){if(Module.setStatus.last||(Module.setStatus.last={time:Date.now(),text:""}),e!==Module.setStatus.last.text){var t=e.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/),n=Date.now();t&&n-Module.setStatus.last.time<30||(Module.setStatus.last.time=n,Module.setStatus.last.text=e,t?(e=t[1],progressElement.value=100*parseInt(t[2]),progressElement.max=100*parseInt(t[4]),progressElement.hidden=!1):(progressElement.value=null,progressElement.max=null,progressElement.hidden=!0),e&&e.length>0?(console.log((new Date).toLocaleTimeString()+" "+e),e+="⚡️",statusElement.style.display="block"):statusElement.style.display="none",statusElement.innerHTML=e)}},totalDependencies:0,monitorRunDependencies:function(e){this.totalDependencies=Math.max(this.totalDependencies,e),Module.setStatus(e?"Preparing... ("+(this.totalDependencies-e)+"/"+this.totalDependencies+")":loadingDoneMessage())}};Module.setStatus("Downloading ScummVM..."),window.onerror=function(){statusElement.classList.add("error"),Module.setStatus("Exception thrown, see JavaScript console"),Module.setStatus=function(e){e&&Module.printErr("[post-exception status] "+e)}}</script><script>
+// SDL3 (emscripten) s'abonne au clavier de window à chaque création de fenêtre sans retirer l'abonnement
+// précédent : un appui arrive plusieurs fois (le jeu voit des répétitions : Échap ouvre puis referme le
+// menu, lettres en double dans les noms de sauvegarde). Seul le dernier abonnement (fenêtre active) est
+// appelé ; les anciens, liés à des fenêtres détruites, n'envoient pas le texte tapé.
+(() => {
+  const KEY = new Set(["keydown", "keyup", "keypress"]), live = window.__sdlKeyHandlers = {}, wrap = new WeakMap();
+  const add = EventTarget.prototype.addEventListener, rem = EventTarget.prototype.removeEventListener;
+  EventTarget.prototype.addEventListener = function (type, fn, opt) {
+    if (this !== window || !KEY.has(type) || typeof fn !== "function" || !/scummvm\.js/.test(new Error().stack || ""))
+      return add.call(this, type, fn, opt);                      // seuls les abonnements de ScummVM (SDL) sont filtrés
+    const list = live[type] = live[type] || [];
+    let w = wrap.get(fn);
+    if (!w) { w = function (e) { if (list[list.length - 1] === fn) return fn.call(this, e); }; wrap.set(fn, w); }
+    list.push(fn);
+    return add.call(this, type, w, opt);
+  };
+  EventTarget.prototype.removeEventListener = function (type, fn, opt) {
+    if (this === window && KEY.has(type) && wrap.has(fn)) {
+      const list = live[type] || [], i = list.lastIndexOf(fn);
+      if (i >= 0) list.splice(i, 1);
+      return rem.call(this, type, wrap.get(fn), opt);
+    }
+    return rem.call(this, type, fn, opt);
+  };
+})();
+(() => {
+  if (!location.hash) history.replaceState(null, "", "#lol-fr");
+  const DB = "/home/web_user", KEY = DB + "/scummvm.ini", SEC = "[lol-fr]";
+  const start = () => { const s = document.createElement("script"); s.src = "scummvm.js"; document.body.appendChild(s); };
+  const section = (t) => { const i = t.indexOf(SEC); if (i < 0) return ""; const j = t.indexOf("\n[", i + 1); return j < 0 ? t.slice(i) : t.slice(i, j + 1); };
+  fetch("scummvm.ini", { cache: "no-store" }).then((r) => r.text()).then((ini) => new Promise((done) => {
+    const ours = section(ini);
+    const req = indexedDB.open(DB);
+    req.onupgradeneeded = () => req.transaction.abort();          // pas encore de réglages : ScummVM téléchargera le fichier
+    req.onerror = () => done();
+    req.onsuccess = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("FILE_DATA")) { db.close(); return done(); }
+      const st = db.transaction("FILE_DATA", "readwrite").objectStore("FILE_DATA");
+      const get = st.get(KEY);
+      get.onsuccess = () => {
+        const rec = get.result;
+        if (rec && rec.contents && ours) {
+          const old = new TextDecoder().decode(rec.contents);
+          const cur = section(old);
+          const txt = cur ? old.replace(cur, ours) : old.replace(/\n*$/, "\n\n") + ours;
+          if (txt !== old) st.put({ ...rec, timestamp: new Date(), contents: new TextEncoder().encode(txt) }, KEY);
+        }
+      };
+      st.transaction.oncomplete = st.transaction.onerror = () => { db.close(); done(); };
+    };
+  })).catch(() => {}).then(start);
+})();
+// Mémoire du jeu pour la mini-carte : le moteur (lol-web-state.patch) envoie des zones
+// (adresse u32, longueur u32, octets) ; on répond aux lectures du canal « lol-mem » comme
+// l'émulateur DOSBox (zéros hors des zones). Recherches : rien trouvé ; écritures : refusées.
+(() => {
+  let zones = null;
+  Module.lolState = (bytes) => {
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), out = [];
+    for (let o = 0; o + 8 <= bytes.length; ) {
+      const a = dv.getUint32(o, true), n = dv.getUint32(o + 4, true);
+      out.push([a, bytes.subarray(o + 8, o + 8 + n)]); o += 8 + n;
+    }
+    zones = out;
+  };
+  const ch = new BroadcastChannel("lol-mem");
+  ch.onmessage = (e) => {
+    const d = e.data;
+    if (!d || !d.id) return;
+    if (d.ranges && zones) {
+      const data = d.ranges.map(([a, n]) => {
+        const buf = new Uint8Array(n);
+        for (const [za, zb] of zones) {
+          const s = Math.max(a, za), t = Math.min(a + n, za + zb.length);
+          if (s < t) buf.set(zb.subarray(s - za, t - za), s - a);
+        }
+        return buf;
+      });
+      ch.postMessage({ id: d.id, data });
+    } else if (d.find && zones) ch.postMessage({ id: d.id, found: d.find.map(() => -1) });
+    else ch.postMessage({ id: d.id, error: zones ? "non disponible avec ScummVM" : "jeu pas encore lancé" });
+  };
+})();
+</script></body></html>
