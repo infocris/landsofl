@@ -673,7 +673,7 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     `FRE/STARTUP.PAK` qui réunit `STARTUP.PAK` et `STARTIN.PAK`. Le dossier du jeu n'est pas
     modifié.
 - **Lancement.** `python3 -I tools/scummvm_web.py` sert la page sur le port 8001, puis :
-  `http://localhost:8001/lol.html`.
+  `http://localhost:8001/lol.html` (page complète) ou `lol-game.html` (jeu seul).
   - La cible `lol-fr` vient du `scummvm.ini` écrit par le script : chemin du jeu, `language=fr`.
     Sans la langue, le jeu est détecté en anglais et cherche `ENG/`.
   - Le navigateur ne télécharge ce `scummvm.ini` qu'au premier lancement, puis garde sa copie
@@ -701,6 +701,47 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     remplace la section `[lol-fr]` du fichier gardé par celle du serveur.
   - Vérifié : section retirée à la main, rechargement, la section revient avec les touches et
     le jeu démarre.
+  - Depuis l'ajout de la mini-carte, ce lanceur s'appelle `lol-game.html` (jeu seul) et
+    `lol.html` est la page complète (ci-dessous).
+- **Touches reçues plusieurs fois** (2026-11-10). SDL3 (portage emscripten) s'abonne au clavier
+  de `window` à chaque création de fenêtre (lanceur, jeu, changements de mode) sans retirer
+  l'abonnement précédent : 6 abonnements en jeu.
+  - Un seul appui arrive donc 6 fois à SDL, avec le même horodatage. SDL marque les copies
+    comme répétitions (`repeat`), et ScummVM les transmet au jeu (trace ajoutée
+    temporairement dans `sdl3-events.cpp` et `kyra_v1.cpp`).
+  - Effets : lettres en double dans le nom de sauvegarde (« teeeeeessssst ») ; Échap ouvrait le
+    menu puis le refermait aussitôt (le bouton du menu, n° 88, a `keyCode2 = 110` = Échap, et
+    « Reprendre la partie » aussi). Les actions du clavier `lolkeyb` ignorent les répétitions,
+    d'où certaines lettres épargnées.
+  - Correction dans le lanceur : il intercepte `addEventListener` de `window` pour les
+    abonnements clavier venant de `scummvm.js`, et n'appelle que le dernier (fenêtre active).
+    Les écouteurs de la page elle-même ne sont pas filtrés.
+  - Vérifié par l'utilisateur : plus de lettres en double.
+  - Échap isolé : dans ScummVM, en exploration, la touche est aussi un « passer » et n'ouvre
+    pas toujours le menu. La touche O (action `OPT`) ouvre le menu de façon sûre.
+- **Mini-carte, vue 3D et panneau** (2026-11-10). La version DOSBox lit la mémoire du PC émulé
+  sur le canal `lol-mem` (§ 12). Pour ScummVM, le moteur publie son état sous la même forme :
+  - `tools/scummvm/lol-web-state.patch` (à appliquer dans `third_party/scummvm` avant de
+    compiler) ajoute `LoLEngine::webPublishState()`, appelée dans `runLoop()`. Toutes les
+    150 ms, elle range les structures du moteur comme dans le jeu DOS (structures compactées,
+    pointeurs sur 4 octets mis à 0) et les envoie à la page (`EM_ASM`, `Module.lolState`).
+  - Les structures de ScummVM gardent l'ordre des champs du jeu DOS. Compactées, elles
+    retrouvent les tailles et décalages du § 12 : case de grille 10 octets, objet 16, monstre
+    46 (champ x à +7, direction `facing` à +24, type à +32), personnage 130 (PV à +57,
+    équipement à +80, niveaux à +102, expérience à +108). Le tableau des drapeaux
+    (`_flagsTable`, bit `n & 7` de l'octet `n >> 3`) a l'ordre des mots de 16 bits du DOS.
+  - Zones envoyées, aux adresses DOS : case `0x3E4E0`, direction `0x3E4EF`, grille `0x3E713`,
+    objets `0x31F6D`, monstres `0x3186A`, groupe `0x3389D`, drapeaux `0x3E55C`, sac `0x3E4F6`,
+    main `0x3E558`, argent `0x3E6F0`, table d'expérience `0x30270`, et `0x5D6B5` (1 pendant
+    une scène spéciale, `_specialSceneFlag`, sinon 5).
+  - `lol-game.html` répond aux lectures du canal `lol-mem` avec ces zones (zéros ailleurs).
+    Recherches : rien trouvé (choix des sprites par les drapeaux, sinon le premier).
+    Écritures : refusées ; les triches et la création d'objets sont masquées.
+  - `lol.html` est `web/public/index.html` sans js-dos, avec `lol-game.html` dans un cadre.
+    Le serveur sert les fichiers absents du build depuis `web/public`. `minimap.js` n'est pas
+    modifié.
+  - Vérifié (test automatisé, son coupé) : « Niveau 1 — Gladstone », case 13,17 Nord,
+    41 couronnes ; après D puis Z : case 14,17 Est. La vue 3D et les caractéristiques suivent.
 - **Vérifié** (test automatisé, son coupé, WebGL logiciel SwiftShader) : le jeu est détecté
   « CD/DOS/French ». L'intro, le menu titre (« Nouvelle Partie ») et la sélection du
   personnage s'affichent en français.
@@ -1071,3 +1112,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
     dans un nom de sauvegarde. Vérifié avec le menu disquette et la fiche d'un personnage.
 - **2026-11-09** : sources de ScummVM récupérées, fonctions des scripts confrontées (§ 10 bis).
 - **2026-11-09** : ScummVM web compilé et lancé à part (port 8001), jusqu'à la sélection du personnage (§ 10 bis).
+- **2026-11-10** : ScummVM web : touches reçues plusieurs fois (abonnements clavier de SDL3 en double) corrigé dans le lanceur ; mini-carte, vue 3D et panneau branchés sur l'état publié par le moteur (§ 10 bis).

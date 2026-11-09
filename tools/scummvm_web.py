@@ -21,10 +21,19 @@ Le navigateur ne télécharge scummvm.ini qu'une fois : s'il en garde déjà un 
 lol.html, générée à partir de scummvm.html, remplace donc la section [lol-fr] du fichier gardé
 par celle du serveur avant de charger scummvm.js. Le reste du fichier (réglages) est conservé.
 
+Mini-carte, vue 3D et panneau, comme la version DOSBox : le moteur, modifié par
+tools/scummvm/lol-web-state.patch (à appliquer dans third_party/scummvm avant de compiler),
+publie toutes les 150 ms l'état du jeu rangé comme dans la mémoire du jeu DOS, aux mêmes
+adresses (grille, monstres, objets, groupe, drapeaux…). La page du jeu (lol-game.html) répond
+avec ces octets sur le canal « lol-mem », comme l'émulateur DOSBox : minimap.js fonctionne sans
+changement. La page lol.html reprend web/public/index.html (panneau, vue 3D), avec ScummVM dans
+un cadre à la place de js-dos. Les fichiers absents du build sont servis depuis web/public.
+Les triches (écritures en mémoire) ne sont pas disponibles : leurs commandes sont masquées.
+
 Usage : python3 -I tools/scummvm_web.py [port]   (8001 par défaut)
-Puis : http://localhost:8001/lol.html
+Puis : http://localhost:8001/lol.html  (jeu seul : lol-game.html)
 """
-import functools, http.server, os, struct, subprocess, sys
+import functools, http.server, os, re, struct, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
@@ -34,6 +43,7 @@ GAME = os.path.join(ROOT, "extracted-cd", "app", "C", "LOLCD")
 SVM = os.path.join(ROOT, "third_party", "scummvm")
 BUILD = os.path.join(SVM, "build-emscripten")
 DEST = os.path.join(BUILD, "data", "games", "lol")
+PUBLIC = os.path.join(ROOT, "web", "public")
 INTRO = ["GENERAL.PAK", "INTROVOC.PAK", "INTRO1.PAK", "INTRO2.PAK", "INTRO3.PAK", "INTRO4.PAK", "INTRO5.PAK",
          "INTRO6.PAK", "INTRO7.PAK", "INTRO8.PAK", "INTRO9.PAK", "HISTORY.PAK"]
 
@@ -76,6 +86,31 @@ def write_ini():
 
 # Lanceur : met à jour la section [lol-fr] du scummvm.ini gardé par le navigateur, puis charge ScummVM
 LAUNCH_JS = r"""<script>
+// SDL3 (emscripten) s'abonne au clavier de window à chaque création de fenêtre sans retirer l'abonnement
+// précédent : un appui arrive plusieurs fois (le jeu voit des répétitions : Échap ouvre puis referme le
+// menu, lettres en double dans les noms de sauvegarde). Seul le dernier abonnement (fenêtre active) est
+// appelé ; les anciens, liés à des fenêtres détruites, n'envoient pas le texte tapé.
+(() => {
+  const KEY = new Set(["keydown", "keyup", "keypress"]), live = window.__sdlKeyHandlers = {}, wrap = new WeakMap();
+  const add = EventTarget.prototype.addEventListener, rem = EventTarget.prototype.removeEventListener;
+  EventTarget.prototype.addEventListener = function (type, fn, opt) {
+    if (this !== window || !KEY.has(type) || typeof fn !== "function" || !/scummvm\.js/.test(new Error().stack || ""))
+      return add.call(this, type, fn, opt);                      // seuls les abonnements de ScummVM (SDL) sont filtrés
+    const list = live[type] = live[type] || [];
+    let w = wrap.get(fn);
+    if (!w) { w = function (e) { if (list[list.length - 1] === fn) return fn.call(this, e); }; wrap.set(fn, w); }
+    list.push(fn);
+    return add.call(this, type, w, opt);
+  };
+  EventTarget.prototype.removeEventListener = function (type, fn, opt) {
+    if (this === window && KEY.has(type) && wrap.has(fn)) {
+      const list = live[type] || [], i = list.lastIndexOf(fn);
+      if (i >= 0) list.splice(i, 1);
+      return rem.call(this, type, wrap.get(fn), opt);
+    }
+    return rem.call(this, type, fn, opt);
+  };
+})();
 (() => {
   if (!location.hash) history.replaceState(null, "", "#__TARGET__");
   const DB = "/home/web_user", KEY = DB + "/scummvm.ini", SEC = "[__TARGET__]";
@@ -104,7 +139,90 @@ LAUNCH_JS = r"""<script>
     };
   })).catch(() => {}).then(start);
 })();
+// Mémoire du jeu pour la mini-carte : le moteur (lol-web-state.patch) envoie des zones
+// (adresse u32, longueur u32, octets) ; on répond aux lectures du canal « lol-mem » comme
+// l'émulateur DOSBox (zéros hors des zones). Recherches : rien trouvé ; écritures : refusées.
+(() => {
+  let zones = null;
+  Module.lolState = (bytes) => {
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), out = [];
+    for (let o = 0; o + 8 <= bytes.length; ) {
+      const a = dv.getUint32(o, true), n = dv.getUint32(o + 4, true);
+      out.push([a, bytes.subarray(o + 8, o + 8 + n)]); o += 8 + n;
+    }
+    zones = out;
+  };
+  const ch = new BroadcastChannel("lol-mem");
+  ch.onmessage = (e) => {
+    const d = e.data;
+    if (!d || !d.id) return;
+    if (d.ranges && zones) {
+      const data = d.ranges.map(([a, n]) => {
+        const buf = new Uint8Array(n);
+        for (const [za, zb] of zones) {
+          const s = Math.max(a, za), t = Math.min(a + n, za + zb.length);
+          if (s < t) buf.set(zb.subarray(s - za, t - za), s - a);
+        }
+        return buf;
+      });
+      ch.postMessage({ id: d.id, data });
+    } else if (d.find && zones) ch.postMessage({ id: d.id, found: d.find.map(() => -1) });
+    else ch.postMessage({ id: d.id, error: zones ? "non disponible avec ScummVM" : "jeu pas encore lancé" });
+  };
+})();
 </script>"""
+
+# Page principale : celle de la version DOSBox (web/public/index.html), ScummVM dans un cadre
+PAGE_JS = r"""<script>
+(() => {
+  // Mini-carte et vue 3D : affichage mémorisé (mêmes réglages que la version DOSBox)
+  const mm = document.getElementById("mm"), v3d = document.getElementById("v3d");
+  const game = document.getElementById("dos");
+  function toggle(el, key, force) {
+    const show = force !== undefined ? force : el.classList.contains("hidden");
+    el.classList.toggle("hidden", !show);
+    try { localStorage.setItem(key, show ? "on" : "off"); } catch (e) {}
+    window.dispatchEvent(new Event("resize"));
+  }
+  try { if (localStorage.getItem("minimap") === "off") mm.classList.add("hidden"); } catch (e) {}
+  try { if (localStorage.getItem("view3d") === "off") v3d.classList.add("hidden"); } catch (e) {}
+  const toggleMap = (f) => toggle(mm, "minimap", f), toggle3d = (f) => toggle(v3d, "view3d", f);
+  // Boutons : on rend ensuite la main au jeu (sinon le clavier reste sur la page)
+  const back = (e) => { e.currentTarget.blur(); game.focus(); };
+  document.getElementById("mmtoggle").addEventListener("click", (e) => { toggleMap(); back(e); });
+  document.getElementById("v3dtoggle").addEventListener("click", (e) => { toggle3d(); back(e); });
+  // F9 / F10 aussi depuis le jeu (le cadre a le clavier) : écouteur ajouté dans sa fenêtre
+  const keys = (e) => {
+    if (e.code === "F9") { toggleMap(); e.preventDefault(); e.stopPropagation(); }
+    if (e.code === "F10") { toggle3d(); e.preventDefault(); e.stopPropagation(); }
+  };
+  addEventListener("keydown", keys, true);
+  game.addEventListener("load", () => { try { game.contentWindow.addEventListener("keydown", keys, true); } catch (e) {} game.focus(); });
+  // Perspective de la vue 3D : « jeu » ou « réelle »
+  const perspBtn = document.getElementById("persp");
+  let perspMode = "jeu";
+  try { perspMode = localStorage.getItem("persp") || "jeu"; } catch (e) {}
+  function sendPersp() {
+    perspBtn.textContent = "Perspective : " + (perspMode === "jeu" ? "jeu" : "réelle");
+    const f = document.getElementById("v3d-frame");
+    if (f && f.contentWindow) f.contentWindow.postMessage({ type: "lol-persp", mode: perspMode }, location.origin);
+  }
+  perspBtn.addEventListener("click", (e) => {
+    perspMode = perspMode === "jeu" ? "reelle" : "jeu";
+    try { localStorage.setItem("persp", perspMode); } catch (err) {}
+    sendPersp(); back(e);
+  });
+  document.getElementById("v3d-frame").addEventListener("load", sendPersp);
+  sendPersp();
+})();
+</script>"""
+
+PAGE_CSS = """<style>
+  /* version ScummVM : jeu dans un cadre ; pas de triches ni de création d'objets (pas d'écriture en mémoire) */
+  iframe#dos { border: 0; display: block; width: 100%; background: #000; }
+  #cheats, #inv-add, #zqsd, #qload { display: none !important; }
+</style>
+</head>"""
 
 
 def write_launcher():
@@ -114,7 +232,37 @@ def write_launcher():
         sys.exit("scummvm.html : balise de chargement de scummvm.js introuvable.")
     html = html.replace(tag, LAUNCH_JS.replace("__TARGET__", TARGET))
     html = html.replace("<title>ScummVM</title>", "<title>Lands of Lore (ScummVM)</title>")
+    open(os.path.join(BUILD, "lol-game.html"), "w", encoding="utf-8").write(html)
+
+
+def write_page():
+    """lol.html : web/public/index.html sans js-dos, avec ScummVM (lol-game.html) dans un cadre."""
+    html = open(os.path.join(PUBLIC, "index.html"), encoding="utf-8").read()
+    steps = [
+        (r'<link rel="stylesheet" href="js-dos\.css">\n', ""),
+        (r'<script src="js-dos\.js"></script>\n', ""),
+        (r"<title>[^<]*</title>", "<title>Lands of Lore (ScummVM)</title>"),
+        (r"</head>", PAGE_CSS),
+        (r'<div id="dos"></div>', f'<iframe id="dos" src="lol-game.html#{TARGET}" title="Lands of Lore (ScummVM)" allow="autoplay; fullscreen"></iframe>'),
+        # script de la page DOSBox (ZQSD, pause, js-dos, sauvegardes…) : remplacé
+        (r"<script>\n\(\(\) => \{\n  // --- Déplacement ZQSD.*?\n</script>", PAGE_JS),
+    ]
+    for pat, rep in steps:
+        html, n = re.subn(pat, lambda m: rep, html, count=1, flags=re.S)
+        if n != 1:
+            sys.exit(f"web/public/index.html : motif introuvable ({pat[:40]}…)")
     open(os.path.join(BUILD, "lol.html"), "w", encoding="utf-8").write(html)
+
+
+class Handler(http.server.SimpleHTTPRequestHandler):
+    """Fichiers du build ScummVM, sinon ceux de web/public (mini-carte, vue 3D, données des niveaux)."""
+    def translate_path(self, path):
+        p = super().translate_path(path)
+        if not os.path.exists(p):
+            alt = os.path.join(PUBLIC, os.path.relpath(p, BUILD))
+            if os.path.exists(alt):
+                return alt
+        return p
 
 
 def prepare():
@@ -137,6 +285,7 @@ def prepare():
     # index.json de chaque dossier, lus par le système de fichiers HTTP de ScummVM
     write_ini()
     write_launcher()
+    write_page()
     subprocess.run([sys.executable, os.path.join(SVM, "dists", "emscripten", "build-make_http_index.py"),
                     os.path.join(BUILD, "data")], check=True, stdout=subprocess.DEVNULL)
 
@@ -145,5 +294,5 @@ if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8001
     prepare()
     print(f"http://localhost:{port}/lol.html")
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=BUILD)
+    handler = functools.partial(Handler, directory=BUILD)
     http.server.ThreadingHTTPServer(("127.0.0.1", port), handler).serve_forever()
