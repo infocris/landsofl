@@ -34,8 +34,8 @@ adresses (grille, monstres, objets, groupe, drapeaux…). La page du jeu (lol-ga
 avec ces octets sur le canal « lol-mem », comme l'émulateur DOSBox : minimap.js fonctionne sans
 changement. La page lol.html reprend web/public/index.html (panneau, vue 3D), avec ScummVM dans
 un cadre à la place de js-dos. Les fichiers absents de web/scummvm sont servis depuis web/public.
-Les triches (écritures en mémoire) ne sont pas disponibles : leurs commandes sont masquées.
-L'inventaire se gère par commandes exécutées par le moteur (déplacer, supprimer, créer).
+L'inventaire et les triches passent par des commandes exécutées par le moteur (déplacer, supprimer,
+créer, vie / magie infinies, couronnes) : pas d'écriture directe en mémoire.
 
 Usage : python3 -I tools/scummvm_web.py [port]   (8001 par défaut)
         python3 -I tools/scummvm_web.py import   (copie un nouveau build dans web/scummvm)
@@ -180,7 +180,7 @@ LAUNCH_JS = r"""<script>
     } else if (d.find && zones) ch.postMessage({ id: d.id, found: d.find.map(() => -1) });
     else if (d.cmd && zones) {
       // commandes d'inventaire : exécutées par le moteur dans sa boucle (webRunCommands)
-      const op = { move: 1, delete: 2, create: 3, goto: 4 }[d.cmd.op] || 0;
+      const op = { move: 1, delete: 2, create: 3, goto: 4, cheat: 5, money: 6, hurt: 7, spend: 8 }[d.cmd.op] || 0;
       (Module.lolCmds = Module.lolCmds || []).push([op, d.cmd.a | 0, d.cmd.b | 0, d.id]);
     }
     else ch.postMessage({ id: d.id, error: zones ? "non disponible avec ScummVM" : "jeu pas encore lancé" });
@@ -235,10 +235,9 @@ window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes
 </script>"""
 
 PAGE_CSS = """<style>
-  /* version ScummVM : jeu dans un cadre ; pas de triches (pas d'écriture en mémoire),
-     inventaire géré par commandes au moteur */
+  /* version ScummVM : jeu dans un cadre ; inventaire et triches par commandes au moteur */
   iframe#dos { border: 0; display: block; width: 100%; background: #000; }
-  #cheats, #zqsd, #qload { display: none !important; }
+  #zqsd, #qload { display: none !important; }
 </style>
 </head>"""
 

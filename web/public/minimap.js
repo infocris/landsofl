@@ -1421,6 +1421,11 @@
   // chiffre du tas de pièces qu'à sa prochaine transaction.
   document.getElementById("cheat-money").addEventListener("click", async (e) => {
     e.currentTarget.blur();
+    if (MANAGE) {                        // ScummVM : le moteur ajoute les pièces (et redessine le tas)
+      await mem.cmd({ op: "money", a: 100 });
+      lastStats = ""; setTimeout(() => updateStats().catch(() => {}), 300);
+      return;
+    }
     const r = await mem.read([[STATS.money, 2]]);
     if (!r) return;
     const v = Math.min(65535, (r[0][0] | r[0][1] << 8) + 100);
@@ -1429,9 +1434,24 @@
     updateStats().catch(() => {});
   });
 
+  // ScummVM : le moteur applique lui-même les triches (une perte de vie ou de magie est remplacée
+  // par le maximum, avant toute vérification de mort) : vraiment infinies. État renvoyé au
+  // changement et toutes les 3 s (le jeu peut avoir redémarré).
+  let cheatSent = -1, cheatSentAt = 0;
+  async function sendCheats() {
+    const mask = (cheatHp.checked ? 1 : 0) | (cheatMp.checked ? 2 : 0);
+    if (mask === cheatSent && performance.now() - cheatSentAt < 3000) return;
+    const r = await mem.cmd({ op: "cheat", a: mask }, 1500);
+    if (r && r.code === 0) { cheatSent = mask; cheatSentAt = performance.now(); }
+  }
+  if (MANAGE) {
+    for (const box of [cheatHp, cheatMp]) box.addEventListener("change", () => { cheatSent = -1; sendCheats().catch(() => {}); });
+    setInterval(() => { if (!previewing) sendCheats().catch(() => {}); }, 1000);
+  }
+
   let cheating = false;
   setInterval(async () => {
-    if (cheating || previewing || !(cheatHp.checked || cheatMp.checked)) return;
+    if (MANAGE || cheating || previewing || !(cheatHp.checked || cheatMp.checked)) return;
     cheating = true;
     try {
       const r = await mem.read([PARTY_RANGE()]);

@@ -798,6 +798,21 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
   - Vérifié (test automatisé, son coupé) : niveau 1 GUARD ; niveau 2 type 1 = THUG (et non ORC),
     type 2 = BOAR ; niveau 7 type 2 = CAVEDWLR ; niveau 11 type 1 = SWAMPMON, type 2 =
     SWAMPCIT. Carte et moteur concordent.
+- **Triches : vie et magie infinies, couronnes** (2026-11-10, version ScummVM).
+  - Version DOSBox : la page remet vie et magie au maximum toutes les 100 ms ; un coup assez fort
+    entre deux écritures reste mortel.
+  - Version ScummVM : toute variation de vie ou de magie passe par
+    `setCharacterMagicOrHitPoints(perso, type, points, mode)` (dégâts de `inflictDamage`, sorts,
+    poison…). Avec la triche active, une baisse y est remplacée par le maximum, avant le test de
+    mort (`hitPointsCur < 1` → drapeau 8) : vie vraiment infinie. Chaque tour de boucle remet
+    aussi au maximum ce qui a été perdu avant l'activation.
+  - Commandes : op 5 (masque : 1 vie, 2 magie), renvoyée par la page au changement et toutes
+    les 3 s (le jeu peut avoir redémarré) ; op 6 : ajouter des couronnes (`giveCredits`, tas de
+    pièces redessiné). Commandes de test : op 7 dégâts d'un monstre (`inflictDamage`), op 8
+    magie dépensée.
+  - Vérifié (test automatisé, son coupé), Michael : sans triche, 5 dégâts → 15/20 PV, 3 de magie
+    → 3/6 ; triches cochées → 20/20 et 6/6 ; 500 dégâts et 50 de magie → inchangés, vivant ;
+    décochées, 4 dégâts → 16/20 ; « +100 couronnes » : 41 → 141.
 - **Vérifié** (test automatisé, son coupé, WebGL logiciel SwiftShader) : le jeu est détecté
   « CD/DOS/French ». L'intro, le menu titre (« Nouvelle Partie ») et la sélection du
   personnage s'affichent en français.
@@ -1172,3 +1187,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-10** : ScummVM web versionné dans `web/scummvm` (origine dans `VERSION.txt`, modification du moteur sur la branche locale `lol-web`) (§ 10 bis).
 - **2026-11-10** : ScummVM web : gestion de l'inventaire depuis le panneau (commandes exécutées par le moteur : déplacer, équiper, supprimer, créer) (§ 10 bis).
 - **2026-11-10** : ScummVM web : sprites exacts des monstres (noms publiés par le moteur) ; commande « aller au niveau » (§ 10 bis).
+- **2026-11-10** : ScummVM web : vie et magie infinies appliquées par le moteur (aucun coup mortel), couronnes (§ 10 bis).

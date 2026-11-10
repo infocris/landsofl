@@ -177,10 +177,9 @@
     line-height: 1.15; text-align: center; opacity: .85; background: rgba(20, 14, 8, .75); }
 </style>
 <style>
-  /* version ScummVM : jeu dans un cadre ; pas de triches (pas d'écriture en mémoire),
-     inventaire géré par commandes au moteur */
+  /* version ScummVM : jeu dans un cadre ; inventaire et triches par commandes au moteur */
   iframe#dos { border: 0; display: block; width: 100%; background: #000; }
-  #cheats, #zqsd, #qload { display: none !important; }
+  #zqsd, #qload { display: none !important; }
 </style>
 </head>
 <body>
@@ -266,6 +265,6 @@ window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes
   sendPersp();
 })();
 </script>
-<script src="minimap.js?v=20261110b"></script>
+<script src="minimap.js?v=20261110c"></script>
 </body>
 </html>
