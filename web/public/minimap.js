@@ -858,6 +858,7 @@
     sendSceneTo3d(inScene && !ENGINE_SPRITES ? current.scenes[block] || null : null, near ? near.text : "");
     sendGridTo3d(current.level, hash);
     sendMonstersTo3d(current);
+    sendItemsTo3d(current, liveItems);
     sendTo3d(current.level, x, y, dir);
   }
 
@@ -941,6 +942,16 @@
   }
 
   let lastMonSent = "";
+  // Objets posés au sol (pas ceux rangés dans un mur ou un coffre) : position fine dans la case
+  let lastItemsSent = "";
+  function sendItemsTo3d(L, items) {
+    if (!items || !frame3d || !frame3d.contentWindow) return;
+    const list = items.filter((i) => !i.container).map((i) => ({ x: i.x + (i.xOffs || 0) / 256, y: i.y + (i.yOffs || 0) / 256, type: i.type }));
+    const key = L.level + JSON.stringify(list);
+    if (key === lastItemsSent) return;
+    lastItemsSent = key;
+    frame3d.contentWindow.postMessage({ type: "lol-items", level: L.level, list }, location.origin);
+  }
   function sendMonstersTo3d(L) {
     resolveSprites(L);
     const list = monsters.map((m) => ({ ...m, sprite: (L.spriteOf || {})[m.type] || null }));

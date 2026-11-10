@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261110a";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261110b";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) FOV = 2 * Math.atan(1.375);
   let dirty = true;
@@ -432,6 +432,16 @@
 
     // monstres
     const sprites = [];
+    for (const it of floorItems()) {                    // objets au sol : même échelle que les monstres
+      const dx = it.x - player.x, dy = it.y - player.y;
+      const z = dx * fx + dy * fy, lat = dx * rx + dy * ry;
+      if (z < 0.15) continue;
+      const [srx, sry, rw, rh] = it.rect, d = deff(z);
+      const scale = (WALL_H / 96) * proj / d, sw = rw * scale, sh = rh * scale;
+      const left = W / 2 + lat * proj / d - sw / 2, top = half + (WALL_H / 2) * proj / d - sh;
+      sprites.push({ tz: z, rx: srx, ry: sry, rw, rh, sw, sh, left, top, mirror: false, imgs: FLOOR.imgs,
+        x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
+    }
     for (const m of (EMBED ? liveMonsters.filter((q) => q.level === L.level) : [])) {
       const ids = L.sprites[m.sprite];
       if (!ids) continue;
@@ -592,6 +602,16 @@
   function projectSprites(dirX, dirY, planeX, planeY) {
     const out = [];
     const inv = 1 / (planeX * dirY - dirX * planeY);
+    for (const it of floorItems()) {                    // objets au sol
+      const dx = it.x - player.x, dy = it.y - player.y;
+      const tx = inv * (dirY * dx - dirX * dy), tz = inv * (-planeY * dx + planeX * dy);
+      if (tz < 0.15) continue;
+      const [rx, ry, rw, rh] = it.rect;
+      const scale = (WALL_H / 96) / tz * proj, sw = rw * scale, sh = rh * scale;
+      const left = W / 2 * (1 + tx / tz) - sw / 2, top = H / 2 + pitch + (WALL_H / 2) / tz * proj - sh;
+      out.push({ tz, rx, ry, rw, rh, sw, sh, left, top, mirror: false, imgs: FLOOR.imgs,
+        x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
+    }
     const source = EMBED ? liveMonsters.filter((m) => m.level === L.level) : L.monsters;
     for (const m of source) {
       const ids = L.sprites[EMBED ? m.sprite : m.sprites[0]];
@@ -779,6 +799,29 @@
     try { localStorage.setItem("lol3d:persp", persp); } catch (err) {}
     dirty = true;
   });
+
+  // Mode intégré : objets posés au sol (images du jeu : item_floor.png, tools/export_viewer.py)
+  let liveItems = [];
+  addEventListener("message", (e) => {
+    if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-items") return;
+    liveItems = e.data.list.map((i) => ({ ...i, level: e.data.level }));
+    dirty = true;
+  });
+  const FLOOR = { rects: null, types: null, imgs: null };
+  Promise.all([fetch(`data/item_floor.json?v=${DATA_V}`).then((r) => r.json()), loadImage(`data/item_floor.png?v=${DATA_V}`)])
+    .then(([d, img]) => { FLOOR.rects = d.rects; FLOOR.types = d.types; FLOOR.imgs = darken(img, SHADES); dirty = true; }, () => {});
+  window.lolFloorItems = () => liveItems;   // débogage
+  // objets visibles du niveau affiché -> [{ x, y, rect }]
+  function floorItems() {
+    if (!EMBED || !FLOOR.imgs || !L) return [];
+    const out = [];
+    for (const it of liveItems) {
+      if (it.level !== L.level) continue;
+      const k = FLOOR.types[it.type], rect = k >= 0 ? FLOOR.rects[k] : null;
+      if (rect) out.push({ x: it.x, y: it.y, rect });
+    }
+    return out;
+  }
 
   // Mode intégré : monstres à leurs positions réelles.
   let liveMonsters = [];

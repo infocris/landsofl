@@ -839,6 +839,19 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
   image 0-15 ou 255, retournée) ; la vue 3D synchronisée, dont la caméra est celle du groupe,
   l'utilise telle quelle. Vérifié : brigand en face qui attaque → images 14, 15 ; vue 3D en coup
   de gourdin.
+- **Objets posés au sol dans la vue 3D** (2026-11-10, versions DOSBox et ScummVM).
+  `LoLEngine::drawObjects` dessine un objet au sol avec : si le drapeau 0x40 de son type est mis,
+  l'image `shpIndex` de `GAMESHP.SHP` ; sinon l'image `_gameShapeMap[shpIndex × 2]` de
+  `ITEMSHP.SHP` (`STARTUP.PAK`). `_gameShapeMap` : table de 276 octets de `MAIN.EXE`
+  (offset 0x2B35C de la version CD, retrouvée par ses premiers octets 15 5A 05 37 09 38).
+  `shpIndex` et drapeaux : octets 2 et 3-4 de la fiche du type (`tools/data/items_fr.json`).
+  - `tools/export_viewer.py` : `item_floor.png` (52 images) et `item_floor.json` (image par type,
+    285 types).
+  - `minimap.js` envoie à la vue 3D les objets de la grille vivante (chaînes d'objets des cases),
+    sauf ceux rangés dans un mur ou un coffre, avec leur position fine (x, y : case + octet bas
+    / 256) ; la vue 3D les dessine comme les monstres (même échelle, posés au sol).
+  - Vérifié (ScummVM) : niveau 2, poignard abîmé en 8,4 vu depuis 8,5 : même image et même
+    place que dans le jeu.
 - **Image du jeu dans la vue 3D** (2026-11-10, version ScummVM) : lieux plein écran (panoramas),
   dialogues, séquences, cinématiques.
   - Cause du « noir » signalé : en scène spéciale, la mini-carte demandait l'image exportée du
@@ -1246,3 +1259,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-10** : ScummVM web : vie et magie infinies appliquées par le moteur (aucun coup mortel), couronnes (§ 10 bis).
 - **2026-11-10** : vue 3D : variantes de couleurs et équipement des monstres (§ 10 bis).
 - **2026-11-10** : ScummVM web : animations d'attaque des monstres, image du jeu dans la vue 3D (cinématiques, dialogues, lieux), musique en pause dans le menu ; volume général (§ 10 bis).
+- **2026-11-10** : vue 3D : objets posés au sol (images du jeu) (§ 10 bis).

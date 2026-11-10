@@ -626,6 +626,45 @@ def main(game_dir, maps_dir, out_dir):
             sheet.blit(frame_image(f, pal), (k % 16) * 20, (k // 16) * 20)
     sheet.save(os.path.join(out_dir, "item_icons.png"))
 
+    # objets posés au sol (vue 3D) : image du jeu pour chaque type d'objet (LoLEngine::drawObjects).
+    # Drapeau 0x40 du type : image shpIndex de GAMESHP.SHP ; sinon ITEMSHP.SHP, image
+    # _gameShapeMap[shpIndex * 2] (table de 276 octets de MAIN.EXE, en 0x2B35C dans la version CD).
+    if os.path.exists(table):
+        startup = read_pak(os.path.join(game_dir, "STARTUP.PAK"))
+        item_shp = lolgfx.shp_frames(startup["ITEMSHP.SHP"])
+        game_shp = lolgfx.shp_frames(startup["GAMESHP.SHP"])
+        exe = open(os.path.join(game_dir, "MAIN.EXE"), "rb").read()
+        at = exe.find(bytes([0x15, 0x5A, 0x05, 0x37, 0x09, 0x38, 0x00, 0x36, 0x00, 0x36]))
+        shape_map = exe[at:at + 276] if at >= 0 else b""
+        rows = json.load(open(table, encoding="utf-8"))["items"]
+        cache, imgs, types = {}, [], []
+        for it in rows:
+            raw = bytes.fromhex(it["raw"])
+            shp, flags = raw[2], raw[3] | raw[4] << 8
+            if flags & 0x40:
+                key, frames = ("G", shp), game_shp
+            else:
+                idx = shape_map[shp * 2] if shp * 2 < len(shape_map) else 255
+                idx = idx - 256 if idx > 127 else idx
+                key, frames = ("I", idx), item_shp
+            k = key[1]
+            if key not in cache:
+                f = frames[k] if 0 <= k < len(frames) else None
+                cache[key] = len(imgs) if f and f[0] > 0 else -1
+                if cache[key] >= 0:
+                    imgs.append(frame_image(f, pal))
+            types.append(cache[key])
+        sx, rects = 0, []
+        for img in imgs:
+            rects.append([sx, 0, img.w, img.h]); sx += img.w + 1
+        floor_sheet = Image(max(1, sx), max([1] + [i.h for i in imgs]))
+        for img, r in zip(imgs, rects):
+            floor_sheet.blit(img, r[0], 0)
+        floor_sheet.save(os.path.join(out_dir, "item_floor.png"))
+        with open(os.path.join(out_dir, "item_floor.json"), "w", encoding="utf-8") as fh:
+            json.dump({"rects": rects, "types": types}, fh)
+        print(f"objets au sol : {len(imgs)} images pour {len(types)} types")
+
 
 if __name__ == "__main__":
     main(*sys.argv[1:4])
