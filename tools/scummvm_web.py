@@ -157,19 +157,23 @@ LAUNCH_JS = r"""<script src="volume.js"></script>
   let zones = null;
   // Que montrer dans la vue 3D de la page principale ? L'image du jeu (zone x, y, l, h de l'écran
   // 320 × 200) pendant les lieux plein écran, dialogues, séquences et cinématiques ; rien en
-  // exploration ni dans le menu. La boucle principale arrêtée depuis 0,5 s = le jeu est dans une
-  // autre boucle (dialogue, cinématique, changement de niveau).
-  const view = { loops: -1, at: 0, scene: false, upd: 0, seq: [0, 0, 0, 0], menu: false };
+  // exploration, dans le menu ni pendant un changement de niveau. On ne recopie que la fenêtre
+  // de scène du jeu (112, 0, 176 × 120 : la vue), sauf séquence plein écran (largeur 320) et
+  // introduction : jamais l'interface (portraits, sac…). La boucle principale arrêtée depuis
+  // 0,5 s = le jeu est dans une autre boucle (dialogue, cinématique scriptée).
+  const view = { loops: -1, at: 0, scene: false, upd: 0, seq: [0, 0, 0, 0], menu: false, loading: false };
+  const SCENE = [112, 0, 176, 120];
   window.lolView = () => {
-    const full = { mirror: true, crop: [0, 0, 320, 200] };
-    if (!zones) return full;                                   // avant la partie (introduction)
-    if (view.menu) return { mirror: false };
-    if (performance.now() - view.at > 500) return full;
-    if (view.scene || (view.upd & 1)) {
-      const [x1, y1, x2, y2] = view.seq;
-      return x2 > x1 && y2 > y1 && x2 - x1 < 320 ? { mirror: true, crop: [x1, y1, x2 - x1, y2 - y1] } : full;
+    if (!zones || view.loops <= 0) return { mirror: true, crop: [0, 0, 320, 200] };   // avant la partie (introduction)
+    if (view.menu || view.loading) return { mirror: false };
+    const special = view.scene || (view.upd & 1), stale = performance.now() - view.at > 500;
+    if (!special && !stale) return { mirror: false };
+    const [x1, y1, x2, y2] = view.seq;
+    if (special && x2 > x1 && y2 > y1) {
+      if (x2 - x1 >= 320) return { mirror: true, crop: [0, 0, 320, Math.min(200, y2 - y1 || 200)] };   // plein écran
+      return { mirror: true, crop: [x1, y1, x2 - x1, y2 - y1] };
     }
-    return { mirror: false };
+    return { mirror: true, crop: SCENE };
   };
   Module.lolCmdDone = (id, code) => ch.postMessage({ id, data: { code } });
   Module.lolState = (bytes) => {
@@ -181,11 +185,11 @@ LAUNCH_JS = r"""<script src="volume.js"></script>
     zones = out;
     // affichage (zone 0x7F000100) : scène spéciale, _updateFlags, fenêtre de séquence, menu, tours de boucle
     const z = out.find((q) => q[0] === 0x7F000100);
-    if (z && z[1].length >= 16) {
+    if (z && z[1].length >= 17) {
       const b = z[1], w = (o) => b[o] | b[o + 1] << 8;
       const loops = (b[12] | b[13] << 8 | b[14] << 16) + b[15] * 16777216;
       if (loops !== view.loops) { view.loops = loops; view.at = performance.now(); }
-      view.scene = !!b[0]; view.upd = w(1); view.seq = [w(3), w(5), w(7), w(9)]; view.menu = !!b[11];
+      view.scene = !!b[0]; view.upd = w(1); view.seq = [w(3), w(5), w(7), w(9)]; view.menu = !!b[11]; view.loading = !!b[16];
     }
   };
   const ch = new BroadcastChannel("lol-mem");

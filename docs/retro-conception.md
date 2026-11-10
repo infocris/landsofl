@@ -850,9 +850,16 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     zone d'affichage (`0x7F000100`) : `_specialSceneFlag`, `_updateFlags`, fenêtre de séquence
     (`gui_prepareForSequence` : 112,0-288,120 pour la fenêtre de scène, largeur 320 = plein
     écran), menu ouvert, compteur de tours de `runLoop`.
-  - `lol-game.html` (`lolView()`) : avant la partie, ou boucle principale arrêtée depuis 0,5 s
-    (cinématique, dialogue, changement de niveau) → écran entier ; scène spéciale ou
-    `_updateFlags & 1` → fenêtre de séquence (ou écran entier) ; menu ou exploration → rien.
+  - `lol-game.html` (`lolView()`) :
+    - avant la partie (boucle principale jamais lancée : introduction) → écran entier ;
+    - menu, changement de niveau (`_webLoadingLevel`, mis par `loadLevel`, effacé au tour
+      suivant de la boucle principale) ou exploration → rien (vue 3D) ;
+    - scène spéciale ou `_updateFlags & 1` → fenêtre de séquence ; largeur 320 → écran entier ;
+    - boucle principale arrêtée depuis 0,5 s (dialogue, cinématique scriptée) → fenêtre de
+      scène seule (112,0, 176 × 120), jamais l'interface.
+    - Corrigé le 2026-11-10 : la première version recopiait l'écran entier, interface comprise,
+      pendant les changements de niveau et la scène du garde devant Gladstone. Vérifié : passage
+      niveau 2 → 1 → vue 3D conservée ; introduction en plein écran.
   - `lol.html` recopie le canevas de ScummVM (`captureStream`, vidéo) dans la vue 3D, recadré.
   - Vérifié : introduction recopiée ; rien en exploration ni dans le menu. Dialogues et
     panoramas non testés en automatique (il faut les déclencher en jeu).

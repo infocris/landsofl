@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..23adfbf0 100644
+index 392e4c2d..ed4655a3 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -39,6 +39,10 @@
@@ -13,7 +13,7 @@ index 392e4c2d..23adfbf0 100644
  namespace Kyra {
  
  const char *const LoLEngine::kMouseKeymapName = "lolmouse";
-@@ -929,6 +933,277 @@ void LoLEngine::startupNew() {
+@@ -929,6 +933,279 @@ void LoLEngine::startupNew() {
  	_screen->showMouse();
  }
  
@@ -27,8 +27,10 @@ index 392e4c2d..23adfbf0 100644
 +	static uint32 lastTime = 0;
 +	static Common::Array<byte> buf;
 +	const uint32 now = _system->getMillis();
-+	if (mainLoop)
++	if (mainLoop) {
 +		_webLoopCount++;
++		_webLoadingLevel = false;
++	}
 +	const bool changed = mainLoop && EM_ASM_INT({ return Module.lolCmds && Module.lolCmds.length ? 1 : 0; });
 +	if (changed)
 +		webRunCommands();
@@ -68,7 +70,7 @@ index 392e4c2d..23adfbf0 100644
 +	begin(0x7F000100);
 +	u8(_specialSceneFlag ? 1 : 0); u16(_updateFlags);
 +	u16(_seqWindowX1); u16(_seqWindowY1); u16(_seqWindowX2); u16(_seqWindowY2);
-+	u8(_webInMenu ? 1 : 0); u32(_webLoopCount);
++	u8(_webInMenu ? 1 : 0); u32(_webLoopCount); u8(_webLoadingLevel ? 1 : 0);
 +	end();
 +	// image de chaque monstre telle que le jeu la dessine vu du groupe (drawMonster) :
 +	// numéro d'image (0-15, 255 = aucune), puis 1 = image retournée horizontalement
@@ -291,7 +293,7 @@ index 392e4c2d..23adfbf0 100644
  void LoLEngine::runLoop() {
  	// Initialize debugger since how it should be fully usable
  	static_cast<Debugger_LoL *>(getDebugger())->initialize();
-@@ -957,6 +1232,7 @@ void LoLEngine::runLoop() {
+@@ -957,6 +1234,7 @@ void LoLEngine::runLoop() {
  		gui_updateInput();
  
  		update();
@@ -299,7 +301,7 @@ index 392e4c2d..23adfbf0 100644
  
  		updatePlayTimer();
  
-@@ -1477,6 +1753,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
+@@ -1477,6 +1755,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
  
  	int newVal = (mode == 2) ? (pointsMax + points) : (mode ? (pointsCur + points) : points);
  	newVal = CLIP(newVal, 0, pointsMax);
@@ -308,7 +310,7 @@ index 392e4c2d..23adfbf0 100644
  
  	if (type) {
  		c->magicPointsCur = newVal;
-@@ -2074,6 +2352,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
+@@ -2074,6 +2354,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
  
  void LoLEngine::delay(uint32 millis, bool doUpdate, bool) {
  	while (millis && !shouldQuit()) {
@@ -317,7 +319,7 @@ index 392e4c2d..23adfbf0 100644
  			update();
  		else
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index 2cfadf37..0251df87 100644
+index 2cfadf37..8975cdde 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
 @@ -315,6 +315,11 @@ private:
@@ -332,7 +334,7 @@ index 2cfadf37..0251df87 100644
  	void update() override;
  
  	// mouse
-@@ -1072,6 +1077,11 @@ private:
+@@ -1072,6 +1077,12 @@ private:
  
  	LoLItem *_itemsInPlay;
  	ItemProperty *_itemProperties;
@@ -340,10 +342,23 @@ index 2cfadf37..0251df87 100644
 +	char _webMonsterShapeFile[3][13] = {};	// version web : fichier de sprites chargé dans chaque emplacement
 +	bool _webInfiniteHp = false, _webInfiniteMp = false;	// version web : triches vie / magie infinies
 +	bool _webInMenu = false;	// version web : menu (disquette) ouvert
++	bool _webLoadingLevel = false;	// version web : changement de niveau, jusqu'au retour dans la boucle principale
 +	uint32 _webLoopCount = 0;	// version web : tours de la boucle principale
  
  	Item _itemInHand;
  	Item _inventory[48];
+diff --git a/engines/kyra/engine/scene_lol.cpp b/engines/kyra/engine/scene_lol.cpp
+index 532afdf4..a08e971d 100644
+--- a/engines/kyra/engine/scene_lol.cpp
++++ b/engines/kyra/engine/scene_lol.cpp
+@@ -32,6 +32,7 @@
+ namespace Kyra {
+ 
+ void LoLEngine::loadLevel(int index) {
++	_webLoadingLevel = true;	// version web : effacé au prochain tour de la boucle principale
+ 	_flagsTable[73] |= 0x08;
+ 	setMouseCursorToIcon(0x85);
+ 	_nextScriptFunc = 0;
 diff --git a/engines/kyra/engine/sprites_lol.cpp b/engines/kyra/engine/sprites_lol.cpp
 index 055e4f8c..8fd1d5c3 100644
 --- a/engines/kyra/engine/sprites_lol.cpp
