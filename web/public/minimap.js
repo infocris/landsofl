@@ -797,7 +797,9 @@
       const a = i * MON.size + 2;                 // bytes commence à x0 - 2
       const block = bytes[a - 2] | bytes[a - 1] << 8, x = bytes[a] | bytes[a + 1] << 8, y = bytes[a + 2] | bytes[a + 3] << 8;
       if (!block || block > 1023 || (x >> 8) !== (block & 31) || (y >> 8) !== (block >> 5)) continue;
-      out.push({ slot: i, x: x / 256, y: y / 256, dir: bytes[a + 17] & 3, type: bytes[a + 25], sf: bytes[a + 12], mode: bytes[a + 13] });   // +12 image d'animation, +13 mode
+      // +12 image d'animation, +13 mode ; +18 drapeaux (& 7 = variante de couleurs), +35..+38 équipement
+      out.push({ slot: i, x: x / 256, y: y / 256, dir: bytes[a + 17] & 3, type: bytes[a + 25], sf: bytes[a + 12], mode: bytes[a + 13],
+        variant: bytes[a + 18] & 7, equip: [bytes[a + 35], bytes[a + 36], bytes[a + 37], bytes[a + 38]] });
     }
     return out;
   }
@@ -1299,7 +1301,7 @@
   // Débogage depuis la console : LoLMinimap.monsters() -> case, direction, type, sprite choisi
   function debugMonsters() {
     const L = current;
-    return monsters.map((m) => ({ case: `${Math.floor(m.x)},${Math.floor(m.y)}`, dir: m.dir, type: m.type,
+    return monsters.map((m) => ({ case: `${Math.floor(m.x)},${Math.floor(m.y)}`, dir: m.dir, type: m.type, variant: m.variant, equip: m.equip.filter(Boolean).join(","),
       sprite: L && L.spriteOf ? L.spriteOf[m.type] || "(aucun : type inconnu du niveau)" : "(en cours)",
       possibles: L ? (L.monsterTypes[m.type] || []).join("/") : "" }));
   }

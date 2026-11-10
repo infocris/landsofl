@@ -490,7 +490,7 @@ def main(game_dir, maps_dir, out_dir):
 
         # sprites des monstres : images 0-15 (face, profil, dos par groupes de 4, puis attaque)
         sprite_names = sorted({s for m in level["monsters"] for s in m["sprites"]})
-        sprite_sigs = {}
+        sprite_sigs, sprite_variants, sprite_equip = {}, {}, {}
         sprites, sprite_imgs = {}, []
         for sname in sprite_names:
             data = None
@@ -515,6 +515,36 @@ def main(game_dir, maps_dir, out_dir):
                 else:                                   # image absente : première de son groupe
                     entry.append(entry[fi - fi % 4] if fi % 4 and entry else (entry[0] if entry else None))
             sprites[sname] = entry
+            # variantes de couleurs (image 16, comme LoLEngine::loadMonsterShapes) : colonne 0 =
+            # couleurs d'origine, colonne d = remplacements de la variante d (drapeaux du monstre & 7)
+            if len(frames) > 16 and frames[16]:
+                w16, h16, px16 = frames[16]
+                variants = {}
+                for d in range(1, min(8, w16)):
+                    pairs = []
+                    for r in range(h16):
+                        a, b = px16[r * w16], px16[r * w16 + d]
+                        if a and b and a != b:
+                            pairs.append(list(rgb(pal, a)) + list(rgb(pal, b)))
+                    if pairs:
+                        variants[str(d)] = pairs
+                if variants:
+                    sprite_variants[sname] = variants
+            # équipement dessiné par-dessus le corps (LoLEngine::drawMonster) : 4 jeux × 16 images,
+            # image 17 + jeu * 16 + image du corps ; jeu = equipmentShapes[i] - 1
+            equip = []
+            for v in range(4):
+                row = []
+                for fi in range(16):
+                    k = 17 + v * 16 + fi
+                    if k < len(frames) and frames[k] and frames[k][0] > 1 and any(c is not None for c in frames[k][2]):
+                        row.append(len(sprite_imgs))
+                        sprite_imgs.append(frame_image(frames[k], pal))
+                    else:
+                        row.append(None)
+                equip.append(row)
+            if any(x is not None for row in equip for x in row):
+                sprite_equip[sname] = equip
         sx, rects = 0, []
         for img in sprite_imgs:
             rects.append([sx, 0, img.w, img.h]); sx += img.w + 1
@@ -552,6 +582,8 @@ def main(game_dir, maps_dir, out_dir):
             "monsterTypes": {str(m["type"]): m["sprites"] for m in level["monsters"]
                              if m["type"] is not None and m["sprites"]},
             "spriteSigs": sprite_sigs,
+            "spriteVariants": sprite_variants,     # nom -> {variante: [[r, g, b, r2, g2, b2]…]}
+            "spriteEquip": sprite_equip,           # nom -> 4 jeux × 16 numéros d'image (ou null)
             "spriteConds": sprite_conditions(files[f"LEVEL{n}.INI"]) if f"LEVEL{n}.INI" in files else {},
             "scenes": scenes,   # case -> image du lieu (data/scenes/)
             "locks": locks_by_level.get(n, []),   # serrures : case + clé (tools/locks.py)

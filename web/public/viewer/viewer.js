@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261109o";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261110a";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) FOV = 2 * Math.atan(1.375);
   let dirty = true;
@@ -165,6 +165,7 @@
     L.floorTex = pixels(floor);
     L.ceilTex = pixels(ceil);
     L.sprImgs = darken(spr, SHADES);
+    L.sprSrc = spr; L.compCache = new Map();
     L.wallInfo = [];
     for (const [id, w] of Object.entries(L.walls)) L.wallInfo[+id] = w;
     L.outdoor = OUTDOOR[L.tileset] || null;
@@ -343,7 +344,7 @@
         if (it.sp) {
           const sp = it.sp;
           if (sp.ghost) ctx.globalAlpha = 0.55;          // apparition sur événement
-          ctx.drawImage(L.sprImgs[shadeFor(dist)], sp.rx + Math.floor(it.u * sp.rw), sp.ry, 1, sp.rh,
+          ctx.drawImage((sp.imgs || L.sprImgs)[shadeFor(dist)], sp.rx + Math.floor(it.u * sp.rw), sp.ry, 1, sp.rh,
             x, sp.top, 1, sp.sh);
           ctx.globalAlpha = 1;
         } else {
@@ -442,12 +443,12 @@
       let pose = 1, mirror = rel < 0;
       if (Math.abs(rel) < Math.PI / 4) { pose = 0; mirror = false; }
       else if (Math.abs(rel) > 3 * Math.PI / 4) { pose = 2; mirror = false; }
-      const rect = L.spriteRects[spriteFrame(ids, pose, m)];
-      if (!rect) continue;
-      const [srx, sry, rw, rh] = rect, d = deff(z);
+      const look = monsterLook(m.sprite, ids, pose, m);
+      if (!look) continue;
+      const { rx: srx, ry: sry, rw, rh, imgs } = look, d = deff(z);
       const scale = (WALL_H / 96) * proj / d, sw = rw * scale, sh = rh * scale;
       const left = W / 2 + lat * proj / d - sw / 2, top = half + (WALL_H / 2) * proj / d - sh;
-      sprites.push({ tz: z, rx: srx, ry: sry, rw, rh, sw, sh, left, top, mirror,
+      sprites.push({ tz: z, rx: srx, ry: sry, rw, rh, sw, sh, left, top, mirror, imgs,
         x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
     }
 
@@ -494,7 +495,7 @@
         const dist = Math.max(0.05, it.d);
         if (it.sp) {
           const sp = it.sp;
-          ctx.drawImage(L.sprImgs[shadeFor(dist)], sp.rx + Math.floor(it.u * sp.rw), sp.ry, 1, sp.rh, x, sp.top, 1, sp.sh);
+          ctx.drawImage((sp.imgs || L.sprImgs)[shadeFor(dist)], sp.rx + Math.floor(it.u * sp.rw), sp.ry, 1, sp.rh, x, sp.top, 1, sp.sh);
         } else {
           const colH = WALL_H * proj / deff(dist), top = half - colH / 2;
           const tx = (it.tex % cols) * fw + Math.min(fw - 1, Math.floor(it.u * fw));
@@ -527,6 +528,14 @@
     return m && m.sf ? m.sf & 3 : 0;
   }
   window.lolMonStep = (slot) => monsterStep(liveMonsters.find((m) => m.slot === slot));   // débogage
+  // débogage : apparence d'un monstre -> canvas (ex. lolMonsterLook("BANDIT", 0, { variant: 2, equip: [] }))
+  window.lolMonsterLook = (name, pose, m) => {
+    const look = L && L.sprites[name] ? monsterLook(name, L.sprites[name], pose, { sf: 0, ...m }) : null;
+    if (!look) return null;
+    const c = document.createElement("canvas"); c.width = look.rw; c.height = look.rh;
+    c.getContext("2d").drawImage(look.imgs[0], look.rx, look.ry, look.rw, look.rh, 0, 0, look.rw, look.rh);
+    return c;
+  };
   function animating() {
     const now = performance.now();
     for (const t of monTrack.values()) if (now < t.until) return true;
@@ -535,6 +544,45 @@
   function spriteFrame(ids, pose, m) {
     if (ids.length >= 12) return ids[pose * 4 + monsterStep(m)] ?? ids[pose * 4] ?? ids[0];
     return ids[pose] ?? ids[0];                           // anciennes données : 3 poses
+  }
+
+  // Apparence propre à chaque monstre (LoLEngine::drawMonster) : variante de couleurs (drapeaux & 7,
+  // table de l'image 16 du sprite) et jusqu'à 4 pièces d'équipement dessinées par-dessus le corps
+  // (images 17 + jeu * 16 + image). L'image composée et ses niveaux d'ombre sont gardés en cache.
+  // -> { imgs, rx, ry, rw, rh } (planche commune quand le monstre n'a ni variante ni équipement).
+  function monsterLook(name, ids, pose, m) {
+    const id = spriteFrame(ids, pose, m), rect = L.spriteRects[id];
+    if (!rect) return null;
+    const [rx, ry, rw, rh] = rect;
+    const pairs = m.variant && L.spriteVariants && L.spriteVariants[name] ? L.spriteVariants[name][m.variant] : null;
+    const sets = L.spriteEquip && L.spriteEquip[name] && m.equip ? m.equip.filter((e) => e > 0 && e <= 4) : [];
+    if (!pairs && !sets.length) return { imgs: L.sprImgs, rx, ry, rw, rh };
+    const fi = ids.indexOf(id) >= 0 ? (ids.length >= 12 ? ids.indexOf(id, pose * 4) : ids.indexOf(id)) : 0;
+    const key = `${id}|${m.variant || 0}|${sets.join(",")}`;
+    let imgs = L.compCache.get(key);
+    if (!imgs) {
+      const c = document.createElement("canvas");
+      c.width = rw; c.height = rh;
+      const g = c.getContext("2d");
+      g.drawImage(L.sprSrc, rx, ry, rw, rh, 0, 0, rw, rh);
+      if (pairs) {
+        const map = new Map(pairs.map((p) => [p[0] << 16 | p[1] << 8 | p[2], p.slice(3)]));
+        const d = g.getImageData(0, 0, rw, rh), px = d.data;
+        for (let i = 0; i < px.length; i += 4) {
+          if (!px[i + 3]) continue;
+          const to = map.get(px[i] << 16 | px[i + 1] << 8 | px[i + 2]);
+          if (to) { px[i] = to[0]; px[i + 1] = to[1]; px[i + 2] = to[2]; }
+        }
+        g.putImageData(d, 0, 0);
+      }
+      for (const e of sets) {
+        const di = L.spriteEquip[name][e - 1][fi >= 0 ? fi : 0], r2 = di != null ? L.spriteRects[di] : null;
+        if (r2) g.drawImage(L.sprSrc, r2[0], r2[1], r2[2], r2[3], 0, 0, r2[2], r2[3]);
+      }
+      imgs = darken(c, SHADES);
+      L.compCache.set(key, imgs);
+    }
+    return { imgs, rx: 0, ry: 0, rw, rh };
   }
 
   // Projection des monstres à l'écran (choix face / profil / dos selon l'angle de vue).
@@ -556,14 +604,14 @@
       let pose = 1, mirror = rel < 0;
       if (Math.abs(rel) < Math.PI / 4) { pose = 0; mirror = false; }
       else if (Math.abs(rel) > 3 * Math.PI / 4) { pose = 2; mirror = false; }
-      const rect = L.spriteRects[spriteFrame(ids, pose, m)];
-      if (!rect) continue;
-      const [rx, ry, rw, rh] = rect;
+      const look = monsterLook(EMBED ? m.sprite : m.sprites[0], ids, pose, m);
+      if (!look) continue;
+      const { rx, ry, rw, rh, imgs } = look;
       const scale = (WALL_H / 96) / tz * proj;      // même échelle que les murs (96 px = hauteur)
       const sw = rw * scale, sh = rh * scale;
       const left = W / 2 * (1 + tx / tz) - sw / 2;
       const top = H / 2 + pitch + (WALL_H / 2) / tz * proj - sh;
-      out.push({ tz, rx, ry, rw, rh, sw, sh, left, top, mirror, ghost: m.spawn === "event",
+      out.push({ tz, rx, ry, rw, rh, sw, sh, left, top, mirror, imgs, ghost: m.spawn === "event",
         x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
     }
     return out;

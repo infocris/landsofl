@@ -813,6 +813,23 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
   - Vérifié (test automatisé, son coupé), Michael : sans triche, 5 dégâts → 15/20 PV, 3 de magie
     → 3/6 ; triches cochées → 20/20 et 6/6 ; 500 dégâts et 50 de magie → inchangés, vivant ;
     décochées, 4 dégâts → 16/20 ; « +100 couronnes » : 41 → 141.
+- **Apparence propre à chaque monstre** (2026-11-10, vue 3D, versions DOSBox et ScummVM).
+  `LoLEngine::drawMonster` varie un même sprite de deux façons :
+  - **variante de couleurs** : `flags & 7` du monstre (octet +25 de la structure, 6ᵉ argument
+    de la fonction de script 0x38, souvent calculé, donc lu sur les monstres vivants). L'image 16
+    du fichier .SHP est une table : colonne 0 = couleurs d'origine (une par ligne), colonne d =
+    remplacement pour la variante d (0 ou absente : inchangée). Ex. BANDIT : 88-94 (cape) →
+    112-118, 119-125 ou 34-40 ; colonne 4 = d'origine. D'où capes verte, olive, gris-vert, rouge ;
+  - **équipement** : `equipmentShapes[4]` (octets +42 à +45), jeux 1 à 4 ; pour l'image f du
+    corps, le jeu dessine l'image 17 + (jeu − 1) × 16 + f du même fichier, au même endroit
+    (casque, masse, bouclier… : GUARD, ORC, THUG, AMAZON, PENTROG, WRAITH…). BANDIT n'a pas
+    d'images d'équipement.
+  - `tools/export_viewer.py` exporte `spriteVariants` (paires de couleurs RGB par variante) et
+    `spriteEquip` (4 × 16 images ajoutées à la planche) ; `minimap.js` transmet `variant` et
+    `equip` de chaque monstre ; la vue 3D compose l'image (recoloration + équipement) et la garde
+    en cache avec ses niveaux d'ombre (`monsterLook`).
+  - Vérifié : planche des 4 variantes de BANDIT et d'ORC avec équipements 1, 1+3, 2 (variante 2).
+    Au niveau 6, les 4 brigands vivants ont des variantes 0, 2, 3 (tirées au chargement).
 - **Vérifié** (test automatisé, son coupé, WebGL logiciel SwiftShader) : le jeu est détecté
   « CD/DOS/French ». L'intro, le menu titre (« Nouvelle Partie ») et la sélection du
   personnage s'affichent en français.
@@ -1188,3 +1205,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-10** : ScummVM web : gestion de l'inventaire depuis le panneau (commandes exécutées par le moteur : déplacer, équiper, supprimer, créer) (§ 10 bis).
 - **2026-11-10** : ScummVM web : sprites exacts des monstres (noms publiés par le moteur) ; commande « aller au niveau » (§ 10 bis).
 - **2026-11-10** : ScummVM web : vie et magie infinies appliquées par le moteur (aucun coup mortel), couronnes (§ 10 bis).
+- **2026-11-10** : vue 3D : variantes de couleurs et équipement des monstres (§ 10 bis).
