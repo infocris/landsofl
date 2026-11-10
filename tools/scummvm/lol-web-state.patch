@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..1398e4d3 100644
+index 392e4c2d..c516c8c3 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -39,6 +39,10 @@
@@ -13,7 +13,7 @@ index 392e4c2d..1398e4d3 100644
  namespace Kyra {
  
  const char *const LoLEngine::kMouseKeymapName = "lolmouse";
-@@ -929,6 +933,193 @@ void LoLEngine::startupNew() {
+@@ -929,6 +933,222 @@ void LoLEngine::startupNew() {
  	_screen->showMouse();
  }
  
@@ -49,6 +49,15 @@ index 392e4c2d..1398e4d3 100644
 +	begin(0x3E4F6); for (int i = 0; i < 48; i++) u16(_inventory[i]); end();
 +	begin(0x3E55C); for (int i = 0; i < 128; i++) u8(i < (int)sizeof(_flagsTable) ? _flagsTable[i] : 0); end();
 +	begin(0x30270); for (int i = 0; i < 11; i++) u32(_expRequirements ? _expRequirements[i] : 0); end();
++	// sprites des monstres (zone propre à la version web, hors de la mémoire DOS) : pour chacun des
++	// 5 types de monstres, nom (13 octets) du fichier chargé dans son emplacement (shapeIndex)
++	begin(0x7F000000);
++	for (int t = 0; t < 5; t++) {
++		const int slot = _monsterProperties ? _monsterProperties[t].shapeIndex : -1;
++		const char *n = (slot >= 0 && slot < 3) ? _webMonsterShapeFile[slot] : "";
++		for (int k = 0; k < 13; k++) u8(k < (int)strlen(n) ? (uint8)n[k] : 0);
++	}
++	end();
 +
 +	// grille : 1024 cases de 10 octets (murs N E S O, objets posés, objets à dessiner, direction, drapeaux)
 +	begin(0x3E713);
@@ -109,7 +118,7 @@ index 392e4c2d..1398e4d3 100644
 +// avec les fonctions du jeu (scripts des objets équipés, recalcul des caractéristiques, affichage).
 +// Emplacements : 0..47 sac, 100 main, 200 + perso * 11 + emplacement d'équipement.
 +// op 1 : déplacer a vers b (échange si b est occupé) ; op 2 : supprimer l'objet de a ;
-+// op 3 : créer un objet de type a dans le sac. Résultat (Module.lolCmdDone(id, code)) :
++// op 3 : créer un objet de type a dans le sac ; op 4 : aller au niveau a, case b. Résultat (Module.lolCmdDone(id, code)) :
 +// 0 fait, 1 emplacement ou objet impossible, 2 sac plein, 3 emplacement vide.
 +void LoLEngine::webRunCommands() {
 +#ifdef __EMSCRIPTEN__
@@ -166,6 +175,26 @@ index 392e4c2d..1398e4d3 100644
 +		return (_itemProperties[_itemsInPlay[item].itemPropertyIndex].type & (1 << ((loc - 200) % 11))) != 0;
 +	};
 +
++	if (op == 4) {	// aller au niveau a, case b (comme olol_loadNewLevel)
++		if (a < 1 || a > 29 || b < 0 || b > 1023)
++			return 1;
++		_screen->fadeClearSceneWindow(10);
++		_screen->fillRect(112, 0, 288, 120, 0);
++		disableSysTimer(2);
++		for (int i = 0; i < 8; i++) {
++			if (!_flyingObjects[i].enable || _flyingObjects[i].objectType)
++				continue;
++			endObjectFlight(&_flyingObjects[i], _flyingObjects[i].x, _flyingObjects[i].y, 1);
++		}
++		completeDoorOperations();
++		generateTempData();
++		_currentBlock = b;
++		_currentDirection = 0;
++		calcCoordinates(_partyPosX, _partyPosY, _currentBlock, 0x80, 0x80);
++		loadLevel(a);
++		enableSysTimer(2);
++		return 0;
++	}
 +	if (op == 3) {
 +		if (a <= 0 || a >= _webNumItemProperties)
 +			return 1;
@@ -207,7 +236,7 @@ index 392e4c2d..1398e4d3 100644
  void LoLEngine::runLoop() {
  	// Initialize debugger since how it should be fully usable
  	static_cast<Debugger_LoL *>(getDebugger())->initialize();
-@@ -957,6 +1148,7 @@ void LoLEngine::runLoop() {
+@@ -957,6 +1177,7 @@ void LoLEngine::runLoop() {
  		gui_updateInput();
  
  		update();
@@ -216,7 +245,7 @@ index 392e4c2d..1398e4d3 100644
  		updatePlayTimer();
  
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index 2cfadf37..270d2635 100644
+index 2cfadf37..2afc12c3 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
 @@ -315,6 +315,11 @@ private:
@@ -231,14 +260,32 @@ index 2cfadf37..270d2635 100644
  	void update() override;
  
  	// mouse
-@@ -1072,6 +1077,7 @@ private:
+@@ -1072,6 +1077,8 @@ private:
  
  	LoLItem *_itemsInPlay;
  	ItemProperty *_itemProperties;
 +	int _webNumItemProperties = 0;	// version web : taille de _itemProperties
++	char _webMonsterShapeFile[3][13] = {};	// version web : fichier de sprites chargé dans chaque emplacement
  
  	Item _itemInHand;
  	Item _inventory[48];
+diff --git a/engines/kyra/engine/sprites_lol.cpp b/engines/kyra/engine/sprites_lol.cpp
+index 055e4f8c..8fd1d5c3 100644
+--- a/engines/kyra/engine/sprites_lol.cpp
++++ b/engines/kyra/engine/sprites_lol.cpp
+@@ -29,6 +29,12 @@ namespace Kyra {
+ void LoLEngine::loadMonsterShapes(const char *file, int monsterIndex, int animType) {
+ 	releaseMonsterShapes(monsterIndex);
+ 	_screen->loadBitmap(file, 3, 3, 0);
++	if (monsterIndex >= 0 && monsterIndex < 3) {	// version web : nom sans extension, pour la mini-carte
++		Common::strlcpy(_webMonsterShapeFile[monsterIndex], file, 13);
++		char *dot = strchr(_webMonsterShapeFile[monsterIndex], '.');
++		if (dot)
++			*dot = 0;
++	}
+ 
+ 	const uint8 *p = _screen->getCPagePtr(2);
+ 	const uint8 *ts[16];
 diff --git a/engines/kyra/script/script_lol.cpp b/engines/kyra/script/script_lol.cpp
 index 30c59a77..bde6ac2a 100644
 --- a/engines/kyra/script/script_lol.cpp

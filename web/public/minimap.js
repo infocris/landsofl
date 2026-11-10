@@ -855,7 +855,29 @@
   // Sprite de chaque type : quand un type a plusieurs sprites possibles (ex. ORC ou THUG
   // selon l'histoire), on cherche en mémoire lequel le jeu a chargé (une fois par niveau).
   let resolving = false;
+  // Version ScummVM : le moteur publie, pour chacun des 5 types de monstres, le nom du fichier de
+  // sprites chargé dans son emplacement (zone 0x7F000000, 13 octets par type ; tools/scummvm_web.py).
+  // Choix exact, relu à chaque mise à jour (un script peut recharger un emplacement en cours de niveau).
+  const ENGINE_SPRITES = window.LOL_ENGINE === "scummvm", SPRITE_NAMES = 0x7F000000;
+  async function resolveEngineSprites(L) {
+    if (resolving) return;
+    resolving = true;
+    try {
+      const r = await mem.read([[SPRITE_NAMES, 5 * 13]]);
+      if (!r) return;
+      const b = r[0], spriteOf = {};
+      for (const [t, names] of Object.entries(L.monsterTypes)) {
+        let n = "";
+        for (let k = 0; k < 13 && t < 5 && b[t * 13 + k]; k++) n += String.fromCharCode(b[t * 13 + k]);
+        n = n.toUpperCase();
+        if (names.includes(n)) spriteOf[t] = n;
+        else if (n) console.warn(`mini-carte : sprite ${n} (type ${t}) absent des sprites prévus pour le niveau ${L.level}`, names);
+      }
+      if (JSON.stringify(spriteOf) !== JSON.stringify(L.spriteOf)) L.spriteOf = spriteOf;
+    } finally { resolving = false; }
+  }
   async function resolveSprites(L) {
+    if (ENGINE_SPRITES) return resolveEngineSprites(L);
     if (L.spriteOf || resolving) return;
     resolving = true;
     try {

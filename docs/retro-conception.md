@@ -779,6 +779,25 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
   - Vérifié (test automatisé, son coupé) : heaume de nain (type 17) créé dans le sac, équipé
     sur Michael (tête), rangé, glissé dans la main (le jeu affiche « Heaume de nain pris(e). »
     et le curseur le porte), supprimé ; anneau Bezel (225) glissé sur la tête : refusé.
+- **Sprites des monstres** (2026-11-10, version ScummVM). Un type de monstre peut avoir plusieurs
+  apparences selon l'histoire (niveau 2 : ORC ou THUG ; 7 : SCAVNGR ou RATMAN ; 11 : SWAMPMON
+  ou HURZELL ; 23, 26, 29…). Le script du niveau charge un fichier de sprites dans l'un des
+  3 emplacements (`loadMonsterShapes(fichier, emplacement, …)`), et chaque type pointe vers un
+  emplacement (`_monsterProperties[type].shapeIndex`).
+  - Version DOSBox : la page cherche en mémoire la signature des sprites chargés, sinon suit la
+    condition du script (drapeau). Version ScummVM : pas de recherche possible, d'où des
+    sprites faux.
+  - Le moteur garde le nom du fichier chargé dans chaque emplacement
+    (`_webMonsterShapeFile`, rempli par `loadMonsterShapes`). Il publie, dans une zone propre
+    à la version web (`0x7F000000`, hors de la mémoire DOS), le nom pour chacun des 5 types
+    (13 octets par type).
+  - `minimap.js` (version ScummVM) relit ces noms à chaque mise à jour : la carte et la vue 3D
+    suivent même un rechargement d'emplacement en cours de niveau.
+  - Commande web ajoutée pour les tests : aller au niveau n, case c (`goto`, op 4), comme
+    `olol_loadNewLevel`.
+  - Vérifié (test automatisé, son coupé) : niveau 1 GUARD ; niveau 2 type 1 = THUG (et non ORC),
+    type 2 = BOAR ; niveau 7 type 2 = CAVEDWLR ; niveau 11 type 1 = SWAMPMON, type 2 =
+    SWAMPCIT. Carte et moteur concordent.
 - **Vérifié** (test automatisé, son coupé, WebGL logiciel SwiftShader) : le jeu est détecté
   « CD/DOS/French ». L'intro, le menu titre (« Nouvelle Partie ») et la sélection du
   personnage s'affichent en français.
@@ -1152,3 +1171,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-10** : ScummVM web : touches reçues plusieurs fois (abonnements clavier de SDL3 en double) corrigé dans le lanceur ; mini-carte, vue 3D et panneau branchés sur l'état publié par le moteur (§ 10 bis).
 - **2026-11-10** : ScummVM web versionné dans `web/scummvm` (origine dans `VERSION.txt`, modification du moteur sur la branche locale `lol-web`) (§ 10 bis).
 - **2026-11-10** : ScummVM web : gestion de l'inventaire depuis le panneau (commandes exécutées par le moteur : déplacer, équiper, supprimer, créer) (§ 10 bis).
+- **2026-11-10** : ScummVM web : sprites exacts des monstres (noms publiés par le moteur) ; commande « aller au niveau » (§ 10 bis).

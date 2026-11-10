@@ -83,7 +83,7 @@
     } else if (d.find && zones) ch.postMessage({ id: d.id, found: d.find.map(() => -1) });
     else if (d.cmd && zones) {
       // commandes d'inventaire : exécutées par le moteur dans sa boucle (webRunCommands)
-      const op = { move: 1, delete: 2, create: 3 }[d.cmd.op] || 0;
+      const op = { move: 1, delete: 2, create: 3, goto: 4 }[d.cmd.op] || 0;
       (Module.lolCmds = Module.lolCmds || []).push([op, d.cmd.a | 0, d.cmd.b | 0, d.id]);
     }
     else ch.postMessage({ id: d.id, error: zones ? "non disponible avec ScummVM" : "jeu pas encore lancé" });
