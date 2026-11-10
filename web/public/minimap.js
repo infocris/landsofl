@@ -811,6 +811,11 @@
     const block = r[0][0] | r[0][1] << 8, dir = r[1][0] | r[1][1] << 8;
     const hash = readGrid(r[2]);
     monsters = readMonsters(r[3]);
+    if (ENGINE_SPRITES) {
+      // ScummVM : image de chaque monstre telle que le jeu la dessine (attaques, coups, marche)
+      const f = await mem.read([[0x7F000200, 60]]);
+      if (f) for (const m of monsters) { const k = m.slot * 2; m.frame = f[0][k]; m.flip = !!f[0][k + 1]; }
+    }
     const inScene = r[4][0] === 1;
     const liveItems = readLiveItems(r[2], r[5]);
     const now = performance.now();
@@ -848,7 +853,9 @@
       li.classList.toggle("near", Number.isFinite(c) && Math.abs((c % 32) - x) <= 1 && Math.abs(Math.floor(c / 32) - y) <= 1);
     }
     draw(block, dir);
-    sendSceneTo3d(inScene ? current.scenes[block] || "" : null, near ? near.text : "");
+    // image fixe du lieu dans la vue 3D ; sans image connue, la vue reste visible (avant : écran
+    // noir « Lieu »). Version ScummVM : la page recopie l'image du jeu elle-même (tools/scummvm_web.py).
+    sendSceneTo3d(inScene && !ENGINE_SPRITES ? current.scenes[block] || null : null, near ? near.text : "");
     sendGridTo3d(current.level, hash);
     sendMonstersTo3d(current);
     sendTo3d(current.level, x, y, dir);

@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lands of Lore</title>
+<script src="volume.js?v=20261110a"></script>
 <link rel="stylesheet" href="js-dos.css">
 <script src="js-dos.js"></script>
 <!-- ?v= : à changer à chaque modification des scripts (évite les copies en cache) -->
@@ -16,7 +17,10 @@
   /* colonne de gauche : jeu, puis vue 3D synchronisée */
   #left { flex: 1; min-width: 0; height: 100vh; display: flex; flex-direction: column; }
   #dos { flex: 3; min-height: 0; }
-  #v3d { flex: 2; min-height: 160px; border-top: 1px solid #3a3226; background: #000; }
+  #v3d { flex: 2; min-height: 160px; border-top: 1px solid #3a3226; background: #000; position: relative; }
+  /* version ScummVM : image du jeu recopiée dans la vue 3D (lieux plein écran, dialogues, cinématiques) */
+  #v3d-mirror { position: absolute; inset: 0; width: 100%; height: 100%; background: #000; image-rendering: pixelated; }
+  #v3d-mirror[hidden] { display: none; }
   #v3d.hidden { display: none; }
   #v3d iframe { width: 100%; height: 100%; border: 0; display: block; }
   :root { --mm-size: 384px; --mm-w: max(420px, calc(var(--mm-size) + 36px)); }
@@ -161,6 +165,11 @@
     background: rgba(0,0,0,.6); color: #ddd; cursor: pointer; }
   body:has(#mm:not(.hidden)) #persp { right: calc(var(--mm-w) + 12px); }
   body:has(#v3d.hidden) #persp { display: none; }
+  #vol { position: fixed; right: 12px; bottom: 192px; z-index: 1000; display: flex; align-items: center; gap: 4px;
+    font: 12px/1 system-ui, sans-serif; padding: 3px 8px; border: 1px solid #555; border-radius: 6px; background: rgba(0,0,0,.6); }
+  #vol-label { cursor: pointer; user-select: none; }
+  #vol input { width: 90px; accent-color: #c9a227; }
+  body:has(#mm:not(.hidden)) #vol { right: calc(var(--mm-w) + 12px); }
   #v3dtoggle { position: fixed; right: 12px; bottom: 120px; z-index: 1000;
     font: 12px/1 system-ui, sans-serif; padding: 6px 10px; border: 1px solid #555; border-radius: 6px;
     background: rgba(0,0,0,.6); color: #aaa; cursor: pointer; }
@@ -182,7 +191,7 @@
 <body>
 <div id="left">
   <div id="dos"></div>
-  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261110a" title="Vue 3D synchronisée"></iframe></div>
+  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261110b" title="Vue 3D synchronisée"></iframe></div>
 </div>
 <aside id="mm" aria-label="Mini-carte">
   <div id="mm-title"><span>Mini-carte</span><button id="mm-tex" type="button" title="Cases illustrées avec les textures du lieu / couleurs simples">▦</button><button id="mm-smaller" type="button" title="Réduire la mini-carte">−</button><button id="mm-bigger" type="button" title="Agrandir la mini-carte">+</button></div>
@@ -215,6 +224,7 @@
 <button id="v3dtoggle" type="button" title="Afficher/masquer la vue 3D (F10)">3D</button>
 <button id="persp" type="button" title="Perspective de la vue 3D : celle du jeu d'origine ou une perspective réelle"></button>
 <div id="mm-tip" hidden></div>
+<div id="vol"><span id="vol-label" title="Couper / rétablir le son">🔊</span><input type="range" id="vol-range" min="0" max="100" step="1" aria-label="Volume général"></div>
 <button id="mmtoggle" type="button" title="Afficher/masquer la mini-carte (F9)">Carte</button>
 <button id="qload" type="button" title="Recharger l'état enregistré avec F6 (QUICK.SAV)" hidden>F7 · charger l'état</button>
 <button id="zqsd" type="button" title="Activer/désactiver les touches ZQSD (F8)"></button>
@@ -470,6 +480,6 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261110d"></script>
+<script src="minimap.js?v=20261110e"></script>
 </body>
 </html>

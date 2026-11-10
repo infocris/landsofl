@@ -830,6 +830,38 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     en cache avec ses niveaux d'ombre (`monsterLook`).
   - Vérifié : planche des 4 variantes de BANDIT et d'ORC avec équipements 1, 1+3, 2 (variante 2).
     Au niveau 6, les 4 brigands vivants ont des variantes 0, 2, 3 (tirées au chargement).
+- **Animations des monstres (attaques, coups, marche)** (2026-11-10, version ScummVM). Le jeu
+  choisit l'image dans `getMonsterCurFrame(m, drapeaux de direction)` : selon le type
+  d'animation du sprite (`_monsterAnimType`, 4 cas), le mode (5 immobile, 8 combat, 11 / 13…),
+  `fightCurTick`, `currentSubFrame`, les coups reçus ; direction par
+  `_monsterDirFlags[(direction du groupe << 2) + facing]` (bit 0x10 = image retournée). Le moteur
+  publie l'image qu'il dessine pour chacun des 30 monstres (zone `0x7F000200`, 2 octets :
+  image 0-15 ou 255, retournée) ; la vue 3D synchronisée, dont la caméra est celle du groupe,
+  l'utilise telle quelle. Vérifié : brigand en face qui attaque → images 14, 15 ; vue 3D en coup
+  de gourdin.
+- **Image du jeu dans la vue 3D** (2026-11-10, version ScummVM) : lieux plein écran (panoramas),
+  dialogues, séquences, cinématiques.
+  - Cause du « noir » signalé : en scène spéciale, la mini-carte demandait l'image exportée du
+    lieu ; sans image pour cette case, la vue affichait un fond noir « Lieu ». ScummVM signale
+    une scène spéciale aussi pendant dialogues et séquences. Corrigé : sans image connue, la vue
+    3D reste affichée (aussi pour DOSBox).
+  - Le moteur publie aussi depuis `delay()` (appelée par toutes les boucles d'attente :
+    dialogues, séquences, menu ; les commandes restent réservées à la boucle principale) une
+    zone d'affichage (`0x7F000100`) : `_specialSceneFlag`, `_updateFlags`, fenêtre de séquence
+    (`gui_prepareForSequence` : 112,0-288,120 pour la fenêtre de scène, largeur 320 = plein
+    écran), menu ouvert, compteur de tours de `runLoop`.
+  - `lol-game.html` (`lolView()`) : avant la partie, ou boucle principale arrêtée depuis 0,5 s
+    (cinématique, dialogue, changement de niveau) → écran entier ; scène spéciale ou
+    `_updateFlags & 1` → fenêtre de séquence (ou écran entier) ; menu ou exploration → rien.
+  - `lol.html` recopie le canevas de ScummVM (`captureStream`, vidéo) dans la vue 3D, recadré.
+  - Vérifié : introduction recopiée ; rien en exploration ni dans le menu. Dialogues et
+    panoramas non testés en automatique (il faut les déclencher en jeu).
+- **Musique en pause dans le menu** (version ScummVM) : `clickedOptions` met le mélangeur en
+  pause (`_mixer->pauseAll`) pendant `runMenu`. Non vérifié à l'oreille (tests sans son).
+- **Volume général** (versions DOSBox et ScummVM) : `web/public/volume.js` insère un gain
+  WebAudio commun entre tout nœud et `AudioContext.destination` (`AudioNode.prototype.connect`
+  intercepté) ; curseur dans la page (mémorisé), appliqué aussi au cadre de ScummVM. Vérifié :
+  curseur à 30 % → gain du jeu 0,3.
 - **Vérifié** (test automatisé, son coupé, WebGL logiciel SwiftShader) : le jeu est détecté
   « CD/DOS/French ». L'intro, le menu titre (« Nouvelle Partie ») et la sélection du
   personnage s'affichent en français.
@@ -1206,3 +1238,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-10** : ScummVM web : sprites exacts des monstres (noms publiés par le moteur) ; commande « aller au niveau » (§ 10 bis).
 - **2026-11-10** : ScummVM web : vie et magie infinies appliquées par le moteur (aucun coup mortel), couronnes (§ 10 bis).
 - **2026-11-10** : vue 3D : variantes de couleurs et équipement des monstres (§ 10 bis).
+- **2026-11-10** : ScummVM web : animations d'attaque des monstres, image du jeu dans la vue 3D (cinématiques, dialogues, lieux), musique en pause dans le menu ; volume général (§ 10 bis).

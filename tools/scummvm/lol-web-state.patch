@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..b34d0076 100644
+index 392e4c2d..23adfbf0 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -39,6 +39,10 @@
@@ -13,7 +13,7 @@ index 392e4c2d..b34d0076 100644
  namespace Kyra {
  
  const char *const LoLEngine::kMouseKeymapName = "lolmouse";
-@@ -929,6 +933,253 @@ void LoLEngine::startupNew() {
+@@ -929,6 +933,277 @@ void LoLEngine::startupNew() {
  	_screen->showMouse();
  }
  
@@ -22,15 +22,17 @@ index 392e4c2d..b34d0076 100644
 +// et rangées comme dans le jeu DOS (structures compactées, pointeurs sur 4 octets mis à 0).
 +// La page répond avec ces zones sur le canal « lol-mem » comme l'émulateur DOSBox.
 +// Format : (adresse u32, longueur u32, octets)…, petit-boutiste.
-+void LoLEngine::webPublishState() {
++void LoLEngine::webPublishState(bool mainLoop) {
 +#ifdef __EMSCRIPTEN__
 +	static uint32 lastTime = 0;
 +	static Common::Array<byte> buf;
 +	const uint32 now = _system->getMillis();
-+	const bool changed = EM_ASM_INT({ return Module.lolCmds && Module.lolCmds.length ? 1 : 0; });
++	if (mainLoop)
++		_webLoopCount++;
++	const bool changed = mainLoop && EM_ASM_INT({ return Module.lolCmds && Module.lolCmds.length ? 1 : 0; });
 +	if (changed)
 +		webRunCommands();
-+	for (int i = 0; i < 4; i++) {	// triches : remettre au maximum (ce qui a été perdu avant l'activation)
++	for (int i = 0; i < 4 && mainLoop; i++) {	// triches : remettre au maximum (ce qui a été perdu avant l'activation)
 +		LoLCharacter &c = _characters[i];
 +		if (!(c.flags & 1) || (c.flags & 8))
 +			continue;
@@ -39,7 +41,7 @@ index 392e4c2d..b34d0076 100644
 +		if (_webInfiniteMp && c.magicPointsCur < (int)c.magicPointsMax)
 +			setCharacterMagicOrHitPoints(i, 1, c.magicPointsMax, 0);
 +	}
-+	if (now - lastTime < 150 && !changed)
++	if (now - lastTime < (mainLoop ? 150u : 100u) && !changed)
 +		return;
 +	lastTime = now;
 +	buf.clear();
@@ -60,6 +62,28 @@ index 392e4c2d..b34d0076 100644
 +	begin(0x30270); for (int i = 0; i < 11; i++) u32(_expRequirements ? _expRequirements[i] : 0); end();
 +	// sprites des monstres (zone propre à la version web, hors de la mémoire DOS) : pour chacun des
 +	// 5 types de monstres, nom (13 octets) du fichier chargé dans son emplacement (shapeIndex)
++	// affichage (zone propre à la version web) : scène spéciale, _updateFlags, fenêtre de séquence
++	// (x1, y1, x2, y2), menu ouvert, tours de la boucle principale (s'arrêtent pendant dialogues,
++	// séquences et cinématiques, qui ont leurs propres boucles)
++	begin(0x7F000100);
++	u8(_specialSceneFlag ? 1 : 0); u16(_updateFlags);
++	u16(_seqWindowX1); u16(_seqWindowY1); u16(_seqWindowX2); u16(_seqWindowY2);
++	u8(_webInMenu ? 1 : 0); u32(_webLoopCount);
++	end();
++	// image de chaque monstre telle que le jeu la dessine vu du groupe (drawMonster) :
++	// numéro d'image (0-15, 255 = aucune), puis 1 = image retournée horizontalement
++	begin(0x7F000200);
++	for (int i = 0; i < 30; i++) {
++		LoLMonster *m = &_monsters[i];
++		int frm = -1, flip = 0;
++		if (m->properties && _monsterDirFlags && m->block) {
++			const int16 flg = _monsterDirFlags[(_currentDirection << 2) + (m->facing & 3)];
++			frm = getMonsterCurFrame(m, flg & 0xFFEF);
++			flip = (flg & 0x10) ? 1 : 0;
++		}
++		u8(frm < 0 || frm > 15 ? 255 : frm); u8(flip);
++	}
++	end();
 +	begin(0x7F000000);
 +	for (int t = 0; t < 5; t++) {
 +		const int slot = _monsterProperties ? _monsterProperties[t].shapeIndex : -1;
@@ -267,15 +291,15 @@ index 392e4c2d..b34d0076 100644
  void LoLEngine::runLoop() {
  	// Initialize debugger since how it should be fully usable
  	static_cast<Debugger_LoL *>(getDebugger())->initialize();
-@@ -957,6 +1208,7 @@ void LoLEngine::runLoop() {
+@@ -957,6 +1232,7 @@ void LoLEngine::runLoop() {
  		gui_updateInput();
  
  		update();
-+		webPublishState();
++		webPublishState(true);
  
  		updatePlayTimer();
  
-@@ -1477,6 +1729,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
+@@ -1477,6 +1753,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
  
  	int newVal = (mode == 2) ? (pointsMax + points) : (mode ? (pointsCur + points) : points);
  	newVal = CLIP(newVal, 0, pointsMax);
@@ -284,15 +308,23 @@ index 392e4c2d..b34d0076 100644
  
  	if (type) {
  		c->magicPointsCur = newVal;
+@@ -2074,6 +2352,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
+ 
+ void LoLEngine::delay(uint32 millis, bool doUpdate, bool) {
+ 	while (millis && !shouldQuit()) {
++		webPublishState(false);	// version web : état publié aussi pendant dialogues, séquences, menu
+ 		if (doUpdate)
+ 			update();
+ 		else
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index 2cfadf37..d01f1053 100644
+index 2cfadf37..0251df87 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
 @@ -315,6 +315,11 @@ private:
  
  	// main loop
  	void runLoop();
-+	void webPublishState();	// version web : état du jeu aux adresses du jeu DOS, pour la mini-carte
++	void webPublishState(bool mainLoop = true);	// version web : état du jeu aux adresses du jeu DOS, pour la mini-carte
 +	void webRunCommands();	// version web : commandes d'inventaire envoyées par la page
 +	int webInventoryCommand(int op, int a, int b);
 +	Item webItemAt(int loc);
@@ -300,13 +332,15 @@ index 2cfadf37..d01f1053 100644
  	void update() override;
  
  	// mouse
-@@ -1072,6 +1077,9 @@ private:
+@@ -1072,6 +1077,11 @@ private:
  
  	LoLItem *_itemsInPlay;
  	ItemProperty *_itemProperties;
 +	int _webNumItemProperties = 0;	// version web : taille de _itemProperties
 +	char _webMonsterShapeFile[3][13] = {};	// version web : fichier de sprites chargé dans chaque emplacement
 +	bool _webInfiniteHp = false, _webInfiniteMp = false;	// version web : triches vie / magie infinies
++	bool _webInMenu = false;	// version web : menu (disquette) ouvert
++	uint32 _webLoopCount = 0;	// version web : tours de la boucle principale
  
  	Item _itemInHand;
  	Item _inventory[48];
@@ -327,6 +361,22 @@ index 055e4f8c..8fd1d5c3 100644
  
  	const uint8 *p = _screen->getCPagePtr(2);
  	const uint8 *ts[16];
+diff --git a/engines/kyra/gui/gui_lol.cpp b/engines/kyra/gui/gui_lol.cpp
+index 926e60dc..31bb0dec 100644
+--- a/engines/kyra/gui/gui_lol.cpp
++++ b/engines/kyra/gui/gui_lol.cpp
+@@ -1543,7 +1543,11 @@ int LoLEngine::clickedOptions(Button *button) {
+ 	if (_flags.isTalkie && getVolume(kVolumeSpeech) == 2)
+ 		_configVoice |= (textEnabled() ? 2 : 1);
+ 
++	_webInMenu = true;			// version web : musique et sons en pause pendant le menu
++	_mixer->pauseAll(true);
+ 	_gui->runMenu(_gui->_mainMenu);
++	_mixer->pauseAll(false);
++	_webInMenu = false;
+ 
+ 	_updateFlags &= 0xFFFB;
+ 	setMouseCursorToItemInHand();
 diff --git a/engines/kyra/script/script_lol.cpp b/engines/kyra/script/script_lol.cpp
 index 30c59a77..bde6ac2a 100644
 --- a/engines/kyra/script/script_lol.cpp

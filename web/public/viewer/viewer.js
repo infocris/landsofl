@@ -443,6 +443,7 @@
       let pose = 1, mirror = rel < 0;
       if (Math.abs(rel) < Math.PI / 4) { pose = 0; mirror = false; }
       else if (Math.abs(rel) > 3 * Math.PI / 4) { pose = 2; mirror = false; }
+      if (m.frame !== undefined && m.frame !== 255) mirror = !!m.flip;
       const look = monsterLook(m.sprite, ids, pose, m);
       if (!look) continue;
       const { rx: srx, ry: sry, rw, rh, imgs } = look, d = deff(z);
@@ -551,14 +552,16 @@
   // (images 17 + jeu * 16 + image). L'image composée et ses niveaux d'ombre sont gardés en cache.
   // -> { imgs, rx, ry, rw, rh } (planche commune quand le monstre n'a ni variante ni équipement).
   function monsterLook(name, ids, pose, m) {
-    const id = spriteFrame(ids, pose, m), rect = L.spriteRects[id];
+    // image dessinée par le jeu (version ScummVM : attaques, coups, marche), sinon choisie ici
+    const engineFrame = m.frame !== undefined && m.frame !== 255 && ids.length >= 16;
+    const id = engineFrame ? ids[m.frame] ?? ids[0] : spriteFrame(ids, pose, m), rect = L.spriteRects[id];
     if (!rect) return null;
     const [rx, ry, rw, rh] = rect;
     const pairs = m.variant && L.spriteVariants && L.spriteVariants[name] ? L.spriteVariants[name][m.variant] : null;
     const sets = L.spriteEquip && L.spriteEquip[name] && m.equip ? m.equip.filter((e) => e > 0 && e <= 4) : [];
     if (!pairs && !sets.length) return { imgs: L.sprImgs, rx, ry, rw, rh };
-    const fi = ids.indexOf(id) >= 0 ? (ids.length >= 12 ? ids.indexOf(id, pose * 4) : ids.indexOf(id)) : 0;
-    const key = `${id}|${m.variant || 0}|${sets.join(",")}`;
+    const fi = engineFrame ? m.frame : ids.indexOf(id) >= 0 ? (ids.length >= 12 ? ids.indexOf(id, pose * 4) : ids.indexOf(id)) : 0;
+    const key = `${id}|${fi}|${m.variant || 0}|${sets.join(",")}`;
     let imgs = L.compCache.get(key);
     if (!imgs) {
       const c = document.createElement("canvas");
@@ -604,6 +607,7 @@
       let pose = 1, mirror = rel < 0;
       if (Math.abs(rel) < Math.PI / 4) { pose = 0; mirror = false; }
       else if (Math.abs(rel) > 3 * Math.PI / 4) { pose = 2; mirror = false; }
+      if (EMBED && m.frame !== undefined && m.frame !== 255) mirror = !!m.flip;
       const look = monsterLook(EMBED ? m.sprite : m.sprites[0], ids, pose, m);
       if (!look) continue;
       const { rx, ry, rw, rh, imgs } = look;

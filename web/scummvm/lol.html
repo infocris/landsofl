@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lands of Lore (ScummVM)</title>
+<script src="volume.js?v=20261110a"></script>
 <!-- ?v= : à changer à chaque modification des scripts (évite les copies en cache) -->
 <script src="memscan.js?v=20261110a"></script>
 <style>
@@ -14,7 +15,10 @@
   /* colonne de gauche : jeu, puis vue 3D synchronisée */
   #left { flex: 1; min-width: 0; height: 100vh; display: flex; flex-direction: column; }
   #dos { flex: 3; min-height: 0; }
-  #v3d { flex: 2; min-height: 160px; border-top: 1px solid #3a3226; background: #000; }
+  #v3d { flex: 2; min-height: 160px; border-top: 1px solid #3a3226; background: #000; position: relative; }
+  /* version ScummVM : image du jeu recopiée dans la vue 3D (lieux plein écran, dialogues, cinématiques) */
+  #v3d-mirror { position: absolute; inset: 0; width: 100%; height: 100%; background: #000; image-rendering: pixelated; }
+  #v3d-mirror[hidden] { display: none; }
   #v3d.hidden { display: none; }
   #v3d iframe { width: 100%; height: 100%; border: 0; display: block; }
   :root { --mm-size: 384px; --mm-w: max(420px, calc(var(--mm-size) + 36px)); }
@@ -159,6 +163,11 @@
     background: rgba(0,0,0,.6); color: #ddd; cursor: pointer; }
   body:has(#mm:not(.hidden)) #persp { right: calc(var(--mm-w) + 12px); }
   body:has(#v3d.hidden) #persp { display: none; }
+  #vol { position: fixed; right: 12px; bottom: 192px; z-index: 1000; display: flex; align-items: center; gap: 4px;
+    font: 12px/1 system-ui, sans-serif; padding: 3px 8px; border: 1px solid #555; border-radius: 6px; background: rgba(0,0,0,.6); }
+  #vol-label { cursor: pointer; user-select: none; }
+  #vol input { width: 90px; accent-color: #c9a227; }
+  body:has(#mm:not(.hidden)) #vol { right: calc(var(--mm-w) + 12px); }
   #v3dtoggle { position: fixed; right: 12px; bottom: 120px; z-index: 1000;
     font: 12px/1 system-ui, sans-serif; padding: 6px 10px; border: 1px solid #555; border-radius: 6px;
     background: rgba(0,0,0,.6); color: #aaa; cursor: pointer; }
@@ -185,7 +194,7 @@
 <body>
 <div id="left">
   <iframe id="dos" src="lol-game.html#lol-fr" title="Lands of Lore (ScummVM)" allow="autoplay; fullscreen"></iframe>
-  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261109o" title="Vue 3D synchronisée"></iframe></div>
+  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261110b" title="Vue 3D synchronisée"></iframe></div>
 </div>
 <aside id="mm" aria-label="Mini-carte">
   <div id="mm-title"><span>Mini-carte</span><button id="mm-tex" type="button" title="Cases illustrées avec les textures du lieu / couleurs simples">▦</button><button id="mm-smaller" type="button" title="Réduire la mini-carte">−</button><button id="mm-bigger" type="button" title="Agrandir la mini-carte">+</button></div>
@@ -218,6 +227,7 @@
 <button id="v3dtoggle" type="button" title="Afficher/masquer la vue 3D (F10)">3D</button>
 <button id="persp" type="button" title="Perspective de la vue 3D : celle du jeu d'origine ou une perspective réelle"></button>
 <div id="mm-tip" hidden></div>
+<div id="vol"><span id="vol-label" title="Couper / rétablir le son">🔊</span><input type="range" id="vol-range" min="0" max="100" step="1" aria-label="Volume général"></div>
 <button id="mmtoggle" type="button" title="Afficher/masquer la mini-carte (F9)">Carte</button>
 <button id="qload" type="button" title="Recharger l'état enregistré avec F6 (QUICK.SAV)" hidden>F7 · charger l'état</button>
 <button id="zqsd" type="button" title="Activer/désactiver les touches ZQSD (F8)"></button>
@@ -263,8 +273,44 @@ window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes
   });
   document.getElementById("v3d-frame").addEventListener("load", sendPersp);
   sendPersp();
+
+  // Image du jeu recopiée dans la vue 3D (lieux plein écran, dialogues, séquences, cinématiques) :
+  // flux vidéo du canevas de ScummVM (captureStream), recadré sur la zone indiquée par lolView().
+  const v3dBox = document.getElementById("v3d");
+  const mirror = document.createElement("canvas");
+  mirror.id = "v3d-mirror"; mirror.hidden = true; v3dBox.appendChild(mirror);
+  const video = document.createElement("video");
+  video.muted = true; video.playsInline = true;
+  let stream = null;
+  window.lolMirror = () => ({ shown: !mirror.hidden, video: video.readyState, size: [video.videoWidth, video.videoHeight] });   // débogage
+  function tickMirror() {
+    requestAnimationFrame(tickMirror);
+    let st = null, gw = null;
+    try { gw = game.contentWindow; st = gw && gw.lolView ? gw.lolView() : null; } catch (e) {}
+    const on = !!(st && st.mirror) && !v3dBox.classList.contains("hidden");
+    if (mirror.hidden === on) mirror.hidden = !on;
+    if (!on) return;
+    const cv = gw.document.getElementById("canvas");
+    if (!cv) return;
+    if (!stream || stream.__canvas !== cv) {
+      stream = cv.captureStream(30); stream.__canvas = cv;
+      video.srcObject = stream; video.play().catch(() => {});
+    }
+    if (video.readyState < 2 || !video.videoWidth) return;
+    const dpr = window.devicePixelRatio || 1, W = Math.round(v3dBox.clientWidth * dpr), H = Math.round(v3dBox.clientHeight * dpr);
+    if (mirror.width !== W || mirror.height !== H) { mirror.width = W; mirror.height = H; }
+    // jeu 320 × 200 centré dans le canevas de ScummVM (bandes noires selon la fenêtre)
+    const VW = video.videoWidth, VH = video.videoHeight, s = Math.min(VW / 320, VH / 200);
+    const ox = (VW - 320 * s) / 2, oy = (VH - 200 * s) / 2;
+    const [x, y, w, h] = st.crop, k = Math.min(W / w, H / h);
+    const g = mirror.getContext("2d");
+    g.imageSmoothingEnabled = false;
+    g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
+    g.drawImage(video, ox + x * s, oy + y * s, w * s, h * s, (W - w * k) / 2, (H - h * k) / 2, w * k, h * k);
+  }
+  requestAnimationFrame(tickMirror);
 })();
 </script>
-<script src="minimap.js?v=20261110c"></script>
+<script src="minimap.js?v=20261110e"></script>
 </body>
 </html>

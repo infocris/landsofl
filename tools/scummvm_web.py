@@ -95,7 +95,8 @@ def write_ini():
 
 
 # Lanceur : met à jour la section [lol-fr] du scummvm.ini gardé par le navigateur, puis charge ScummVM
-LAUNCH_JS = r"""<script>
+LAUNCH_JS = r"""<script src="volume.js"></script>
+<script>
 // SDL3 (emscripten) s'abonne au clavier de window à chaque création de fenêtre sans retirer l'abonnement
 // précédent : un appui arrive plusieurs fois (le jeu voit des répétitions : Échap ouvre puis referme le
 // menu, lettres en double dans les noms de sauvegarde). Seul le dernier abonnement (fenêtre active) est
@@ -154,6 +155,22 @@ LAUNCH_JS = r"""<script>
 // l'émulateur DOSBox (zéros hors des zones). Recherches : rien trouvé ; écritures : refusées.
 (() => {
   let zones = null;
+  // Que montrer dans la vue 3D de la page principale ? L'image du jeu (zone x, y, l, h de l'écran
+  // 320 × 200) pendant les lieux plein écran, dialogues, séquences et cinématiques ; rien en
+  // exploration ni dans le menu. La boucle principale arrêtée depuis 0,5 s = le jeu est dans une
+  // autre boucle (dialogue, cinématique, changement de niveau).
+  const view = { loops: -1, at: 0, scene: false, upd: 0, seq: [0, 0, 0, 0], menu: false };
+  window.lolView = () => {
+    const full = { mirror: true, crop: [0, 0, 320, 200] };
+    if (!zones) return full;                                   // avant la partie (introduction)
+    if (view.menu) return { mirror: false };
+    if (performance.now() - view.at > 500) return full;
+    if (view.scene || (view.upd & 1)) {
+      const [x1, y1, x2, y2] = view.seq;
+      return x2 > x1 && y2 > y1 && x2 - x1 < 320 ? { mirror: true, crop: [x1, y1, x2 - x1, y2 - y1] } : full;
+    }
+    return { mirror: false };
+  };
   Module.lolCmdDone = (id, code) => ch.postMessage({ id, data: { code } });
   Module.lolState = (bytes) => {
     const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), out = [];
@@ -162,6 +179,14 @@ LAUNCH_JS = r"""<script>
       out.push([a, bytes.subarray(o + 8, o + 8 + n)]); o += 8 + n;
     }
     zones = out;
+    // affichage (zone 0x7F000100) : scène spéciale, _updateFlags, fenêtre de séquence, menu, tours de boucle
+    const z = out.find((q) => q[0] === 0x7F000100);
+    if (z && z[1].length >= 16) {
+      const b = z[1], w = (o) => b[o] | b[o + 1] << 8;
+      const loops = (b[12] | b[13] << 8 | b[14] << 16) + b[15] * 16777216;
+      if (loops !== view.loops) { view.loops = loops; view.at = performance.now(); }
+      view.scene = !!b[0]; view.upd = w(1); view.seq = [w(3), w(5), w(7), w(9)]; view.menu = !!b[11];
+    }
   };
   const ch = new BroadcastChannel("lol-mem");
   ch.onmessage = (e) => {
@@ -231,6 +256,42 @@ window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes
   });
   document.getElementById("v3d-frame").addEventListener("load", sendPersp);
   sendPersp();
+
+  // Image du jeu recopiée dans la vue 3D (lieux plein écran, dialogues, séquences, cinématiques) :
+  // flux vidéo du canevas de ScummVM (captureStream), recadré sur la zone indiquée par lolView().
+  const v3dBox = document.getElementById("v3d");
+  const mirror = document.createElement("canvas");
+  mirror.id = "v3d-mirror"; mirror.hidden = true; v3dBox.appendChild(mirror);
+  const video = document.createElement("video");
+  video.muted = true; video.playsInline = true;
+  let stream = null;
+  window.lolMirror = () => ({ shown: !mirror.hidden, video: video.readyState, size: [video.videoWidth, video.videoHeight] });   // débogage
+  function tickMirror() {
+    requestAnimationFrame(tickMirror);
+    let st = null, gw = null;
+    try { gw = game.contentWindow; st = gw && gw.lolView ? gw.lolView() : null; } catch (e) {}
+    const on = !!(st && st.mirror) && !v3dBox.classList.contains("hidden");
+    if (mirror.hidden === on) mirror.hidden = !on;
+    if (!on) return;
+    const cv = gw.document.getElementById("canvas");
+    if (!cv) return;
+    if (!stream || stream.__canvas !== cv) {
+      stream = cv.captureStream(30); stream.__canvas = cv;
+      video.srcObject = stream; video.play().catch(() => {});
+    }
+    if (video.readyState < 2 || !video.videoWidth) return;
+    const dpr = window.devicePixelRatio || 1, W = Math.round(v3dBox.clientWidth * dpr), H = Math.round(v3dBox.clientHeight * dpr);
+    if (mirror.width !== W || mirror.height !== H) { mirror.width = W; mirror.height = H; }
+    // jeu 320 × 200 centré dans le canevas de ScummVM (bandes noires selon la fenêtre)
+    const VW = video.videoWidth, VH = video.videoHeight, s = Math.min(VW / 320, VH / 200);
+    const ox = (VW - 320 * s) / 2, oy = (VH - 200 * s) / 2;
+    const [x, y, w, h] = st.crop, k = Math.min(W / w, H / h);
+    const g = mirror.getContext("2d");
+    g.imageSmoothingEnabled = false;
+    g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
+    g.drawImage(video, ox + x * s, oy + y * s, w * s, h * s, (W - w * k) / 2, (H - h * k) / 2, w * k, h * k);
+  }
+  requestAnimationFrame(tickMirror);
 })();
 </script>"""
 
