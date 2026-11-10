@@ -155,25 +155,29 @@ LAUNCH_JS = r"""<script src="volume.js"></script>
 // l'émulateur DOSBox (zéros hors des zones). Recherches : rien trouvé ; écritures : refusées.
 (() => {
   let zones = null;
-  // Que montrer dans la vue 3D de la page principale ? L'image du jeu (zone x, y, l, h de l'écran
-  // 320 × 200) pendant les lieux plein écran, dialogues, séquences et cinématiques ; rien en
-  // exploration, dans le menu ni pendant un changement de niveau. On ne recopie que la fenêtre
-  // de scène du jeu (112, 0, 176 × 120 : la vue), sauf séquence plein écran (largeur 320) et
-  // introduction : jamais l'interface (portraits, sac…). La boucle principale arrêtée depuis
-  // 0,5 s = le jeu est dans une autre boucle (dialogue, cinématique scriptée).
-  const view = { loops: -1, at: 0, scene: false, upd: 0, seq: [0, 0, 0, 0], menu: false, loading: false };
+  // État d'affichage du jeu (débogage ; la page ne recopie plus l'image du jeu dans la vue 3D,
+  // à la demande de l'utilisateur, 2026-11-10). Ce que serait la zone à montrer :
+  // - copie de l'image du jeu (mirror) : introduction, lieux plein écran, dialogues, séquences ;
+  //   seulement la fenêtre de scène (112, 0, 176 × 120 : la vue), sauf séquence plein écran ;
+  // - superposition (overlay) : la vue 3D reste affichée et seuls les pixels que l'animation
+  //   ajoute à la fenêtre de scène (sorts, effets) sont dessinés par-dessus ; pendant un sort
+  //   (_webCasting) ou quand la boucle principale est arrêtée depuis 0,5 s hors dialogue ;
+  // - rien : exploration, menu, changement de niveau.
+  const view = { loops: -1, at: 0, scene: false, upd: 0, seq: [0, 0, 0, 0], menu: false, loading: false, casting: false };
   const SCENE = [112, 0, 176, 120];
   window.lolView = () => {
     if (!zones || view.loops <= 0) return { mirror: true, crop: [0, 0, 320, 200] };   // avant la partie (introduction)
     if (view.menu || view.loading) return { mirror: false };
+    if (view.casting) return { mirror: true, overlay: true, crop: SCENE };
     const special = view.scene || (view.upd & 1), stale = performance.now() - view.at > 500;
-    if (!special && !stale) return { mirror: false };
     const [x1, y1, x2, y2] = view.seq;
     if (special && x2 > x1 && y2 > y1) {
       if (x2 - x1 >= 320) return { mirror: true, crop: [0, 0, 320, Math.min(200, y2 - y1 || 200)] };   // plein écran
       return { mirror: true, crop: [x1, y1, x2 - x1, y2 - y1] };
     }
-    return { mirror: true, crop: SCENE };
+    if (special) return { mirror: true, crop: SCENE };
+    if (stale) return { mirror: true, overlay: true, crop: SCENE };
+    return { mirror: false };
   };
   Module.lolCmdDone = (id, code) => ch.postMessage({ id, data: { code } });
   Module.lolState = (bytes) => {
@@ -185,11 +189,11 @@ LAUNCH_JS = r"""<script src="volume.js"></script>
     zones = out;
     // affichage (zone 0x7F000100) : scène spéciale, _updateFlags, fenêtre de séquence, menu, tours de boucle
     const z = out.find((q) => q[0] === 0x7F000100);
-    if (z && z[1].length >= 17) {
+    if (z && z[1].length >= 18) {
       const b = z[1], w = (o) => b[o] | b[o + 1] << 8;
       const loops = (b[12] | b[13] << 8 | b[14] << 16) + b[15] * 16777216;
       if (loops !== view.loops) { view.loops = loops; view.at = performance.now(); }
-      view.scene = !!b[0]; view.upd = w(1); view.seq = [w(3), w(5), w(7), w(9)]; view.menu = !!b[11]; view.loading = !!b[16];
+      view.scene = !!b[0]; view.upd = w(1); view.seq = [w(3), w(5), w(7), w(9)]; view.menu = !!b[11]; view.loading = !!b[16]; view.casting = !!b[17];
     }
   };
   const ch = new BroadcastChannel("lol-mem");
@@ -260,42 +264,6 @@ window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes
   });
   document.getElementById("v3d-frame").addEventListener("load", sendPersp);
   sendPersp();
-
-  // Image du jeu recopiée dans la vue 3D (lieux plein écran, dialogues, séquences, cinématiques) :
-  // flux vidéo du canevas de ScummVM (captureStream), recadré sur la zone indiquée par lolView().
-  const v3dBox = document.getElementById("v3d");
-  const mirror = document.createElement("canvas");
-  mirror.id = "v3d-mirror"; mirror.hidden = true; v3dBox.appendChild(mirror);
-  const video = document.createElement("video");
-  video.muted = true; video.playsInline = true;
-  let stream = null;
-  window.lolMirror = () => ({ shown: !mirror.hidden, video: video.readyState, size: [video.videoWidth, video.videoHeight] });   // débogage
-  function tickMirror() {
-    requestAnimationFrame(tickMirror);
-    let st = null, gw = null;
-    try { gw = game.contentWindow; st = gw && gw.lolView ? gw.lolView() : null; } catch (e) {}
-    const on = !!(st && st.mirror) && !v3dBox.classList.contains("hidden");
-    if (mirror.hidden === on) mirror.hidden = !on;
-    if (!on) return;
-    const cv = gw.document.getElementById("canvas");
-    if (!cv) return;
-    if (!stream || stream.__canvas !== cv) {
-      stream = cv.captureStream(30); stream.__canvas = cv;
-      video.srcObject = stream; video.play().catch(() => {});
-    }
-    if (video.readyState < 2 || !video.videoWidth) return;
-    const dpr = window.devicePixelRatio || 1, W = Math.round(v3dBox.clientWidth * dpr), H = Math.round(v3dBox.clientHeight * dpr);
-    if (mirror.width !== W || mirror.height !== H) { mirror.width = W; mirror.height = H; }
-    // jeu 320 × 200 centré dans le canevas de ScummVM (bandes noires selon la fenêtre)
-    const VW = video.videoWidth, VH = video.videoHeight, s = Math.min(VW / 320, VH / 200);
-    const ox = (VW - 320 * s) / 2, oy = (VH - 200 * s) / 2;
-    const [x, y, w, h] = st.crop, k = Math.min(W / w, H / h);
-    const g = mirror.getContext("2d");
-    g.imageSmoothingEnabled = false;
-    g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
-    g.drawImage(video, ox + x * s, oy + y * s, w * s, h * s, (W - w * k) / 2, (H - h * k) / 2, w * k, h * k);
-  }
-  requestAnimationFrame(tickMirror);
 })();
 </script>"""
 

@@ -654,6 +654,13 @@ def main(game_dir, maps_dir, out_dir):
                 if cache[key] >= 0:
                     imgs.append(frame_image(f, pal))
             types.append(cache[key])
+        # giclée d'un coup reçu par un monstre (LoLEngine::drawMonster) : image 6 de GAMESHP.SHP,
+        # couleurs 2-7 décalées selon les drapeaux & 0xC000 du monstre : +0, +63, +15, +74
+        blood = []
+        w6, h6, px6 = game_shp[6]
+        for shift in (0, 63, 15, 74):
+            blood.append(len(imgs))
+            imgs.append(frame_image((w6, h6, [c + shift if c is not None and 2 <= c <= 7 else c for c in px6]), pal))
         sx, rects = 0, []
         for img in imgs:
             rects.append([sx, 0, img.w, img.h]); sx += img.w + 1
@@ -662,7 +669,7 @@ def main(game_dir, maps_dir, out_dir):
             floor_sheet.blit(img, r[0], 0)
         floor_sheet.save(os.path.join(out_dir, "item_floor.png"))
         with open(os.path.join(out_dir, "item_floor.json"), "w", encoding="utf-8") as fh:
-            json.dump({"rects": rects, "types": types}, fh)
+            json.dump({"rects": rects, "types": types, "blood": blood}, fh)
         print(f"objets au sol : {len(imgs)} images pour {len(types)} types")
 
 

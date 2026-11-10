@@ -18,9 +18,6 @@
   #left { flex: 1; min-width: 0; height: 100vh; display: flex; flex-direction: column; }
   #dos { flex: 3; min-height: 0; }
   #v3d { flex: 2; min-height: 160px; border-top: 1px solid #3a3226; background: #000; position: relative; }
-  /* version ScummVM : image du jeu recopiée dans la vue 3D (lieux plein écran, dialogues, cinématiques) */
-  #v3d-mirror { position: absolute; inset: 0; width: 100%; height: 100%; background: #000; image-rendering: pixelated; }
-  #v3d-mirror[hidden] { display: none; }
   #v3d.hidden { display: none; }
   #v3d iframe { width: 100%; height: 100%; border: 0; display: block; }
   :root { --mm-size: 384px; --mm-w: max(420px, calc(var(--mm-size) + 36px)); }
@@ -191,7 +188,7 @@
 <body>
 <div id="left">
   <div id="dos"></div>
-  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261110c" title="Vue 3D synchronisée"></iframe></div>
+  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261110d" title="Vue 3D synchronisée"></iframe></div>
 </div>
 <aside id="mm" aria-label="Mini-carte">
   <div id="mm-title"><span>Mini-carte</span><button id="mm-tex" type="button" title="Cases illustrées avec les textures du lieu / couleurs simples">▦</button><button id="mm-smaller" type="button" title="Réduire la mini-carte">−</button><button id="mm-bigger" type="button" title="Agrandir la mini-carte">+</button></div>
@@ -480,6 +477,6 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261110f"></script>
+<script src="minimap.js?v=20261110g"></script>
 </body>
 </html>

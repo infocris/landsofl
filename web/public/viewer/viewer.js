@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261110b";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261110c";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) FOV = 2 * Math.atan(1.375);
   let dirty = true;
@@ -461,6 +461,8 @@
       const left = W / 2 + lat * proj / d - sw / 2, top = half + (WALL_H / 2) * proj / d - sh;
       sprites.push({ tz: z, rx: srx, ry: sry, rw, rh, sw, sh, left, top, mirror, imgs,
         x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
+      const blood = bloodSprite(m, z, left, top, sw, sh, scale);
+      if (blood) sprites.push(blood);
     }
 
     // murs : rayons courbes
@@ -637,6 +639,8 @@
       const top = H / 2 + pitch + (WALL_H / 2) / tz * proj - sh;
       out.push({ tz, rx, ry, rw, rh, sw, sh, left, top, mirror, imgs, ghost: m.spawn === "event",
         x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
+      const blood = EMBED ? bloodSprite(m, tz, left, top, sw, sh, scale) : null;
+      if (blood) out.push(blood);
     }
     return out;
   }
@@ -807,9 +811,21 @@
     liveItems = e.data.list.map((i) => ({ ...i, level: e.data.level }));
     dirty = true;
   });
-  const FLOOR = { rects: null, types: null, imgs: null };
+  const FLOOR = { rects: null, types: null, imgs: null, blood: null };
+  // giclée d'un coup reçu, dessinée au centre du monstre décalé de hitOffsX/Y (drawMonster) ;
+  // plus le coup est fort, moins elle est réduite (m.blood = 1 à 4)
+  function bloodSprite(m, tz, left, top, sw, sh, scale) {
+    if (!m.blood || !FLOOR.blood) return null;
+    const r = FLOOR.rects[FLOOR.blood[m.bloodType & 3]];
+    if (!r) return null;
+    const k = scale / m.blood, bw = r[2] * k, bh = r[3] * k;
+    const cx = left + sw / 2 + (m.hitX || 0) * scale, cy = top + sh / 2 + (m.hitY || 0) * scale;
+    const l = cx - bw / 2;
+    return { tz: tz - 0.01, rx: r[0], ry: r[1], rw: r[2], rh: r[3], sw: bw, sh: bh, left: l, top: cy - bh / 2, mirror: false,
+      imgs: FLOOR.imgs, x0: Math.max(0, Math.floor(l)), x1: Math.min(W - 1, Math.ceil(l + bw)) };
+  }
   Promise.all([fetch(`data/item_floor.json?v=${DATA_V}`).then((r) => r.json()), loadImage(`data/item_floor.png?v=${DATA_V}`)])
-    .then(([d, img]) => { FLOOR.rects = d.rects; FLOOR.types = d.types; FLOOR.imgs = darken(img, SHADES); dirty = true; }, () => {});
+    .then(([d, img]) => { FLOOR.rects = d.rects; FLOOR.types = d.types; FLOOR.blood = d.blood || null; FLOOR.imgs = darken(img, SHADES); dirty = true; }, () => {});
   window.lolFloorItems = () => liveItems;   // débogage
   // objets visibles du niveau affiché -> [{ x, y, rect }]
   function floorItems() {

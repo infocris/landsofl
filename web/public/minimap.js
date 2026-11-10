@@ -799,7 +799,8 @@
       if (!block || block > 1023 || (x >> 8) !== (block & 31) || (y >> 8) !== (block >> 5)) continue;
       // +12 image d'animation, +13 mode ; +18 drapeaux (& 7 = variante de couleurs), +35..+38 équipement
       out.push({ slot: i, x: x / 256, y: y / 256, dir: bytes[a + 17] & 3, type: bytes[a + 25], sf: bytes[a + 12], mode: bytes[a + 13],
-        variant: bytes[a + 18] & 7, equip: [bytes[a + 35], bytes[a + 36], bytes[a + 37], bytes[a + 38]] });
+        variant: bytes[a + 18] & 7, equip: [bytes[a + 35], bytes[a + 36], bytes[a + 37], bytes[a + 38]],
+        hitX: (bytes[a + 10] << 24) >> 24, hitY: (bytes[a + 11] << 24) >> 24 });   // +10/+11 : hitOffsX/Y (signés)
     }
     return out;
   }
@@ -813,8 +814,12 @@
     monsters = readMonsters(r[3]);
     if (ENGINE_SPRITES) {
       // ScummVM : image de chaque monstre telle que le jeu la dessine (attaques, coups, marche)
-      const f = await mem.read([[0x7F000200, 60]]);
-      if (f) for (const m of monsters) { const k = m.slot * 2; m.frame = f[0][k]; m.flip = !!f[0][k + 1]; }
+      // + giclée d'un coup reçu : réduction 1-4 (0 = aucune), couleur 0-3, décalage hitOffsX/Y
+      const f = await mem.read([[0x7F000200, 120]]);
+      if (f) for (const m of monsters) {
+        const k = m.slot * 4;
+        m.frame = f[0][k]; m.flip = !!f[0][k + 1]; m.blood = f[0][k + 2]; m.bloodType = f[0][k + 3];
+      }
     }
     const inScene = r[4][0] === 1;
     const liveItems = readLiveItems(r[2], r[5]);

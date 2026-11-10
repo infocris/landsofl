@@ -852,7 +852,21 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     / 256) ; la vue 3D les dessine comme les monstres (même échelle, posés au sol).
   - Vérifié (ScummVM) : niveau 2, poignard abîmé en 8,4 vu depuis 8,5 : même image et même
     place que dans le jeu.
-- **Image du jeu dans la vue 3D** (2026-11-10, version ScummVM) : lieux plein écran (panoramas),
+- **Giclées des coups dans la vue 3D** (2026-11-10, version ScummVM). Quand un monstre est
+  touché (`damageReceived`), `drawMonster` dessine par-dessus l'image 6 de `GAMESHP.SHP`, au
+  centre du monstre décalé de `hitOffsX/Y` (aléatoires, ±12), réduite d'un facteur
+  `bloodAmount` = PV max / dégâts (1 à 4 ; en mourant, `fightCurTick × 2`), couleurs 2-7
+  décalées selon `flags & 0xC000` du type (+63, +15, +74). Le moteur publie réduction et
+  couleur avec l'image de chaque monstre (zone `0x7F000200`, 4 octets) ; l'export ajoute les
+  4 couleurs de la giclée à `item_floor.png` (`blood`) ; la vue 3D la dessine sur le monstre.
+  Vérifié par un rendu de la vue 3D seule (brigand touché).
+- **Recopie de l'image du jeu dans la vue 3D : retirée** (2026-11-10, à la demande de
+  l'utilisateur, qui préfère la 3D même pendant sorts, dialogues et cinématiques). La copie
+  (puis une superposition des seuls pixels changés pendant les sorts) a existé brièvement ; le
+  moteur publie toujours l'état d'affichage (zone `0x7F000100`, dont `_webCasting` : sort en
+  cours, mis par `castSpell`), lu par `lolView()` dans `lol-game.html` pour le débogage.
+  Historique :
+- **Image du jeu dans la vue 3D** (2026-11-10, version ScummVM, retirée) : lieux plein écran (panoramas),
   dialogues, séquences, cinématiques.
   - Cause du « noir » signalé : en scène spéciale, la mini-carte demandait l'image exportée du
     lieu ; sans image pour cette case, la vue affichait un fond noir « Lieu ». ScummVM signale
@@ -1260,3 +1274,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-10** : vue 3D : variantes de couleurs et équipement des monstres (§ 10 bis).
 - **2026-11-10** : ScummVM web : animations d'attaque des monstres, image du jeu dans la vue 3D (cinématiques, dialogues, lieux), musique en pause dans le menu ; volume général (§ 10 bis).
 - **2026-11-10** : vue 3D : objets posés au sol (images du jeu) (§ 10 bis).
+- **2026-11-10** : vue 3D : giclées des coups sur les monstres ; recopie de l'image du jeu retirée. Correctif : une erreur de syntaxe dans la page ScummVM désactivait la vie infinie, l'inventaire et les couronnes (§ 10 bis).
