@@ -685,7 +685,9 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     modifié.
 - **Lancement.** `python3 -I tools/scummvm_web.py` sert la page sur le port 8001, puis :
   `http://localhost:8001/lol.html` (page complète) ou `lol-game.html` (jeu seul).
-  - Ce serveur sert aussi la version DOSBox (`index.html`, fichiers de `web/public`).
+  - Ce serveur sert aussi la version DOSBox (`index.html`, fichiers de `web/public`), y compris
+    sur `/`. Lancé sur le port 8000 (`python3 -I tools/scummvm_web.py 8000`), il sert les deux moteurs
+    à la même adresse.
   - **Choix du moteur** (`web/public/engine.js`) : sélecteur « Moteur DOSBox | ScummVM » au-dessus
     du volume, dans les deux pages. Le moteur actuel est en surbrillance (`window.LOL_ENGINE`).
     Un clic demande confirmation, puis charge l'autre page : `index.html` ou `lol.html`. Sur le

@@ -305,10 +305,11 @@ def write_page():
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
-    """Fichiers de web/scummvm, sinon ceux de web/public (mini-carte, vue 3D, données des niveaux)."""
+    """Fichiers de web/scummvm, sinon ceux de web/public (version DOSBox, mini-carte, vue 3D, données)."""
     def translate_path(self, path):
         p = super().translate_path(path)
-        if not os.path.exists(p):
+        # « / » (dossier sans index.html) : page DOSBox de web/public ; ScummVM sur /lol.html
+        if not os.path.exists(p) or (os.path.isdir(p) and not os.path.exists(os.path.join(p, "index.html"))):
             alt = os.path.join(PUBLIC, os.path.relpath(p, SITE))
             if os.path.exists(alt):
                 return alt
