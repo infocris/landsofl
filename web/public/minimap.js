@@ -1339,9 +1339,9 @@
     }).filter(Boolean));
   }
   fillAddList();
-  async function createItem() {
+  async function createItem(type) {
     const v = addInput.value.trim();
-    let t = parseInt(v, 10);
+    let t = type !== undefined ? type : parseInt(v, 10);
     if (!(t > 0) && itemInfo) t = itemInfo.findIndex((it) => it.name.toLowerCase() === v.toLowerCase());
     if (!(t > 0 && itemInfo && t < itemInfo.length)) { addMsg.textContent = "Objet inconnu : choisis-le dans la liste."; return; }
     if (MANAGE) {
@@ -1364,6 +1364,130 @@
     lastInv = ""; updateInventory().catch(() => {});
   }
   document.getElementById("inv-add-btn").addEventListener("click", (e) => { e.currentTarget.blur(); createItem().catch(() => {}); });
+
+  // --- Magie : lancer un sort depuis la page (version ScummVM) -------------------------
+  // Le moteur publie les sorts connus du groupe (zone 0x7F000300, 7 × 48 octets : type, coûts en
+  // magie et en vie des 4 niveaux, nom) ; la commande « cast » rejoue le menu de magie d'un portrait
+  // (contrôles, coût, expérience). Soin de niveau 1 à 3 : la cible est choisie ici.
+  const SPELLS = 0x7F000300, HEAL = 1;
+  const spellsEl = document.getElementById("spells"), spList = document.getElementById("sp-list");
+  const spCaster = document.getElementById("sp-caster"), spTarget = document.getElementById("sp-target");
+  const spTargetL = document.getElementById("sp-target-l"), spMsg = document.getElementById("sp-msg");
+  const CP850 = "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜø£Ø×ƒáíóúñÑªº¿®¬½¼¡«»";
+  const cp850 = (bytes) => Array.from(bytes, (b) => b < 128 ? String.fromCharCode(b) : CP850[b - 128] || "?").join("");
+  let spellKey = "", spellParty = [];
+  const SPELL_ERR = { 1: "Impossible maintenant : personnage occupé ou inconscient, menu de magie ouvert, ou sort inconnu.",
+    4: "Pas assez de magie (ou de vie) pour ce niveau.", 5: "Le sort ne peut pas partir d'ici (mur juste devant ?)." };
+  function fillSelect(sel, party, keep) {
+    const v = sel.value;
+    sel.replaceChildren(...party.map((c) => { const o = document.createElement("option"); o.value = c.slot; o.textContent = c.name; return o; }));
+    if (keep && party.some((c) => String(c.slot) === v)) sel.value = v;
+  }
+  async function updateSpells() {
+    if (!MANAGE || previewing) return;
+    const r = await mem.read([[SPELLS, 7 * 48], PARTY_RANGE()]);
+    if (!r) return;
+    const spells = [];
+    for (let i = 0; i < 7; i++) {
+      const b = r[0].subarray(i * 48, i * 48 + 48);
+      if (b[0] === 0xFF) continue;
+      const w = (k) => b[k] | b[k + 1] << 8;
+      const raw = b.subarray(18, 48), z = raw.indexOf(0), name = cp850(z < 0 ? raw : raw.subarray(0, z)).trim();
+      spells.push({ type: b[0], name, mp: [w(2), w(4), w(6), w(8)], hp: [w(10), w(12), w(14), w(16)] });
+    }
+    const party = partyChars(r[1]).map((c) => {
+      const u16 = (k) => c.at(k) | c.at(k + 1) << 8, s16 = (k) => (u16(k) << 16) >> 16;
+      return { slot: c.slot, name: c.name, hp: s16(55), mp: s16(59) };
+    });
+    const key = JSON.stringify([spells, party]);
+    if (key === spellKey) return;
+    spellKey = key;
+    spellsEl.hidden = !spells.length || !party.length;
+    if (JSON.stringify(party.map((c) => c.slot)) !== JSON.stringify(spellParty.map((c) => c.slot))) {
+      fillSelect(spCaster, party, true);
+      fillSelect(spTarget, party, true);
+    }
+    spellParty = party;
+    spTargetL.hidden = !spells.some((s) => s.type === HEAL);
+    renderSpells(spells);
+  }
+  function renderSpells(spells) {
+    const caster = spellParty.find((c) => String(c.slot) === spCaster.value) || spellParty[0];
+    spList.replaceChildren(...spells.map((s) => {
+      const row = document.createElement("div"); row.className = "sp-row";
+      const nm = document.createElement("span"); nm.className = "sp-name"; nm.textContent = s.name || `sort ${s.type}`;
+      row.appendChild(nm);
+      for (let l = 0; l < 4; l++) {
+        const b = document.createElement("button"); b.type = "button";
+        b.innerHTML = `${l + 1} <small>${s.mp[l]}</small>`;
+        const ok = caster && s.mp[l] <= caster.mp && s.hp[l] < caster.hp;
+        b.disabled = !ok;
+        b.title = `${s.name} niveau ${l + 1} : ${s.mp[l]} points de magie${s.hp[l] ? `, ${s.hp[l]} points de vie` : ""}`
+          + (s.type === HEAL ? (l < 3 ? " — soigne le personnage choisi" : " — soigne tout le groupe") : "")
+          + (ok ? "" : " (pas assez pour " + (caster ? caster.name : "le lanceur") + ")");
+        b.addEventListener("click", () => { b.blur(); cast(s, l).catch(() => {}); });
+        row.appendChild(b);
+      }
+      return row;
+    }));
+  }
+  async function cast(s, level) {
+    const a = +spCaster.value, target = s.type === HEAL && level < 3 ? +spTarget.value : -1;
+    spMsg.textContent = `${s.name} niveau ${level + 1}…`;
+    const r = await mem.cmd({ op: "cast", a, b: s.type | level << 8 | (target + 1) << 12 }, 20000);
+    spMsg.textContent = !r ? "Le jeu ne répond pas (menu ou dialogue ouvert ?) : réessaie en exploration."
+      : r.code ? SPELL_ERR[r.code] || `Refusé (code ${r.code}).` : `${s.name} niveau ${level + 1} lancé.`;
+    spellKey = ""; lastStats = "";
+    setTimeout(() => { updateSpells().catch(() => {}); updateStats().catch(() => {}); }, 300);
+  }
+  spCaster.addEventListener("change", () => { spCaster.blur(); spellKey = ""; updateSpells().catch(() => {}); });
+  spTarget.addEventListener("change", () => spTarget.blur());
+  if (MANAGE) setInterval(() => { updateSpells().catch(() => {}); }, 1000);
+
+  // --- Annuaire des objets par catégorie ----------------------------------------------
+  // Tous les objets de la table du jeu (viewer/data/items.json), classés comme sur la carte ;
+  // « + » en crée un dans le sac (comme le champ « Créer un objet »), clic sur le nom : fiche.
+  const catEl = document.getElementById("cat"), catTabs = document.getElementById("cat-tabs");
+  const catList = document.getElementById("cat-list"), catQ = document.getElementById("cat-q");
+  let catSel = "tout";
+  try { catSel = localStorage.getItem("itemCatalogTab") || "tout"; } catch (e) {}
+  const catKey = (t) => Object.keys(CATEGORIES).find((k) => CATEGORIES[k] === itemCategory(t));
+  function catalogItems() {
+    return itemInfo.map((it, t) => ({ it, t })).filter(({ it, t }) => t && !/^temp object$|^Objet illégal$/i.test(it.name));
+  }
+  function renderCatalog() {
+    if (!itemInfo || !catEl.open) return;
+    const all = catalogItems();
+    const counts = {}; for (const { t } of all) { const k = catKey(t); counts[k] = (counts[k] || 0) + 1; }
+    catTabs.replaceChildren(...[["tout", `tout (${all.length})`], ...Object.keys(CATEGORIES).map((k) => [k, `${CATEGORIES[k].label} (${counts[k] || 0})`])].map(([k, label]) => {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.classList.toggle("on", k === catSel);
+      b.addEventListener("click", () => { catSel = k; try { localStorage.setItem("itemCatalogTab", k); } catch (e) {} b.blur(); renderCatalog(); });
+      return b;
+    }));
+    const q = catQ.value.trim().toLowerCase();
+    const shown = all.filter(({ it, t }) => (catSel === "tout" || catKey(t) === catSel)
+      && (!q || it.name.toLowerCase().includes(q) || (it.kind || "").toLowerCase().includes(q) || (it.effects || []).join(" ").toLowerCase().includes(q)))
+      .sort((x, y) => x.it.name.localeCompare(y.it.name, "fr"));
+    catList.replaceChildren(...shown.map(({ it, t }) => {
+      const li = document.createElement("li");
+      const icon = document.createElement("div"); icon.className = "slot full"; setIcon(icon, it.icon); icon.title = "Fiche de l'objet";
+      const nm = document.createElement("span"); nm.className = "nm" + (owned.has(t) ? " own" : "");
+      nm.textContent = it.name; nm.title = (owned.has(t) ? "Déjà possédé · " : "") + `type ${t} — cliquer pour la fiche`;
+      const sm = document.createElement("small"); sm.textContent = [it.kind, ...(it.effects || [])].filter(Boolean).join(" · "); nm.appendChild(sm);
+      const add = document.createElement("button"); add.type = "button"; add.className = "add"; add.textContent = "+";
+      add.title = `Créer « ${it.name} » dans le sac`;
+      add.addEventListener("click", () => { add.blur(); createItem(t).catch(() => {}); });
+      const open = () => { showDetail(t, "annuaire"); detailEl.scrollIntoView({ block: "nearest" }); };
+      icon.addEventListener("click", open); nm.addEventListener("click", open);
+      li.append(icon, nm, add);
+      return li;
+    }));
+    if (!shown.length) { const li = document.createElement("li"); li.textContent = "aucun objet"; catList.appendChild(li); }
+  }
+  catEl.addEventListener("toggle", renderCatalog);
+  catQ.addEventListener("input", renderCatalog);
+  for (const ev of ["keydown", "keyup", "keypress"]) catQ.addEventListener(ev, (e) => e.stopPropagation());
+
   addInput.addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Enter") createItem().catch(() => {}); });
   addInput.addEventListener("keyup", (e) => e.stopPropagation());
 
@@ -1491,6 +1615,13 @@
   let xpTable = [];
   const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
   async function levelUp(slot, skill) {
+    if (MANAGE) {                       // ScummVM : la page ne peut pas écrire en mémoire, le moteur s'en charge
+      const r = await mem.cmd({ op: "levelup", a: slot, b: skill });
+      if (!r || r.code) invMessage(!r ? "Le jeu ne répond pas (menu ouvert ?) : réessaie en exploration." : "Montée de niveau impossible pour ce personnage.");
+      lastStats = "";
+      setTimeout(() => updateStats().catch(() => {}), 250);
+      return;
+    }
     const base = INV.char0 + slot * INV.charSize;               // adresse du nom
     const r = await mem.read([[base, INV.charSize], [XP.table, 4 * 11]]);
     if (!r) return;

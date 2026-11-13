@@ -821,6 +821,36 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
   - Vérifié (test automatisé, son coupé), Michael : sans triche, 5 dégâts → 15/20 PV, 3 de magie
     → 3/6 ; triches cochées → 20/20 et 6/6 ; 500 dégâts et 50 de magie → inchangés, vivant ;
     décochées, 4 dégâts → 16/20 ; « +100 couronnes » : 41 → 141.
+- **Montée de niveau** (triche, bouton « + » d'une compétence).
+  - **DOSBox** : la page écrit le niveau, l'expérience et les bonus en mémoire.
+  - **ScummVM** : la page ne peut pas écrire dans le moteur, ce qui explique la panne
+    (2026-11-13). Elle envoie op 10, et le moteur appelle
+    `increaseExperience(perso, compétence, seuil − xp)` avec le seuil `_expRequirements[niveau]`.
+    Ce sont la règle et les bonus du jeu : vie, magie, message. Le niveau 10 est le maximum.
+  - **Vérifié** : Guerrier 1 (1 xp) → 2 (500 / 1500 xp).
+- **Lancer un sort depuis la page** (version ScummVM, 2026-11-13).
+  - **Sorts publiés** : zone `0x7F000300`, 7 entrées de 48 octets, une par sort connu du groupe
+    (`_availableSpells`, -1 = vide). Contenu de chaque entrée : type (i8), un octet 0, puis le
+    coût en magie et le coût en vie des 4 niveaux (`_spellProperties[t].mpRequired` et
+    `hpRequired`, u16), puis le nom (`getLangString(spellNameCode)`, 30 octets, CP850).
+  - **Commande op 9** : a = lanceur, b = type | niveau (0 à 3) << 8 | (cible + 1) << 12. Elle
+    reprend `clickedMagicSubmenu` (menu de magie d'un portrait) :
+    - refus si le personnage est occupé ou inconscient (`flags & 0x314C`) ou si un menu de magie
+      est ouvert ;
+    - `checkMagic`, qui affiche le message du jeu ;
+    - drapeau 4, `castSpell`, `setCharacterUpdateEvent(perso, 1, 8, 1)`, puis expérience de
+      magie niveau².
+  - **Codes de retour** : 4 = pas assez de magie ou de vie ; 5 = sort impossible ici (mur juste
+    devant pour un sort à drapeau 0x100).
+  - **Soin (type 1) de niveau 1 à 3** : le jeu attend normalement un clic sur un portrait
+    (`processMagicHealSelectTarget`). La cible donnée par la page est appliquée comme
+    `clickedSpellTargetCharacter` : `castHealOnSingleCharacter`, puis retour aux boutons
+    normaux.
+  - **Vérifié** : Michael, Étincelle niveau 1 → magie 6 → 1. Le soin ciblé n'est pas testé, faute
+    de sort de soin en début de partie.
+- **Annuaire des objets** (deux versions) : les 283 objets de `items.json`, classés par onglets
+  (catégories de la mini-carte), avec un filtre texte. Le bouton « + » crée l'objet dans le sac
+  (op 3 sous ScummVM, écriture mémoire sous DOSBox) ; un clic ouvre la fiche.
 - **Apparence propre à chaque monstre** (2026-11-10, vue 3D, versions DOSBox et ScummVM).
   `LoLEngine::drawMonster` varie un même sprite de deux façons :
   - **variante de couleurs** : `flags & 7` du monstre (octet +25 de la structure, 6ᵉ argument
@@ -1305,3 +1335,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-10** : vue 3D : giclées des coups sur les monstres ; recopie de l'image du jeu retirée. Correctif : une erreur de syntaxe dans la page ScummVM désactivait la vie infinie, l'inventaire et les couronnes (§ 10 bis).
 - **2026-11-13** : sélecteur du moteur d'émulation (DOSBox / ScummVM) dans les deux pages (§ 10 bis).
 - **2026-11-13** : mini-carte : exploration progressive ; condition de la carte automatique du jeu (`_flagsTable[31] & 0x10`, octet 9 de la case) (§ 11).
+- **2026-11-13** : ScummVM web : sorts lancés depuis la page, montée de niveau par le moteur (correctif) ; annuaire des objets (§ 10 bis).
