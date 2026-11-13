@@ -76,6 +76,12 @@
   .sp-row button small { font-weight: 400; color: #8fa0d8; }
   .sp-row button:hover:not(:disabled) { background: #22305a; color: #fff; }
   .sp-row button:disabled { opacity: .35; cursor: not-allowed; }
+  #sp-learn { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; color: #a39578; font-size: 11px; }
+  #sp-learn:empty { display: none; }
+  #sp-learn button { font: 11px/1 system-ui, sans-serif; padding: 3px 6px; border: 1px dashed #6d5a3a; border-radius: 4px;
+    background: #1d1912; color: #e8dcc0; cursor: pointer; }
+  #sp-learn button:hover { border-style: solid; border-color: #c9a227; color: #fff; }
+  #sp-learn button.all { border: 1px solid #c9a227; color: #c9a227; }
   #sp-msg { color: #a39578; font-size: 11px; min-height: 1.3em; margin-top: 2px; }
   #cat-open { margin-top: 8px; width: 100%; font: 600 12px/1 system-ui, sans-serif; padding: 6px; border: 1px solid #c9a227;
     border-radius: 4px; background: #1d1912; color: #c9a227; cursor: pointer; }
@@ -270,6 +276,7 @@
         <label>Lanceur <select id="sp-caster"></select></label>
         <label id="sp-target-l" hidden title="Soin de niveau 1 à 3 : personnage soigné (niveau 4 : tout le groupe)">Soigner <select id="sp-target"></select></label></div>
       <div id="sp-list"></div>
+      <div id="sp-learn"></div>
       <div id="sp-msg"></div>
     </div>
   </div>
@@ -553,7 +560,7 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261113c"></script>
+<script src="minimap.js?v=20261113d"></script>
 <script src="engine.js?v=20261113a"></script>
 </body>
 </html>

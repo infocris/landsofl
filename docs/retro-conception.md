@@ -848,6 +848,21 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     normaux.
   - **Vérifié** : Michael, Étincelle niveau 1 → magie 6 → 1. Le soin ciblé n'est pas testé, faute
     de sort de soin en début de partie.
+- **Débloquer des sorts à l'avance** (version ScummVM, 2026-11-13).
+  - **Les sorts du joueur** sont les types 0 à 6 : Étincelle, Soins, Gel, Boule de Feu, Poing
+    Mortel, Brume Fatale, Foudre. Ils correspondent aux 7 cases de `_availableSpells`. Les types
+    suivants (8 et plus : brouillard, essaim, cube de Vaelan, gardien…) ne sont lancés que par des
+    objets, avec un lanceur négatif dans `castSpell`.
+  - **Zone `0x7F000480`** : les 7 sorts du joueur, connus ou non, en entrées de 46 octets. Chaque
+    entrée donne le coût en magie et le coût en vie des 4 niveaux (u16), puis le nom (30 octets).
+  - **Commande op 11** : a = sort, b = personnage qui le transmet. Elle appelle
+    `addSpellToScroll`, comme la fonction de script `olol_addSpellToScroll` (maîtres de magie,
+    parchemins). Pour les types supérieurs à 1, le jeu joue l'animation du sort qui passe du
+    portrait au parchemin.
+  - **Redessin** : la page 2 est redessinée, puis recopiée à l'écran, si le parchemin est
+    affiché (`_flagsTable[31] & 0x20`, levé ici dès le début de la partie). Code 6 = déjà connu.
+  - **Vérifié** : en début de partie, les 6 sorts manquants ont été débloqués un par un puis
+    avec « Tout ». Ils apparaissent dans le parchemin du jeu et dans le panneau Magie.
 - **Annuaire des objets** (deux versions) : fenêtre modale (bouton « Annuaire des objets… »
   sous l'inventaire) avec les 283 objets de `items.json`, classés par onglets (catégories de la
   mini-carte), avec un filtre texte. La fiche s'affiche à droite. Le bouton « + » crée l'objet dans le sac
@@ -1337,3 +1352,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : sélecteur du moteur d'émulation (DOSBox / ScummVM) dans les deux pages (§ 10 bis).
 - **2026-11-13** : mini-carte : exploration progressive ; condition de la carte automatique du jeu (`_flagsTable[31] & 0x10`, octet 9 de la case) (§ 11).
 - **2026-11-13** : ScummVM web : sorts lancés depuis la page, montée de niveau par le moteur (correctif) ; annuaire des objets (§ 10 bis).
+- **2026-11-13** : ScummVM web : déblocage des sorts du joueur depuis la page (§ 10 bis).

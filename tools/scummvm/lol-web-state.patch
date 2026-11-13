@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..a8fbc551 100644
+index 392e4c2d..9932b1ac 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -39,6 +39,10 @@
@@ -13,7 +13,7 @@ index 392e4c2d..a8fbc551 100644
  namespace Kyra {
  
  const char *const LoLEngine::kMouseKeymapName = "lolmouse";
-@@ -929,6 +933,340 @@ void LoLEngine::startupNew() {
+@@ -929,6 +933,372 @@ void LoLEngine::startupNew() {
  	_screen->showMouse();
  }
  
@@ -102,6 +102,16 @@ index 392e4c2d..a8fbc551 100644
 +		for (int l = 0; l < 4; l++) u16(t < 0 ? 0 : _spellProperties[t].mpRequired[l]);
 +		for (int l = 0; l < 4; l++) u16(t < 0 ? 0 : _spellProperties[t].hpRequired[l]);
 +		const char *n = t < 0 ? "" : getLangString(_spellProperties[t].spellNameCode);
++		for (int k = 0; k < 30; k++) u8(n && k < (int)strlen(n) ? (uint8)n[k] : 0);
++	}
++	end();
++	// les 7 sorts de joueur (types 0 à 6), connus ou non : 7 entrées de 46 octets
++	// magie requise u16 × 4, vie requise u16 × 4, nom (30 octets, CP850)
++	begin(0x7F000480);
++	for (int t = 0; t < 7; t++) {
++		for (int l = 0; l < 4; l++) u16(_spellProperties ? _spellProperties[t].mpRequired[l] : 0);
++		for (int l = 0; l < 4; l++) u16(_spellProperties ? _spellProperties[t].hpRequired[l] : 0);
++		const char *n = _spellProperties ? getLangString(_spellProperties[t].spellNameCode) : "";
 +		for (int k = 0; k < 30; k++) u8(n && k < (int)strlen(n) ? (uint8)n[k] : 0);
 +	}
 +	end();
@@ -257,6 +267,28 @@ index 392e4c2d..a8fbc551 100644
 +		gui_drawCharPortraitWithStats(a);
 +		return 0;
 +	}
++	if (op == 11) {	// débloquer le sort de joueur a (0 à 6) ; b = personnage qui le « transmet » (animation)
++		// comme olol_addSpellToScroll (scripts du jeu : parchemins, maîtres de magie)
++		if (a < 0 || a > 6 || _activeMagicMenu != -1)
++			return 1;
++		for (int i = 0; i < 7; i++)
++			if (_availableSpells[i] == a)
++				return 6;	// déjà connu
++		if (b < 0 || b > 3 || !(_characters[b].flags & 1)) {
++			b = 0;
++			while (b < 3 && !(_characters[b].flags & 1))
++				b++;
++		}
++		addSpellToScroll(a, b);
++		if (_flagsTable[31] & 0x20) {	// parchemin des sorts affiché : le redessiner (page 2, puis écran)
++			const int cp = _screen->setCurPage(2);
++			gui_drawScroll();
++			_screen->setCurPage(cp);
++			_screen->copyRegion(12, 0, 12, 0, 87, 92, 2, 0, Screen::CR_NO_P_CHECK);
++			_screen->updateScreen();
++		}
++		return 0;
++	}
 +	if (op == 9) {	// lancer un sort : a = lanceur, b = type | niveau (0-3) << 8 | (cible + 1) << 12
 +		// comme clickedMagicSubmenu (menu de magie du portrait), sans passer par ce menu
 +		const int spell = b & 0xFF, level = (b >> 8) & 0xF, target = ((b >> 12) & 0xF) - 1;
@@ -354,7 +386,7 @@ index 392e4c2d..a8fbc551 100644
  void LoLEngine::runLoop() {
  	// Initialize debugger since how it should be fully usable
  	static_cast<Debugger_LoL *>(getDebugger())->initialize();
-@@ -957,6 +1295,7 @@ void LoLEngine::runLoop() {
+@@ -957,6 +1327,7 @@ void LoLEngine::runLoop() {
  		gui_updateInput();
  
  		update();
@@ -362,7 +394,7 @@ index 392e4c2d..a8fbc551 100644
  
  		updatePlayTimer();
  
-@@ -1477,6 +1816,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
+@@ -1477,6 +1848,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
  
  	int newVal = (mode == 2) ? (pointsMax + points) : (mode ? (pointsCur + points) : points);
  	newVal = CLIP(newVal, 0, pointsMax);
@@ -371,7 +403,7 @@ index 392e4c2d..a8fbc551 100644
  
  	if (type) {
  		c->magicPointsCur = newVal;
-@@ -2074,6 +2415,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
+@@ -2074,6 +2447,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
  
  void LoLEngine::delay(uint32 millis, bool doUpdate, bool) {
  	while (millis && !shouldQuit()) {
@@ -379,7 +411,7 @@ index 392e4c2d..a8fbc551 100644
  		if (doUpdate)
  			update();
  		else
-@@ -2092,6 +2434,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
+@@ -2092,6 +2466,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
  // spells
  
  int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {

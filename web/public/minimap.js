@@ -1369,7 +1369,10 @@
   // Le moteur publie les sorts connus du groupe (zone 0x7F000300, 7 × 48 octets : type, coûts en
   // magie et en vie des 4 niveaux, nom) ; la commande « cast » rejoue le menu de magie d'un portrait
   // (contrôles, coût, expérience). Soin de niveau 1 à 3 : la cible est choisie ici.
-  const SPELLS = 0x7F000300, HEAL = 1;
+  // Sorts de joueur (types 0 à 6, connus ou non : zone 0x7F000480, 7 × 46 octets) : ceux qui
+  // manquent peuvent être débloqués (commande « learn » = addSpellToScroll, comme les scripts).
+  const SPELLS = 0x7F000300, ALL_SPELLS = 0x7F000480, HEAL = 1;
+  const spLearn = document.getElementById("sp-learn");
   const spellsEl = document.getElementById("spells"), spList = document.getElementById("sp-list");
   const spCaster = document.getElementById("sp-caster"), spTarget = document.getElementById("sp-target");
   const spTargetL = document.getElementById("sp-target-l"), spMsg = document.getElementById("sp-msg");
@@ -1385,7 +1388,7 @@
   }
   async function updateSpells() {
     if (!MANAGE || previewing) return;
-    const r = await mem.read([[SPELLS, 7 * 48], PARTY_RANGE()]);
+    const r = await mem.read([[SPELLS, 7 * 48], PARTY_RANGE(), [ALL_SPELLS, 7 * 46]]);
     if (!r) return;
     const spells = [];
     for (let i = 0; i < 7; i++) {
@@ -1395,14 +1398,20 @@
       const raw = b.subarray(18, 48), z = raw.indexOf(0), name = cp850(z < 0 ? raw : raw.subarray(0, z)).trim();
       spells.push({ type: b[0], name, mp: [w(2), w(4), w(6), w(8)], hp: [w(10), w(12), w(14), w(16)] });
     }
+    const known = new Set(spells.map((s) => s.type)), missing = [];
+    for (let t = 0; t < 7; t++) {
+      const b = r[2].subarray(t * 46, t * 46 + 46), raw = b.subarray(16, 46), z = raw.indexOf(0);
+      const name = cp850(z < 0 ? raw : raw.subarray(0, z)).trim();
+      if (!known.has(t) && name) missing.push({ type: t, name });
+    }
     const party = partyChars(r[1]).map((c) => {
       const u16 = (k) => c.at(k) | c.at(k + 1) << 8, s16 = (k) => (u16(k) << 16) >> 16;
       return { slot: c.slot, name: c.name, hp: s16(55), mp: s16(59) };
     });
-    const key = JSON.stringify([spells, party]);
+    const key = JSON.stringify([spells, party, missing]);
     if (key === spellKey) return;
     spellKey = key;
-    spellsEl.hidden = !spells.length || !party.length;
+    spellsEl.hidden = !party.length;
     if (JSON.stringify(party.map((c) => c.slot)) !== JSON.stringify(spellParty.map((c) => c.slot))) {
       fillSelect(spCaster, party, true);
       fillSelect(spTarget, party, true);
@@ -1410,6 +1419,33 @@
     spellParty = party;
     spTargetL.hidden = !spells.some((s) => s.type === HEAL);
     renderSpells(spells);
+    renderLearn(missing);
+  }
+  function renderLearn(missing) {
+    if (!missing.length) { spLearn.replaceChildren(); return; }
+    const mk = (label, title, types, cls) => {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.title = title;
+      if (cls) b.className = cls;
+      b.addEventListener("click", () => { b.blur(); learn(types).catch(() => {}); });
+      return b;
+    };
+    spLearn.replaceChildren("À débloquer :",
+      ...missing.map((s) => mk(s.name, `Apprendre ${s.name} (ajouté au parchemin des sorts, comme dans le jeu)`, [s.type])),
+      ...(missing.length > 1 ? [mk("Tout", "Apprendre tous les sorts manquants", missing.map((s) => s.type), "all")] : []));
+  }
+  async function learn(types) {
+    let ok = 0, last = null;
+    for (const t of types) {
+      spMsg.textContent = "Apprentissage…";
+      last = await mem.cmd({ op: "learn", a: t, b: +spCaster.value }, 20000);
+      if (!last || last.code) break;
+      ok++;
+    }
+    spMsg.textContent = !last ? "Le jeu ne répond pas (menu ou dialogue ouvert ?) : réessaie en exploration."
+      : last.code === 6 ? "Ce sort est déjà connu." : last.code ? "Impossible maintenant (menu de magie ouvert ?)."
+      : ok > 1 ? `${ok} sorts débloqués.` : "Sort débloqué.";
+    spellKey = "";
+    setTimeout(() => updateSpells().catch(() => {}), 300);
   }
   function renderSpells(spells) {
     const caster = spellParty.find((c) => String(c.slot) === spCaster.value) || spellParty[0];
