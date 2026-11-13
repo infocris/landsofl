@@ -981,6 +981,12 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
 | `web/public/viewer/` | visualiseur 3D libre (lancer de rayons maison) | http://localhost:8000/viewer/ |
 | `web/public/minimap.js`, `memscan.js` | mini-carte en direct à côté du jeu | http://localhost:8000/ |
 
+**Taille, zoom et centrage de la mini-carte** (réglages mémorisés).
+- **Taille** : la carte occupe de 256 à 768 px à l'écran, par pas de 64 ; le panneau suit.
+- **Zoom** : de 6 à 40 px par case, avec les boutons ou la molette sur la carte.
+- **Centrage (⌖)** : la vue suit le groupe, qui reste au centre. Sans centrage, la carte entière
+  est centrée, ou la vue est bornée au niveau quand elle déborde.
+
 **Exploration progressive de la mini-carte** (bouton ◐, réglage mémorisé ; ↺ oublie le niveau).
 - **Carte automatique du jeu.** Le moteur marque les cases vues dans les drapeaux de la grille
   (octet 9, `flags |= 7`, `updateAutoMap` dans ScummVM). Il marque la case du groupe et ses

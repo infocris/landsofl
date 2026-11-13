@@ -39,21 +39,51 @@
   const itemsEl = document.getElementById("mm-items");
   const itemsTitleEl = document.getElementById("mm-items-title");
   const frame3d = document.getElementById("v3d-frame");
-  // Taille de la mini-carte : 8 à 24 px par case, mémorisée ; le panneau suit (variables CSS)
-  const CELL_MIN = 8, CELL_MAX = 24;
+  // Taille de la carte à l'écran (SIZE, 256 à 768 px ; le panneau suit, variables CSS) et zoom
+  // (CELL, 6 à 40 px par case) réglés à part et mémorisés. Centrage automatique (⌖) : la vue suit
+  // le groupe, au centre ; sinon la carte entière est centrée, ou bornée au niveau si elle déborde.
+  const CELL_MIN = 6, CELL_MAX = 40, SIZE_MIN = 256, SIZE_MAX = 768;
+  let SIZE = 384, follow = true, view = [0, 0];      // view : décalage du coin haut-gauche (px carte)
   let lastDraw = [0, 0];
-  function setCell(c) {
-    CELL = Math.max(CELL_MIN, Math.min(CELL_MAX, c));
-    canvas.width = canvas.height = 32 * CELL;
-    document.documentElement.style.setProperty("--mm-size", 32 * CELL + "px");
-    document.getElementById("mm-smaller").disabled = CELL <= CELL_MIN;
-    document.getElementById("mm-bigger").disabled = CELL >= CELL_MAX;
-    try { localStorage.setItem("minimapCell", String(CELL)); } catch (e) {}
+  function setSize(sz) {
+    SIZE = Math.max(SIZE_MIN, Math.min(SIZE_MAX, sz));
+    canvas.width = canvas.height = SIZE;
+    document.documentElement.style.setProperty("--mm-size", SIZE + "px");
+    document.getElementById("mm-smaller").disabled = SIZE <= SIZE_MIN;
+    document.getElementById("mm-bigger").disabled = SIZE >= SIZE_MAX;
+    try { localStorage.setItem("minimapSize", String(SIZE)); } catch (e) {}
     draw(lastDraw[0], lastDraw[1]);
     window.dispatchEvent(new Event("resize"));     // js-dos recalcule la taille du jeu
   }
-  for (const [id, d] of [["mm-smaller", -2], ["mm-bigger", 2]])
+  function setCell(c) {
+    CELL = Math.max(CELL_MIN, Math.min(CELL_MAX, Math.round(c)));
+    document.getElementById("mm-zout").disabled = CELL <= CELL_MIN;
+    document.getElementById("mm-zin").disabled = CELL >= CELL_MAX;
+    try { localStorage.setItem("minimapCell", String(CELL)); } catch (e) {}
+    draw(lastDraw[0], lastDraw[1]);
+  }
+  function viewFor(block) {
+    const full = 32 * CELL;
+    const axis = (p) => {
+      if (follow) return (p + 0.5) * CELL - SIZE / 2;                 // groupe au centre
+      if (full <= SIZE) return -(SIZE - full) / 2;                    // carte entière, centrée
+      return Math.max(0, Math.min(full - SIZE, (p + 0.5) * CELL - SIZE / 2));
+    };
+    return block < 1024 ? [axis(block % 32), axis(block >> 5)] : [-(SIZE - full) / 2, -(SIZE - full) / 2];
+  }
+  for (const [id, d] of [["mm-smaller", -64], ["mm-bigger", 64]])
+    document.getElementById(id).addEventListener("click", (e) => { setSize(SIZE + d); e.currentTarget.blur(); });
+  for (const [id, d] of [["mm-zout", -2], ["mm-zin", 2]])
     document.getElementById(id).addEventListener("click", (e) => { setCell(CELL + d); e.currentTarget.blur(); });
+  canvas.addEventListener("wheel", (e) => { e.preventDefault(); setCell(CELL + (e.deltaY < 0 ? 2 : -2)); }, { passive: false });
+  const centerBtn = document.getElementById("mm-center");
+  try { follow = localStorage.getItem("minimapFollow") !== "0"; } catch (e) {}
+  centerBtn.classList.toggle("on", follow);
+  centerBtn.addEventListener("click", (e) => {
+    follow = !follow; centerBtn.classList.toggle("on", follow); e.currentTarget.blur();
+    try { localStorage.setItem("minimapFollow", follow ? "1" : "0"); } catch (err) {}
+    draw(lastDraw[0], lastDraw[1]);
+  });
 
   const mem = new LoLMem.RemoteMemory();
   const levels = [];          // { level, name, faces: Uint8Array(4096), wallTypes, labels }
@@ -507,8 +537,11 @@
   function draw(block, dir) {
     lastDraw = [block, dir];
     const L = current, k = CELL / 12;
+    g.setTransform(1, 0, 0, 1, 0, 0);
     g.fillStyle = "#000"; g.fillRect(0, 0, canvas.width, canvas.height);
     if (!L) return;
+    view = viewFor(block);
+    g.setTransform(1, 0, 0, 1, -Math.round(view[0]), -Math.round(view[1]));
     const img = texMode ? levelImages(L) : null;
     for (let i = 0; i < 1024; i++) {
       const cls = cellClass(L, i), x = (i % 32) * CELL, y = Math.floor(i / 32) * CELL;
@@ -865,7 +898,8 @@
   canvas.addEventListener("mousemove", (e) => {
     if (!current) { tipEl.hidden = true; return; }
     const r = canvas.getBoundingClientRect();
-    const x = Math.floor((e.clientX - r.left) / r.width * 32), y = Math.floor((e.clientY - r.top) / r.height * 32);
+    const x = Math.floor(((e.clientX - r.left) / r.width * SIZE + Math.round(view[0])) / CELL);
+    const y = Math.floor(((e.clientY - r.top) / r.height * SIZE + Math.round(view[1])) / CELL);
     if (x < 0 || y < 0 || x > 31 || y > 31) { tipEl.hidden = true; return; }
     const key = `${x},${y}`;
     if (tipEl.hidden || tipEl.dataset.cell !== key) { tipEl.dataset.cell = key; showTip(cellInfo(x, y), e.clientX, e.clientY); }
@@ -873,7 +907,11 @@
   });
   canvas.addEventListener("mouseleave", () => { tipEl.hidden = true; tipEl.dataset.cell = ""; });
 
-  { let c = 12; try { c = +localStorage.getItem("minimapCell") || 12; } catch (e) {} setCell(c); }
+  {
+    let c = 12, sz = 0;
+    try { c = +localStorage.getItem("minimapCell") || 12; sz = +localStorage.getItem("minimapSize") || 0; } catch (e) {}
+    setCell(c); setSize(sz || 32 * c);              // ancienne version : taille = 32 cases
+  }
 
   let busy = false;
   async function tick() {

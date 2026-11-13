@@ -198,6 +198,10 @@
   #mm-title button:first-of-type { margin-left: auto; }
   #mm-title button:disabled { opacity: .35; cursor: default; }
   #mm-title #mm-tex { width: 28px; }
+  #mm-title { flex-wrap: wrap; }
+  #mm-title .mm-grp { font: 400 10px/1 system-ui, sans-serif; color: #8a7f68; margin-left: 4px; }
+  #mm-title #mm-center { width: 28px; }
+  #mm-title #mm-center.on { border-color: #c9a227; color: #c9a227; }
   #mm-title #mm-tex.on, #mm-title #mm-fog.on { border-color: #c9a227; color: #c9a227; }
   #mm-title #mm-fog, #mm-title #mm-forget { width: 28px; }
   #mm-info { color: #a39578; min-height: 1.4em; }
@@ -258,7 +262,7 @@
   <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261110d" title="Vue 3D synchronisée"></iframe></div>
 </div>
 <aside id="mm" aria-label="Mini-carte">
-  <div id="mm-title"><span>Mini-carte</span><button id="mm-tex" type="button" title="Cases illustrées avec les textures du lieu / couleurs simples">▦</button><button id="mm-fog" type="button" title="Exploration progressive : n'afficher que les cases déjà vues / toute la carte">◐</button><button id="mm-forget" type="button" title="Oublier l'exploration de ce niveau (nouvelle partie)" disabled>↺</button><button id="mm-smaller" type="button" title="Réduire la mini-carte">−</button><button id="mm-bigger" type="button" title="Agrandir la mini-carte">+</button></div>
+  <div id="mm-title"><span>Mini-carte</span><button id="mm-tex" type="button" title="Cases illustrées avec les textures du lieu / couleurs simples">▦</button><button id="mm-fog" type="button" title="Exploration progressive : n'afficher que les cases déjà vues / toute la carte">◐</button><button id="mm-forget" type="button" title="Oublier l'exploration de ce niveau (nouvelle partie)" disabled>↺</button><button id="mm-center" type="button" title="Centrer automatiquement la carte sur le groupe / carte fixe">⌖</button><span class="mm-grp" title="Taille de la carte à l'écran">Taille</span><button id="mm-smaller" type="button" title="Réduire la mini-carte">−</button><button id="mm-bigger" type="button" title="Agrandir la mini-carte">+</button><span class="mm-grp" title="Zoom (aussi : molette sur la carte)">Zoom</span><button id="mm-zout" type="button" title="Dézoomer (molette)">−</button><button id="mm-zin" type="button" title="Zoomer (molette)">+</button></div>
   <div id="mm-info">chargement…</div>
   <canvas id="mm-canvas"></canvas>
   <div id="mm-label"></div>
@@ -561,7 +565,7 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261113e"></script>
+<script src="minimap.js?v=20261113f"></script>
 <script src="engine.js?v=20261113a"></script>
 </body>
 </html>
