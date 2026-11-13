@@ -683,6 +683,16 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
   - Le script construit `web/scummvm/data/games/lol` : des liens vers les fichiers du jeu, plus un
     `FRE/STARTUP.PAK` qui réunit `STARTUP.PAK` et `STARTIN.PAK`. Le dossier du jeu n'est pas
     modifié.
+- **Fichiers du dossier de langue.** La version CD cherche certains PAK dans `FRE/` :
+  - l'introduction (`setupPrologueData`) ;
+  - la fin du jeu (`setupEpilogueData`) : `FRE/GENERAL.PAK`, `INTROVOC.PAK`, `STARTUP.PAK`,
+    `FINALE.PAK`, `FINALE1.PAK` et `FINALE2.PAK`. La scène finale lit aussi ses calques en
+    `FRE/<fichier>` (`tlol_fadeInScene`).
+  - Les trois `FINALE*.PAK` manquaient : à la fin du jeu, ScummVM s'arrêtait sur « Couldn't load
+    file: FRE/FINALE.PAK ». Correctif du 2026-11-13 : ils sont liés dans `FRE/` comme ceux de
+    l'introduction.
+  - Vérifié en lançant `showOutro` avec une commande de test temporaire, retirée ensuite : la fin
+    se joue jusqu'à l'écran « FIN ».
 - **Lancement.** `python3 -I tools/scummvm_web.py` sert la page sur le port 8001, puis :
   `http://localhost:8001/lol.html` (page complète) ou `lol-game.html` (jeu seul).
   - Ce serveur sert aussi la version DOSBox (`index.html`, fichiers de `web/public`), y compris
@@ -1452,3 +1462,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : grande carte en fenêtre modale (Tab), avec téléportation (§ 11).
 - **2026-11-13** : ScummVM web : sauvegarde depuis la page (nouvelle sauvegarde, écraser) (§ 10 bis).
 - **2026-11-13** : ScummVM web : réglages du jeu (sous-titres, volumes) conservés d'un lancement à l'autre (§ 10 bis).
+- **2026-11-13** : ScummVM web : fichiers de la fin (FRE/FINALE*.PAK) ajoutés, la fin du jeu ne plante plus (§ 10 bis).

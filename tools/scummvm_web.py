@@ -55,8 +55,12 @@ SITE = os.path.join(ROOT, "web", "scummvm")          # version servie et version
 DEST = os.path.join(SITE, "data", "games", "lol")
 PATCH = os.path.join(ROOT, "tools", "scummvm", "lol-web-state.patch")
 PUBLIC = os.path.join(ROOT, "web", "public")
+# Fichiers que la version CD de ScummVM cherche dans le dossier de langue FRE/ : introduction
+# (setupPrologueData) et fin du jeu (setupEpilogueData : FINALE*.PAK, sinon « Couldn't load file »
+# à la fin). STARTUP.PAK y est construit à part (STARTUP + STARTIN).
 INTRO = ["GENERAL.PAK", "INTROVOC.PAK", "INTRO1.PAK", "INTRO2.PAK", "INTRO3.PAK", "INTRO4.PAK", "INTRO5.PAK",
-         "INTRO6.PAK", "INTRO7.PAK", "INTRO8.PAK", "INTRO9.PAK", "HISTORY.PAK"]
+         "INTRO6.PAK", "INTRO7.PAK", "INTRO8.PAK", "INTRO9.PAK", "HISTORY.PAK",
+         "FINALE.PAK", "FINALE1.PAK", "FINALE2.PAK"]
 
 
 def link(src, dst):
