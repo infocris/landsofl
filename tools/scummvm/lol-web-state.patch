@@ -1,8 +1,16 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..430aed72 100644
+index 392e4c2d..63fd404b 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
-@@ -39,6 +39,10 @@
+@@ -32,6 +32,7 @@
+ #include "audio/audiostream.h"
+ 
+ #include "common/config-manager.h"
++#include "common/savefile.h"
+ #include "common/system.h"
+ #include "common/translation.h"
+ 
+@@ -39,6 +40,10 @@
  #include "backends/keymapper/keymapper.h"
  #include "backends/keymapper/standard-actions.h"
  
@@ -13,7 +21,7 @@ index 392e4c2d..430aed72 100644
  namespace Kyra {
  
  const char *const LoLEngine::kMouseKeymapName = "lolmouse";
-@@ -929,6 +933,420 @@ void LoLEngine::startupNew() {
+@@ -929,6 +934,459 @@ void LoLEngine::startupNew() {
  	_screen->showMouse();
  }
  
@@ -120,6 +128,11 @@ index 392e4c2d..430aed72 100644
 +		const char *n = t < 0 ? "" : getLangString(_spellProperties[t].spellNameCode);
 +		for (int k = 0; k < 30; k++) u8(n && k < (int)strlen(n) ? (uint8)n[k] : 0);
 +	}
++	end();
++	// sauvegardes listées par la commande 14
++	begin(0x7F000700);
++	for (uint i = 0; i < _webSaveList.size(); i++) u8(_webSaveList[i]);
++	if (_webSaveList.empty()) { u8(0xFF); u8(0xFF); }	// pas encore listées
 +	end();
 +	// volumes du jeu (musique, effets, voix : 2 = coupé … 102), comme le menu « Contrôles audio »
 +	begin(0x7F000600);
@@ -288,6 +301,40 @@ index 392e4c2d..430aed72 100644
 +		gui_drawCharPortraitWithStats(a);
 +		return 0;
 +	}
++	if (op == 14) {	// lister les sauvegardes (publiées en zone 0x7F000700 : nombre u16, puis n° u16 + nom 40 octets)
++		Common::SaveFileManager *sfm = _system->getSavefileManager();
++		Common::StringArray files = sfm->listSavefiles(_targetName + ".###");
++		Common::Array<int> slots;
++		for (const auto &f : files) {
++			const int slot = atoi(f.c_str() + f.size() - 3);
++			if (slot >= 0 && slot <= 999)
++				slots.push_back(slot);
++		}
++		Common::sort(slots.begin(), slots.end());
++		_webSaveList.clear();
++		_webSaveList.push_back(0); _webSaveList.push_back(0);
++		int n = 0;
++		for (int slot : slots) {
++			Common::InSaveFile *in = sfm->openForLoading(getSavegameFilename(_targetName, slot));
++			if (!in)
++				continue;
++			SaveHeader header;
++			if (readSaveHeader(in, header) == kRSHENoError && n < 200) {
++				_webSaveList.push_back(slot & 0xFF); _webSaveList.push_back(slot >> 8);
++				for (uint k = 0; k < 40; k++) _webSaveList.push_back(k < header.description.size() ? (byte)header.description[k] : 0);
++				n++;
++			}
++			delete in;
++		}
++		_webSaveList[0] = n & 0xFF; _webSaveList[1] = n >> 8;
++		return 0;
++	}
++	if (op == 15) {	// charger la sauvegarde a (comme le menu « Charger une partie » : _gameToLoad, lu par runLoop)
++		if (a < 0 || a > 999 || !saveFileLoadable(a))
++			return 1;
++		_gameToLoad = a;
++		return 0;
++	}
 +	if (op == 13) {	// téléportation dans le niveau : case a, direction b (0-3, sinon inchangée)
 +		// comme olol_setGlobalVar(0) des scripts (téléporteurs), puis la scène est redessinée
 +		if (a < 0 || a > 1023 || (_updateFlags & 0x0F) || _weaponsDisabled || _activeMagicMenu != -1)
@@ -434,7 +481,7 @@ index 392e4c2d..430aed72 100644
  void LoLEngine::runLoop() {
  	// Initialize debugger since how it should be fully usable
  	static_cast<Debugger_LoL *>(getDebugger())->initialize();
-@@ -957,6 +1375,7 @@ void LoLEngine::runLoop() {
+@@ -957,6 +1415,7 @@ void LoLEngine::runLoop() {
  		gui_updateInput();
  
  		update();
@@ -442,7 +489,7 @@ index 392e4c2d..430aed72 100644
  
  		updatePlayTimer();
  
-@@ -1477,6 +1896,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
+@@ -1477,6 +1936,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
  
  	int newVal = (mode == 2) ? (pointsMax + points) : (mode ? (pointsCur + points) : points);
  	newVal = CLIP(newVal, 0, pointsMax);
@@ -451,7 +498,7 @@ index 392e4c2d..430aed72 100644
  
  	if (type) {
  		c->magicPointsCur = newVal;
-@@ -2074,6 +2495,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
+@@ -2074,6 +2535,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
  
  void LoLEngine::delay(uint32 millis, bool doUpdate, bool) {
  	while (millis && !shouldQuit()) {
@@ -459,7 +506,7 @@ index 392e4c2d..430aed72 100644
  		if (doUpdate)
  			update();
  		else
-@@ -2092,6 +2514,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
+@@ -2092,6 +2554,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
  // spells
  
  int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
@@ -472,7 +519,7 @@ index 392e4c2d..430aed72 100644
  	_activeSpell.spell = spellType;
  	_activeSpell.p = &_spellProperties[spellType];
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index 2cfadf37..ee13738a 100644
+index 2cfadf37..a1750da9 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
 @@ -315,6 +315,11 @@ private:
@@ -487,7 +534,7 @@ index 2cfadf37..ee13738a 100644
  	void update() override;
  
  	// mouse
-@@ -1072,6 +1077,15 @@ private:
+@@ -1072,6 +1077,16 @@ private:
  
  	LoLItem *_itemsInPlay;
  	ItemProperty *_itemProperties;
@@ -496,6 +543,7 @@ index 2cfadf37..ee13738a 100644
 +	bool _webInfiniteHp = false, _webInfiniteMp = false;	// version web : triches vie / magie infinies
 +	bool _webAutoAttack = false;	// version web : attaque automatique du monstre devant le groupe
 +	uint32 _webAutoAttackTime = 0;
++	Common::Array<byte> _webSaveList;	// version web : sauvegardes listées (n° u16, nom 40 octets)
 +	bool _webInMenu = false;	// version web : menu (disquette) ouvert
 +	bool _webCasting = false;	// version web : sort en cours (animation dans la fenêtre de scène)
 +	bool _webLoadingLevel = false;	// version web : changement de niveau, jusqu'au retour dans la boucle principale

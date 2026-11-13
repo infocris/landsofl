@@ -86,6 +86,29 @@
   #sp-learn button:hover { border-style: solid; border-color: #c9a227; color: #fff; }
   #sp-learn button.all { border: 1px solid #c9a227; color: #c9a227; }
   #sp-msg { color: #a39578; font-size: 11px; min-height: 1.3em; margin-top: 2px; }
+  #sv-open { position: fixed; right: 12px; bottom: 264px; z-index: 1000; font: 12px/1 system-ui, sans-serif; padding: 6px 10px;
+    border: 1px solid #c9a227; border-radius: 6px; background: rgba(0,0,0,.6); color: #e8dcc0; cursor: pointer; }
+  #sv-open:hover { background: #2a2217; }
+  #sv-open[hidden] { display: none; }
+  body:has(#mm:not(.hidden)) #sv-open { right: calc(var(--mm-w) + 12px); }
+  #sv-dlg { width: min(560px, 94vw); max-height: 85vh; padding: 0; border: 1px solid #6d5a3a; border-radius: 10px; color-scheme: dark;
+    background: #110e0a; color: #e8dcc0; font: 15px/1.4 system-ui, sans-serif; box-shadow: 0 20px 60px rgba(0,0,0,.7); }
+  #sv-dlg[open] { display: flex; flex-direction: column; }
+  #sv-dlg::backdrop { background: rgba(0, 0, 0, .65); }
+  #sv-dlg .cat-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; border-bottom: 1px solid #3a3226; }
+  #sv-dlg h2 { margin: 0; font-size: 20px; color: #c9a227; flex: 1; }
+  #sv-dlg .cat-head button { font-size: 18px; background: none; border: 0; color: #a39578; cursor: pointer; padding: 0 4px; }
+  #sv-dlg .cat-head button:hover { color: #fff; }
+  #sv-list { list-style: none; margin: 0; padding: 6px 10px; overflow-y: auto; flex: 1; min-height: 80px; }
+  #sv-list li { display: flex; align-items: center; gap: 12px; padding: 7px 8px; border-bottom: 1px solid #241f17; border-radius: 4px; }
+  #sv-list li:hover { background: rgba(201, 162, 39, .08); }
+  #sv-list .no { color: #8a7f68; min-width: 2.5em; text-align: right; font-variant-numeric: tabular-nums; }
+  #sv-list .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+  #sv-list button { font: 600 13px/1 system-ui, sans-serif; padding: 7px 12px; border: 1px solid #c9a227; border-radius: 6px;
+    background: #1d1912; color: #e8dcc0; cursor: pointer; }
+  #sv-list button:hover { background: #2a2217; color: #fff; }
+  #sv-list button.confirm { background: #c9a227; color: #110e0a; }
+  #sv-msg { padding: 8px 16px 12px; color: #a39578; font-size: 13px; min-height: 1.4em; }
   #st-open { margin-left: auto; font: 11px/1 system-ui, sans-serif; padding: 3px 7px; border: 1px solid #c9a227; border-radius: 4px;
     background: #1d1912; color: #c9a227; cursor: pointer; }
   #st-open:hover { background: #2a2217; color: #fff; }
@@ -349,6 +372,13 @@
 <button id="v3dtoggle" type="button" title="Afficher/masquer la vue 3D (F10)">3D</button>
 <button id="persp" type="button" title="Perspective de la vue 3D : celle du jeu d'origine ou une perspective réelle"></button>
 <div id="mm-tip" hidden></div>
+<button id="sv-open" type="button" hidden title="Charger une sauvegarde du jeu">Charger…</button>
+<dialog id="sv-dlg" aria-labelledby="sv-h">
+  <div class="cat-head"><h2 id="sv-h">Charger une partie</h2><button type="button" id="sv-refresh" title="Relire la liste">↻</button>
+    <button type="button" id="sv-close" title="Fermer (Échap)">✕</button></div>
+  <ol id="sv-list"></ol>
+  <div id="sv-msg"></div>
+</dialog>
 <dialog id="st-dlg" aria-labelledby="st-h">
   <div class="cat-head"><h2 id="st-h">Caractéristiques des personnages</h2><span id="st-money2"></span>
     <button type="button" id="st-close" title="Fermer (Échap)">✕</button></div>
@@ -618,7 +648,7 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261113i"></script>
+<script src="minimap.js?v=20261113j"></script>
 <script src="engine.js?v=20261113a"></script>
 </body>
 </html>

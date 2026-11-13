@@ -848,6 +848,16 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     normaux.
   - **Vérifié** : Michael, Étincelle niveau 1 → magie 6 → 1. Le soin ciblé n'est pas testé, faute
     de sort de soin en début de partie.
+- **Charger une sauvegarde depuis la page** (version ScummVM, 2026-11-13 ; bouton « Charger… »).
+  - **Liste** : la commande op 14 relit les fichiers `lol-fr.###` (`listSavefiles`, en-tête lu
+    par `readSaveHeader`, comme `KyraMetaEngine::listSaves`).
+  - **Zone `0x7F000700`** : nombre (u16), puis n° (u16) et nom (40 octets) pour chaque
+    sauvegarde. 0xFFFF tant qu'aucune liste n'a été demandée.
+  - **Chargement** : la commande op 15 vérifie la sauvegarde (`saveFileLoadable`), puis renseigne
+    `_gameToLoad`, comme le menu « Charger une partie » (`gui_lol.cpp`). `runLoop` la charge au
+    tour suivant.
+  - **Vérifié** : sauvegarde « test web » faite dans le menu du jeu, en case 13,17 ; téléportation
+    en 12,12 ; chargement depuis la page → retour en 13,17.
 - **Téléportation** (version ScummVM, 2026-11-13).
   - **Dans le niveau** : commande op 13 (a = case, b = direction ou -1). Elle fait comme
     `olol_setGlobalVar(0, …)`, utilisé par les téléporteurs des scripts : `_currentBlock`,
@@ -1405,3 +1415,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : ScummVM web : volumes musique, effets et voix dans la page (§ 10 bis).
 - **2026-11-13** : ScummVM web : téléportation (mini-carte, lieux, sélecteur de niveau) (§ 10 bis).
 - **2026-11-13** : page : fiches des personnages dans une fenêtre modale (résumé vie / magie dans le panneau).
+- **2026-11-13** : ScummVM web : chargement des sauvegardes depuis la page (§ 10 bis).
