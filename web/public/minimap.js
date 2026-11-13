@@ -1016,7 +1016,8 @@
       // +12 image d'animation, +13 mode ; +18 drapeaux (& 7 = variante de couleurs), +35..+38 équipement
       out.push({ slot: i, x: x / 256, y: y / 256, dir: bytes[a + 17] & 3, type: bytes[a + 25], sf: bytes[a + 12], mode: bytes[a + 13],
         variant: bytes[a + 18] & 7, equip: [bytes[a + 35], bytes[a + 36], bytes[a + 37], bytes[a + 38]],
-        hitX: (bytes[a + 10] << 24) >> 24, hitY: (bytes[a + 11] << 24) >> 24 });   // +10/+11 : hitOffsX/Y (signés)
+        hitX: (bytes[a + 10] << 24) >> 24, hitY: (bytes[a + 11] << 24) >> 24,     // +10/+11 : hitOffsX/Y (signés)
+        hp: ((bytes[a + 22] | bytes[a + 23] << 8) << 16) >> 16 });               // +22 : points de vie actuels
     }
     return out;
   }
@@ -1031,10 +1032,12 @@
     if (ENGINE_SPRITES) {
       // ScummVM : image de chaque monstre telle que le jeu la dessine (attaques, coups, marche)
       // + giclée d'un coup reçu : réduction 1-4 (0 = aucune), couleur 0-3, décalage hitOffsX/Y
-      const f = await mem.read([[0x7F000200, 120]]);
+      // + points de vie maximum du type (zone 0x7F000900 : 5 × u16) pour la barre de vie de la vue 3D
+      const f = await mem.read([[0x7F000200, 120], [0x7F000900, 10]]);
       if (f) for (const m of monsters) {
         const k = m.slot * 4;
         m.frame = f[0][k]; m.flip = !!f[0][k + 1]; m.blood = f[0][k + 2]; m.bloodType = f[0][k + 3];
+        m.hpMax = m.type < 5 ? f[1][m.type * 2] | f[1][m.type * 2 + 1] << 8 : 0;
       }
     }
     const inScene = r[4][0] === 1;
@@ -1848,7 +1851,7 @@
   // Débogage depuis la console : LoLMinimap.monsters() -> case, direction, type, sprite choisi
   function debugMonsters() {
     const L = current;
-    return monsters.map((m) => ({ case: `${Math.floor(m.x)},${Math.floor(m.y)}`, dir: m.dir, type: m.type, variant: m.variant, equip: m.equip.filter(Boolean).join(","),
+    return monsters.map((m) => ({ case: `${Math.floor(m.x)},${Math.floor(m.y)}`, dir: m.dir, type: m.type, pv: m.hpMax ? `${m.hp}/${m.hpMax}` : m.hp, variant: m.variant, equip: m.equip.filter(Boolean).join(","),
       sprite: L && L.spriteOf ? L.spriteOf[m.type] || "(aucun : type inconnu du niveau)" : "(en cours)",
       possibles: L ? (L.monsterTypes[m.type] || []).join("/") : "" }));
   }

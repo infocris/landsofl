@@ -358,7 +358,25 @@
         }
       }
     }
+    drawHealthBars(sprites);
   }
+  // Barre de vie au-dessus de chaque monstre visible (version ScummVM : points de vie actuels du
+  // monstre / maximum de son type, publiés par le moteur). Masquée si le centre du monstre est
+  // derrière un mur (zbuf) ou s'il est mourant (mode >= 13).
+  function drawHealthBars(sprites) {
+    for (const sp of sprites) {
+      if (!sp.hpMax || sp.hp === undefined || sp.hp <= 0 || sp.mode >= 13) continue;
+      const cx = Math.round(sp.left + sp.sw / 2);
+      if (cx < 0 || cx >= W || zbuf[cx] <= sp.tz) continue;
+      const q = Math.max(0, Math.min(1, sp.hp / sp.hpMax));
+      const w = Math.max(18, Math.min(90, sp.sw * 0.55)), h = Math.max(3, Math.min(7, w / 12));
+      const x = cx - w / 2, y = Math.max(2, sp.top - h - Math.max(3, h));
+      ctx.fillStyle = "rgba(0,0,0,.75)"; ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+      ctx.fillStyle = q > 0.6 ? "#3fbf4a" : q > 0.3 ? "#e0b52a" : "#e0442a";
+      ctx.fillRect(x, y, w * q, h);
+    }
+  }
+
   // Panneau d'une porte en cours d'ouverture : remonté de q × hauteur de l'ouverture.
   function drawPanel(it, dist, x, top, colH) {
     const { panel, panelTex, q } = it.door, fw = L.faceW, fh = L.faceH, cols = L.atlasCols;
@@ -459,7 +477,7 @@
       const { rx: srx, ry: sry, rw, rh, imgs } = look, d = deff(z);
       const scale = (WALL_H / 96) * proj / d, sw = rw * scale, sh = rh * scale;
       const left = W / 2 + lat * proj / d - sw / 2, top = half + (WALL_H / 2) * proj / d - sh;
-      sprites.push({ tz: z, rx: srx, ry: sry, rw, rh, sw, sh, left, top, mirror, imgs,
+      sprites.push({ tz: z, rx: srx, ry: sry, rw, rh, sw, sh, left, top, mirror, imgs, hp: m.hp, hpMax: m.hpMax, mode: m.mode,
         x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
       const blood = bloodSprite(m, z, left, top, sw, sh, scale);
       if (blood) sprites.push(blood);
@@ -519,6 +537,7 @@
         }
       }
     }
+    drawHealthBars(sprites);
   }
 
   // Animation des monstres : 16 images par sprite (0-3 face, 4-7 profil, 8-11 dos ; 12-15
@@ -637,7 +656,7 @@
       const sw = rw * scale, sh = rh * scale;
       const left = W / 2 * (1 + tx / tz) - sw / 2;
       const top = H / 2 + pitch + (WALL_H / 2) / tz * proj - sh;
-      out.push({ tz, rx, ry, rw, rh, sw, sh, left, top, mirror, imgs, ghost: m.spawn === "event",
+      out.push({ tz, rx, ry, rw, rh, sw, sh, left, top, mirror, imgs, ghost: m.spawn === "event", hp: m.hp, hpMax: m.hpMax, mode: m.mode,
         x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
       const blood = EMBED ? bloodSprite(m, tz, left, top, sw, sh, scale) : null;
       if (blood) out.push(blood);

@@ -864,6 +864,17 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     normaux.
   - **Vérifié** : Michael, Étincelle niveau 1 → magie 6 → 1. Le soin ciblé n'est pas testé, faute
     de sort de soin en début de partie.
+- **Barre de vie des monstres dans la vue 3D** (version ScummVM, 2026-11-13).
+  - **Points de vie actuels** : champ `hitPoints` du monstre, à +29 de la fiche de 46 octets,
+    soit +22 depuis x dans `readMonsters`.
+  - **Maximum** : celui du type (`_monsterProperties[type].hitPoints`), publié en zone
+    `0x7F000900` (5 × u16). C'est aussi l'expérience gagnée en tuant le monstre
+    (`increaseExperience`).
+  - **Dessin** : la barre est tracée après les colonnes, au-dessus du sprite. Elle est verte
+    au-dessus de 60 %, jaune au-dessus de 30 %, rouge en dessous. Elle est masquée si le centre du
+    monstre est derrière un mur (`zbuf`), s'il est mourant (mode ≥ 13) ou s'il est à 0.
+  - **Vérifié** au niveau 6, face aux rats : barres pleines, puis la plus proche passe au jaune
+    sous l'attaque auto.
 - **Choisir les compagnons** (version ScummVM, 2026-11-13 ; fenêtre des fiches, « Compagnons »).
   - **Taille du groupe** : 3 personnages au plus (`addCharacter` refuse au-delà), rangés sans trou à
     partir de la place 0 (`countActiveCharacters` s'arrête au premier personnage inactif). La
@@ -1486,3 +1497,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : ScummVM web : réglages du jeu (sous-titres, volumes) conservés d'un lancement à l'autre (§ 10 bis).
 - **2026-11-13** : ScummVM web : fichiers de la fin (FRE/FINALE*.PAK) ajoutés, la fin du jeu ne plante plus (§ 10 bis).
 - **2026-11-13** : ScummVM web : choix des compagnons du groupe (§ 10 bis).
+- **2026-11-13** : vue 3D : barre de vie au-dessus des monstres (ScummVM) (§ 10 bis).
