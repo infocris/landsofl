@@ -1859,13 +1859,62 @@
   const stMini = document.getElementById("st-mini"), stMoney2 = document.getElementById("st-money2");
   const stDlg = document.getElementById("st-dlg");
   let lastStats = "";
-  const openStats = () => { lastStats = ""; stDlg.showModal(); updateStats().catch(() => {}); };
+  const openStats = () => { lastStats = ""; stDlg.showModal(); updateStats().catch(() => {}); updateParty(true).catch(() => {}); };
   document.getElementById("st-open").addEventListener("click", (e) => { e.currentTarget.blur(); openStats(); });
   stMini.addEventListener("click", openStats);
   document.getElementById("st-close").addEventListener("click", () => stDlg.close());
   stDlg.addEventListener("click", (e) => { if (e.target === stDlg) stDlg.close(); });
   stDlg.addEventListener("close", () => { const f = document.getElementById("dos"); if (f && f.focus) f.focus(); });
   for (const ev of ["keydown", "keyup", "keypress"]) stDlg.addEventListener(ev, (e) => e.stopPropagation());
+  // Compagnons (version ScummVM) : places 2 et 3 du groupe, au choix parmi les personnages prédéfinis
+  // du jeu (zone 0x7F000800 : nombre, puis id i16 + nom 11 octets + race/classe/sexe) ; commande
+  // « setchar » (comme addCharacter ; 0 = place vidée, objets du partant mis dans le sac).
+  const stParty = document.getElementById("st-party"), stPartyMsg = document.getElementById("st-party-msg");
+  const slotSel = [document.getElementById("st-slot1"), document.getElementById("st-slot2")];
+  let roster = [], partyKey = "";
+  async function updateParty(force) {
+    if (!MANAGE || !stDlg.open) return;
+    const r = await mem.read([[0x7F000800, 1 + 20 * 14], PARTY_RANGE()]);
+    if (!r) return;
+    const b = r[0], n = b[0];
+    roster = [];
+    for (let i = 0; i < n; i++) {
+      const o = 1 + i * 14, raw = b.subarray(o + 2, o + 13), z = raw.indexOf(0);
+      roster.push({ id: ((b[o] | b[o + 1] << 8) << 16) >> 16, name: cp850(z < 0 ? raw : raw.subarray(0, z)).trim() });
+    }
+    const party = partyChars(r[1]);
+    const key = JSON.stringify([roster, party.map((c) => [c.slot, c.name])]);
+    if (key === partyKey && !force) return;
+    partyKey = key;
+    stParty.hidden = !roster.length || !party.length;
+    const hero = party.find((c) => c.slot === 0);
+    slotSel.forEach((sel, k) => {
+      const slot = k + 1, cur = party.find((c) => c.slot === slot);
+      const reachable = slot <= party.length;                     // pas de trou dans le groupe
+      sel.disabled = !reachable;
+      sel.replaceChildren(...[{ id: 0, name: slot < party.length ? "— retirer —" : "— vide —" },
+        ...roster.filter((p) => p.id && (!hero || p.name !== hero.name))].map((p) => {
+        const o = document.createElement("option"); o.value = p.id; o.textContent = p.name;
+        if (p.id && party.some((c) => c.name === p.name && c.slot !== slot)) { o.disabled = true; o.textContent += " (dans le groupe)"; }
+        return o;
+      }));
+      const curDef = cur && roster.find((p) => p.name === cur.name);
+      sel.value = curDef ? curDef.id : 0; sel.dataset.cur = sel.value;
+    });
+  }
+  slotSel.forEach((sel, k) => sel.addEventListener("change", async () => {
+    sel.blur();
+    const hadOne = !!sel.dataset.cur && sel.dataset.cur !== "0";
+    stPartyMsg.textContent = "…";
+    const r = await mem.cmd({ op: "setchar", a: k + 1, b: +sel.value }, 8000);
+    stPartyMsg.textContent = !r ? "Le jeu ne répond pas (menu ou dialogue ouvert ?)."
+      : r.code === 6 ? "Ce personnage est déjà dans le groupe." : r.code ? "Impossible maintenant (dialogue, scène ou menu ouvert ?)."
+      : +sel.value ? (hadOne ? "Personnage remplacé (objets du précédent dans le sac)." : "Personnage ajouté.") : "Place libérée (objets dans le sac).";
+    lastStats = ""; partyKey = "";
+    setTimeout(() => { updateStats().catch(() => {}); updateParty(true).catch(() => {}); }, 400);
+  }));
+  if (MANAGE) setInterval(() => { updateParty().catch(() => {}); }, 1500);
+  stDlg.addEventListener("close", () => { partyKey = ""; });
   async function updateStats() {
     if (previewing) return;
     const r = await mem.read([PARTY_RANGE(), [STATS.money, 2], [XP.table, 4 * 11]]);

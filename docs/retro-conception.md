@@ -864,6 +864,28 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     normaux.
   - **Vérifié** : Michael, Étincelle niveau 1 → magie 6 → 1. Le soin ciblé n'est pas testé, faute
     de sort de soin en début de partie.
+- **Choisir les compagnons** (version ScummVM, 2026-11-13 ; fenêtre des fiches, « Compagnons »).
+  - **Taille du groupe** : 3 personnages au plus (`addCharacter` refuse au-delà), rangés sans trou à
+    partir de la place 0 (`countActiveCharacters` s'arrête au premier personnage inactif). La
+    place 0 est le héros choisi au début.
+  - **Personnages prédéfinis** : `_charDefaults`, la table de `kyra.dat`. Ordre et id : Michael
+    (-1 ?), Timothy 2, Baccata 3, Lora 4, Conrad -5, Paulson 6, Dawn 7, Kieran -8, Ak'shel -9.
+    Les ids négatifs sont les héros jouables. Publiés en zone `0x7F000800` : nombre, puis id
+    (i16), nom (11 octets) et race/classe/sexe pour chacun.
+  - **Commande op 17** : a = place (1 ou 2), b = id, ou 0 pour vider la place.
+    - Le personnage est recopié depuis la table, comme `addCharacter` : modificateurs par défaut,
+      visage `FACEnn.SHP`, objets de départ créés avec leur script 0x80.
+    - Les objets du personnage remplacé vont dans le sac, ou au sol si le sac est plein.
+    - Une place vidée fait glisser les suivantes (fiches et visages).
+    - Le terrain de jeu est ensuite redessiné.
+  - **Risque** : les scripts de l'histoire ajoutent et retirent eux-mêmes les compagnons par id
+    (`olol_addRemoveCharacter`). Un compagnon ajouté hors de l'histoire peut ne pas être prévu
+    par la suite.
+  - **Vérifié** :
+    - Timothy ajouté en place 2, puis Baccata en place 3 ;
+    - en vidant la place 2, Baccata passe en place 2 ;
+    - les 4 objets de Timothy arrivent dans le sac (3 → 7 cases) ;
+    - les portraits du jeu sont à jour.
 - **Sauvegarder depuis la page** (version ScummVM, 2026-11-13 ; fenêtre « Sauvegardes… »).
   - **Commande op 16** : a = emplacement (-1 = premier libre à partir de 0, comme
     `getNextSavegameSlot` pour LoL). Le nom est transmis en texte : la page l'encode en octets
@@ -1463,3 +1485,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : ScummVM web : sauvegarde depuis la page (nouvelle sauvegarde, écraser) (§ 10 bis).
 - **2026-11-13** : ScummVM web : réglages du jeu (sous-titres, volumes) conservés d'un lancement à l'autre (§ 10 bis).
 - **2026-11-13** : ScummVM web : fichiers de la fin (FRE/FINALE*.PAK) ajoutés, la fin du jeu ne plante plus (§ 10 bis).
+- **2026-11-13** : ScummVM web : choix des compagnons du groupe (§ 10 bis).
