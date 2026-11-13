@@ -362,9 +362,6 @@
   #zqsd:hover { opacity: 1; }
   #zqsd.paused { display: none; }
   #zqsd[data-on="true"] { color: #fff; border-color: #c9a227; }
-  /* placé à droite des flèches de déplacement du jeu (position calculée dans placeZqsd) */
-  #zqsd.ingame { right: auto !important; bottom: auto; transform: translateY(-50%); padding: .35em .6em;
-    line-height: 1.15; text-align: center; opacity: .85; background: rgba(20, 14, 8, .75); }
 </style>
 </head>
 <body>
@@ -487,7 +484,7 @@
   const held = new Map(); // event.code -> code DOS envoyé
 
   const btn = document.getElementById("zqsd");
-  function renderBtn() { btn.innerHTML = "ZQSD<br>" + (remapOn ? "oui" : "non"); btn.dataset.on = remapOn; }
+  function renderBtn() { btn.textContent = "ZQSD : " + (remapOn ? "oui" : "non"); btn.dataset.on = remapOn; }
 
   // Pause du jeu (menu disquette, fiche d'un personnage…) : bit 3 de l'octet 0x39D5A à 0
   // (docs/retro-conception.md, § 12.2). En pause, le bouton est caché et les touches ne sont
@@ -517,22 +514,6 @@
   btn.addEventListener("click", () => { setRemap(!remapOn); btn.blur(); });
   renderBtn();
 
-  // Bouton ZQSD à droite des flèches de déplacement du jeu. Image du jeu 320x200 (proportions
-  // 1,6) centrée dans le canevas de js-dos ; flèches en x 11-75, y 131-167 (pixels du jeu).
-  function placeZqsd() {
-    const c = [...document.querySelectorAll("#dos canvas")].sort((a, b) => b.width * b.height - a.width * a.height)[0];
-    const r = c && c.getBoundingClientRect();
-    if (!r || r.width < 200 || r.height < 120) { btn.classList.remove("ingame"); return; }
-    let w = r.width, h = w / 1.6;
-    if (h > r.height) { h = r.height; w = h * 1.6; }
-    const s = w / 320, x0 = r.left + (r.width - w) / 2, y0 = r.top + (r.height - h) / 2;
-    btn.classList.add("ingame");
-    btn.style.left = Math.round(x0 + 80 * s) + "px";
-    btn.style.top = Math.round(y0 + 149 * s) + "px";
-    btn.style.fontSize = Math.max(9, Math.min(13, 4.4 * s)) + "px";
-  }
-  addEventListener("resize", () => requestAnimationFrame(placeZqsd));
-  setInterval(placeZqsd, 1000);                      // le canevas apparaît/change avec js-dos
 
   function onKey(e) {
     if (e.target && e.target.closest && e.target.closest("input, textarea, select")) return;   // saisie dans le panneau

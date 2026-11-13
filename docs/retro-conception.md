@@ -1520,3 +1520,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : vue 3D : barre de vie au-dessus des monstres (ScummVM) (§ 10 bis).
 - **2026-11-13** : fenêtre « Triches » : atlas, boussole et déblocage des sorts (ScummVM) (§ 10 bis).
 - **2026-11-13** : fenêtre « Triches » : déblocage du livre de sorts (drapeau 0x20) (§ 10 bis).
+- **2026-11-13** : page DOSBox : le bouton ZQSD revient avec les autres boutons, en bas à droite (plus de placement à côté des flèches du jeu).
