@@ -108,7 +108,12 @@
       const li = document.createElement("li"); li.textContent = "aucun lieu nommé sur ce niveau"; placesEl.appendChild(li);
       return;
     }
-    for (const p of L.places) {
+    const shown = L.places.filter((p) => visible(L, p.y * 32 + p.x));
+    if (!shown.length) {
+      const li = document.createElement("li"); li.textContent = "aucun lieu découvert pour l'instant"; placesEl.appendChild(li);
+      return;
+    }
+    for (const p of shown) {
       const li = document.createElement("li");
       li.dataset.cell = p.y * 32 + p.x;
       const b = document.createElement("b"); b.textContent = p.n;
@@ -161,7 +166,12 @@
       const li = document.createElement("li"); li.textContent = "aucun objet placé sur ce niveau"; itemsEl.appendChild(li);
       return;
     }
-    for (const g of L.groups) {
+    const shown = L.groups.filter((gr) => visible(L, gr.y * 32 + gr.x));
+    if (!shown.length) {
+      const li = document.createElement("li"); li.textContent = "aucun objet découvert pour l'instant"; itemsEl.appendChild(li);
+      return;
+    }
+    for (const g of shown) {
       const li = document.createElement("li");
       li.dataset.cell = g.y * 32 + g.x;
       const b = document.createElement("b"); b.textContent = g.n + ".";
@@ -217,6 +227,7 @@
     for (let i = 0; i < 1024; i++) {
       const a = i * ADDR.stride;
       for (let k = 0; k < 4; k++) { const v = bytes[a + k]; live[i * 4 + k] = v; hash = (hash * 31 + v) | 0; }
+      gameSeen[i] = bytes[a + 9] & 7 ? 1 : 0;
     }
     return hash;
   }
@@ -334,6 +345,80 @@
     return allZero ? "floor" : cls;
   }
 
+  // --- Exploration progressive (brouillard) -------------------------------------
+  // Seules les cases déjà vues sont dessinées, avec leurs repères (lieux, objets, monstres…).
+  // Cases vues : celle du groupe, ses 8 voisines (une diagonale si un des deux côtés est ouvert,
+  // comme la carte automatique du jeu, updateAutoMap) et jusqu'à 3 cases devant lui avec leurs
+  // côtés (profondeur de la vue), arrêt au premier mur ou porte fermée. S'y ajoutent les marques
+  // de la carte automatique du jeu (octet 9 de la case, & 7) quand le jeu les pose.
+  // Mémorisé par moteur et par niveau (localStorage) ; ↺ oublie le niveau affiché.
+  const SEEN_KEY = (level) => `minimapSeen:${window.LOL_ENGINE || "dosbox"}:${level}`;
+  const seenOf = new Map();                     // n° de niveau -> Uint8Array(1024)
+  const gameSeen = new Uint8Array(1024);        // marques du jeu dans la grille vivante
+  let fogOn = true;
+  try { fogOn = localStorage.getItem("minimapFog") !== "0"; } catch (e) {}
+  function seenFor(L) {
+    let s = seenOf.get(L.level);
+    if (!s) {
+      s = new Uint8Array(1024);
+      try { const t = localStorage.getItem(SEEN_KEY(L.level)) || ""; for (let i = 0; i < t.length && i < 1024; i++) s[i] = t[i] === "1" ? 1 : 0; } catch (e) {}
+      seenOf.set(L.level, s);
+    }
+    return s;
+  }
+  function saveSeen(L) {
+    try { localStorage.setItem(SEEN_KEY(L.level), Array.from(seenFor(L), (v) => v ? "1" : "0").join("").replace(/0+$/, "")); } catch (e) {}
+  }
+  const visible = (L, i) => !fogOn || !L || seenFor(L)[i] === 1;
+  function opaque(L, i) { const c = cellClass(L, i); return c === "wall" || c === "special" || c === "unknown" || c === "doorClosed" || c === "fake"; }
+  // renvoie true si de nouvelles cases ont été découvertes
+  function explore(L, block, dir) {
+    const s = seenFor(L);
+    let added = 0;
+    const mark = (x, y) => { if (x < 0 || y < 0 || x > 31 || y > 31) return; const i = y * 32 + x; if (!s[i]) { s[i] = 1; added++; } };
+    for (let i = 0; i < 1024; i++) if (gameSeen[i] && !s[i]) { s[i] = 1; added++; }
+    const x = block % 32, y = block >> 5;
+    const open = (cx, cy) => cx >= 0 && cy >= 0 && cx <= 31 && cy <= 31 && !opaque(L, cy * 32 + cx);
+    mark(x, y);
+    for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) mark(x + dx, y + dy);
+    for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) if (open(x + dx, y) || open(x, y + dy)) mark(x + dx, y + dy);
+    const [fx, fy] = [[0, -1], [1, 0], [0, 1], [-1, 0]][dir & 3];
+    let px = x, py = y;
+    for (let step = 1; step <= 3; step++) {
+      px += fx; py += fy;
+      if (px < 0 || py < 0 || px > 31 || py > 31) break;
+      mark(px, py);
+      if (opaque(L, py * 32 + px)) break;
+      mark(px + fy, py - fx); mark(px - fy, py + fx);   // côtés gauche et droit
+    }
+    if (added) saveSeen(L);
+    return added > 0;
+  }
+  const fogBtn = document.getElementById("mm-fog"), forgetBtn = document.getElementById("mm-forget");
+  let fogKey = "";
+  function refreshFog() {
+    fogBtn.classList.toggle("on", fogOn);
+    forgetBtn.disabled = !fogOn || !current;
+    fogKey = "";
+    if (current) renderItemList(current);
+    draw(lastDraw[0], lastDraw[1]);
+  }
+  fogBtn.addEventListener("click", (e) => {
+    fogOn = !fogOn;
+    try { localStorage.setItem("minimapFog", fogOn ? "1" : "0"); } catch (err) {}
+    refreshFog(); e.currentTarget.blur();
+  });
+  forgetBtn.addEventListener("click", (e) => {
+    e.currentTarget.blur();
+    if (!current || !confirm(`Oublier l'exploration du niveau ${current.level} (${current.fr}) sur la mini-carte ?`)) return;
+    seenFor(current).fill(0); saveSeen(current);
+    if (lastDraw[0] < 1024) explore(current, lastDraw[0], lastDraw[1]);
+    refreshFog();
+  });
+  fogBtn.classList.toggle("on", fogOn);
+  // clé des lieux et objets visibles : la liste est refaite quand elle change
+  const fogListKey = (L) => fogOn ? L.places.filter((p) => visible(L, p.y * 32 + p.x)).length + "/" + L.groups.filter((gr) => visible(L, gr.y * 32 + gr.x)).length : "";
+
   // --- Cases illustrées avec les graphismes du lieu ----------------------------
   // Textures exportées pour la vue 3D (viewer/data) : sol 64×64 (moitié basse = dalles vues de
   // près) et planche des faces de murs (128×96 par face, n° de face = walls[id].tex).
@@ -427,6 +512,7 @@
     const img = texMode ? levelImages(L) : null;
     for (let i = 0; i < 1024; i++) {
       const cls = cellClass(L, i), x = (i % 32) * CELL, y = Math.floor(i / 32) * CELL;
+      if (!visible(L, i)) { g.fillStyle = "#15120e"; g.fillRect(x, y, CELL - 1, CELL - 1); continue; }
       const tl = img && cellTile(L, img, i, cls);
       if (tl) g.drawImage(tl, x, y);
       else { g.fillStyle = COLORS[cls]; g.fillRect(x, y, CELL - 1, CELL - 1); }
@@ -436,6 +522,7 @@
     const lp2 = Math.max(1, Math.round(k));
     g.font = `bold ${Math.round(9 * k)}px system-ui, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
     for (const p of L.places) {
+      if (!visible(L, p.y * 32 + p.x)) continue;
       g.fillStyle = "#d22";
       g.fillRect(p.x * CELL + lp2 - 1, p.y * CELL + lp2 - 1, CELL + 1 - 2 * lp2, CELL + 1 - 2 * lp2);
       g.fillStyle = "#fff";
@@ -444,7 +531,7 @@
     // interrupteurs : leviers (barre verte) et éléments cliquables à script (point violet), sur le bord du mur
     for (let i = 0; i < 1024; i++) for (let f = 0; f < 4; f++) {
       const kind = switchKind(L, i, f);
-      if (!kind) continue;
+      if (!kind || !visible(L, i)) continue;
       const x0 = (i % 32) * CELL, y0 = Math.floor(i / 32) * CELL, t = Math.max(2, Math.round(2.5 * k));
       const m = Math.round(CELL * 0.2), len = CELL - 1 - 2 * m;
       const [rx, ry, rw, rh] = [[x0 + m, y0, len, t], [x0 + CELL - 1 - t, y0 + m, t, len],
@@ -458,7 +545,7 @@
     // murs fragiles (à casser au Marteau…) : fissure orange, tant que le mur est debout
     g.strokeStyle = "#ff7a1a"; g.lineWidth = Math.max(1.5, 1.6 * k);
     for (const fw of L.fragile) {
-      if (!isWallCell(L, fw.y * 32 + fw.x)) continue;
+      if (!isWallCell(L, fw.y * 32 + fw.x) || !visible(L, fw.y * 32 + fw.x)) continue;
       const x0 = fw.x * CELL, y0 = fw.y * CELL, c = CELL - 1;
       g.beginPath(); g.moveTo(x0 + c * 0.2, y0 + c * 0.1); g.lineTo(x0 + c * 0.55, y0 + c * 0.4);
       g.lineTo(x0 + c * 0.35, y0 + c * 0.6); g.lineTo(x0 + c * 0.8, y0 + c * 0.9); g.stroke();
@@ -469,7 +556,7 @@
     g.save(); g.lineWidth = Math.max(2, 2 * k); g.setLineDash([Math.max(2, CELL / 5), Math.max(1.5, CELL / 7)]);
     for (let i = 0; i < 1024; i++) {
       const ff = fakeFaces(L, i);
-      if (!ff.length) continue;
+      if (!ff.length || !visible(L, i)) continue;
       const x0 = (i % 32) * CELL + 0.5, y0 = Math.floor(i / 32) * CELL + 0.5, c = CELL - 2;
       g.strokeStyle = SECRET;
       for (const f of ff) {
@@ -485,7 +572,7 @@
     }
     for (const sw of L.secrets) {
       const i = sw.y * 32 + sw.x;
-      if (!isWallCell(L, i) || L.fragile.some((fw) => fw.x === sw.x && fw.y === sw.y)) continue;
+      if (!isWallCell(L, i) || !visible(L, i) || L.fragile.some((fw) => fw.x === sw.x && fw.y === sw.y)) continue;
       const x0 = sw.x * CELL + 1.5, y0 = sw.y * CELL + 1.5, c = CELL - 4;
       g.strokeStyle = "#000"; g.setLineDash([]); g.lineWidth = Math.max(2.5, 2.4 * k); g.strokeRect(x0, y0, c, c);
       g.strokeStyle = SECRET; g.lineWidth = Math.max(1.5, 1.4 * k); g.setLineDash([Math.max(2, CELL / 5), Math.max(1.5, CELL / 7)]);
@@ -495,7 +582,7 @@
     // escaliers (triangle), trous (cercle sombre), passages scriptés vers un autre niveau (losange)
     for (let i = 0; i < 1024; i++) {
       const mk = floorMark(L, i);
-      if (!mk) continue;
+      if (!mk || !visible(L, i)) continue;
       const cx = (i % 32) * CELL + (CELL - 1) / 2, cy = Math.floor(i / 32) * CELL + (CELL - 1) / 2, r = CELL * 0.42;
       g.lineWidth = 1.2; g.strokeStyle = "#000";
       if (mk === "teleport") continue;          // dessiné avec les passages, plus bas
@@ -513,15 +600,16 @@
     // téléporteurs : tourbillon magenta ; destination dans le niveau = cercle creux relié en pointillés
     const ctr = (x, y) => [x * CELL + (CELL - 1) / 2, y * CELL + (CELL - 1) / 2];
     const portals = new Set();
-    for (let i = 0; i < 1024; i++) if (floorMark(L, i) === "teleport") portals.add(i);
-    for (const e of L.exits) if (e.teleport) portals.add(e.y * 32 + e.x);
+    for (let i = 0; i < 1024; i++) if (floorMark(L, i) === "teleport" && visible(L, i)) portals.add(i);
+    const exits = L.exits.filter((e) => visible(L, e.y * 32 + e.x));
+    for (const e of exits) if (e.teleport) portals.add(e.y * 32 + e.x);
     g.save(); g.setLineDash([Math.max(2, CELL / 4), Math.max(2, CELL / 5)]); g.lineWidth = Math.max(1, CELL / 10);
-    for (const e of L.exits) if (e.teleport) {
+    for (const e of exits) if (e.teleport) {
       const [ax, ay] = ctr(e.x, e.y), [bx, by] = ctr(e.tx, e.ty);
       g.strokeStyle = "rgba(255,79,216,.75)"; g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke();
     }
     g.restore();
-    for (const e of L.exits) if (e.teleport) {
+    for (const e of exits) if (e.teleport) {
       const [bx, by] = ctr(e.tx, e.ty);
       g.lineWidth = Math.max(1.5, CELL / 8); g.strokeStyle = "#000";
       g.beginPath(); g.arc(bx, by, CELL * 0.3, 0, 2 * Math.PI); g.stroke();
@@ -537,7 +625,7 @@
       for (let a = 0; a <= 4 * Math.PI; a += 0.3) { const rr = r * 0.85 * a / (4 * Math.PI); g.lineTo(cx + rr * Math.cos(a), cy + rr * Math.sin(a)); }
       g.stroke();
     }
-    for (const e of L.exits) {
+    for (const e of exits) {
       if (portals.has(e.y * 32 + e.x)) continue;
       const cx = e.x * CELL + (CELL - 1) / 2, cy = e.y * CELL + (CELL - 1) / 2, r = CELL * 0.32;
       g.fillStyle = "#fff"; g.strokeStyle = "#000"; g.lineWidth = 1.2;
@@ -546,7 +634,7 @@
     // coffres (symbole 210 de la carte du jeu) : petite malle contre la face, couleur selon l'état
     for (let i = 0; i < 1024; i++) for (let f = 0; f < 4; f++) {
       const st = chestState(L, i, f);
-      if (st < 0) continue;
+      if (st < 0 || !visible(L, i)) continue;
       const x0 = (i % 32) * CELL, y0 = Math.floor(i / 32) * CELL, w = CELL * 0.62, h = CELL * 0.42;
       const cx = x0 + (CELL - 1) / 2 + [0, 1, 0, -1][f] * (CELL - 1 - w) / 2;
       const cy = y0 + (CELL - 1) / 2 + [-1, 0, 1, 0][f] * (CELL - 1 - h) / 2;
@@ -557,7 +645,7 @@
     }
     // serrures : petite clé dorée dans le coin de la case
     g.strokeStyle = "#ffd700"; g.fillStyle = "#ffd700"; g.lineWidth = Math.max(1, k);
-    for (const c of new Set(L.locks.map((l) => l.y * 32 + l.x))) {
+    for (const c of new Set(L.locks.map((l) => l.y * 32 + l.x).filter((c) => visible(L, c)))) {
       const x0 = (c % 32) * CELL, y0 = Math.floor(c / 32) * CELL, r = 2 * k;
       g.beginPath(); g.arc(x0 + r + 1, y0 + r + 1, r, 0, 2 * Math.PI); g.stroke();
       g.beginPath(); g.moveTo(x0 + 2 * r + 1, y0 + r + 1); g.lineTo(x0 + CELL - 2, y0 + r + 1);
@@ -566,7 +654,7 @@
     // serrures de la clé sélectionnée dans l'inventaire : cercle doré clignotant
     if (selKey >= 0) {
       const on = Math.floor(performance.now() / 400) % 2 === 0;
-      for (const l of L.locks) if (l.key === selKey) {
+      for (const l of L.locks) if (l.key === selKey && visible(L, l.y * 32 + l.x)) {
         const cx = l.x * CELL + CELL / 2, cy = l.y * CELL + CELL / 2;
         g.strokeStyle = "#000"; g.lineWidth = 4;
         g.beginPath(); g.arc(cx, cy, CELL * (on ? 1.1 : 0.9), 0, 2 * Math.PI); g.stroke();
@@ -584,6 +672,7 @@
     // objets : icône de la catégorie du premier objet de la case (icônes du jeu), numéro en coin
     const iconOk = iconSheet.complete && iconSheet.naturalWidth > 0 && itemInfo;
     for (const it of L.groups) {
+      if (!visible(L, it.y * 32 + it.x)) continue;
       const tx = it.x * CELL + CELL / 2, ty = it.y * CELL + CELL / 2 + 0.5;
       if (iconOk) {
         const cat = groupIcon(it), sz = CELL + 2, ix = it.x * CELL - 1, iy = it.y * CELL - 1;
@@ -604,6 +693,7 @@
     }
     // monstres : position réelle et direction
     for (const m of monsters) {
+      if (!visible(L, Math.floor(m.y) * 32 + Math.floor(m.x))) continue;
       const mx = m.x * CELL, my = m.y * CELL, a = [-Math.PI / 2, 0, Math.PI / 2, Math.PI][m.dir];
       const col = monsterMood(m).color;
       g.fillStyle = col; g.strokeStyle = "#000"; g.lineWidth = 1;
@@ -700,6 +790,7 @@
   function cellInfo(x, y) {
     const L = current, i = y * 32 + x, out = [];
     const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+    if (!visible(L, i)) return `<b>Case ${x},${y}</b> <span class="t">· inexplorée</span>`;
     out.push(`<b>Case ${x},${y}</b> <span class="t">· ${CLASS_FR[cellClass(L, i)]}</span>`);
     if (lastDraw[0] === i) out.push("Vous êtes ici");
     for (const p of L.places) if (p.x === x && p.y === y)
@@ -852,6 +943,9 @@
       if (d < bd) { bd = d; near = l; }
     }
     labelEl.textContent = near ? near.text : "";
+    explore(current, block, dir);
+    forgetBtn.disabled = !fogOn;
+    if (fogListKey(current) !== fogKey) { fogKey = fogListKey(current); renderItemList(current); }
     // objets à portée (case du groupe et cases voisines)
     for (const li of [...itemsEl.children, ...placesEl.children]) {
       const c = +li.dataset.cell;

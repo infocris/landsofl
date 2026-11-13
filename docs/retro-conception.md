@@ -920,6 +920,26 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
 | `web/public/viewer/` | visualiseur 3D libre (lancer de rayons maison) | http://localhost:8000/viewer/ |
 | `web/public/minimap.js`, `memscan.js` | mini-carte en direct à côté du jeu | http://localhost:8000/ |
 
+**Exploration progressive de la mini-carte** (bouton ◐, réglage mémorisé ; ↺ oublie le niveau).
+- **Carte automatique du jeu.** Le moteur marque les cases vues dans les drapeaux de la grille
+  (octet 9, `flags |= 7`, `updateAutoMap` dans ScummVM). Il marque la case du groupe et ses
+  8 voisines. Une voisine n'est pas marquée quand les faces de murs qui l'en séparent ont le bit
+  0xC0 dans `_wllAutomapData`.
+- **Condition.** Ce marquage n'a lieu que si le drapeau global `_flagsTable[31] & 0x10` est levé.
+  En début de partie, à Gladstone, l'octet 9 reste à 0 partout, même après quelques pas (vérifié
+  sous ScummVM). Le drapeau dépend donc du scénario.
+- **Suivi par la page.** La mini-carte tient donc son propre relevé, pour les deux moteurs :
+  - la case du groupe et ses 4 voisines ;
+  - une diagonale si un des deux côtés est ouvert ;
+  - jusqu'à 3 cases devant le groupe, avec leurs côtés, jusqu'au premier mur, porte fermée ou
+    faux mur.
+- **Fusion.** Les marques du jeu (octet 9 & 7) s'y ajoutent.
+- **Stockage.** Le relevé est gardé dans `localStorage` (`minimapSeen:<moteur>:<niveau>`). Il ne
+  suit pas les sauvegardes.
+- **Affichage.** Les cases non vues sont sombres. Les repères qu'elles portent (lieux, objets,
+  coffres, serrures, monstres, passages) sont masqués, et les listes « Lieux » et « Objets » ne
+  donnent que ceux qui sont découverts.
+
 **Rendu illustré de la mini-carte** (bouton ▦, réglage mémorisé). Les cases reprennent les
 graphismes du lieu exportés pour la vue 3D :
 - **sol** : moitié basse de `levelNN_floor.png`, c'est-à-dire les dalles vues de près ;
@@ -1284,3 +1304,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-10** : vue 3D : objets posés au sol (images du jeu) (§ 10 bis).
 - **2026-11-10** : vue 3D : giclées des coups sur les monstres ; recopie de l'image du jeu retirée. Correctif : une erreur de syntaxe dans la page ScummVM désactivait la vie infinie, l'inventaire et les couronnes (§ 10 bis).
 - **2026-11-13** : sélecteur du moteur d'émulation (DOSBox / ScummVM) dans les deux pages (§ 10 bis).
+- **2026-11-13** : mini-carte : exploration progressive ; condition de la carte automatique du jeu (`_flagsTable[31] & 0x10`, octet 9 de la case) (§ 11).
