@@ -1018,6 +1018,19 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
 | `web/public/viewer/` | visualiseur 3D libre (lancer de rayons maison) | http://localhost:8000/viewer/ |
 | `web/public/minimap.js`, `memscan.js` | mini-carte en direct à côté du jeu | http://localhost:8000/ |
 
+**Grande carte (touche Tab)** : fenêtre modale qui reprend le dessin de la mini-carte dans un
+second canevas.
+- **Cadrage** : la taille de case remplit l'écran (10 à 40 px) et le niveau entier est centré.
+- **Tuiles** : celles du rendu illustré sont gardées par taille de case. Les deux cartes ne se
+  les disputent donc pas.
+- **Clavier** : Tab ouvre et ferme la carte, aussi quand le jeu a le clavier. Un écouteur en
+  capture est posé dans la fenêtre du cadre ScummVM. Tab est ignoré pendant une saisie ou quand
+  une autre fenêtre est ouverte.
+- **Survol** : il affiche l'info-bulle de la case.
+- **Double-clic** (version ScummVM) : il téléporte le groupe sur la case, comme sur la mini-carte.
+- **Vérifié** : Tab depuis le jeu ouvre la carte ; un double-clic sur la Fontaine fait passer le
+  groupe de 13,17 à 12,12 ; Tab referme la carte.
+
 **Taille, zoom et centrage de la mini-carte** (réglages mémorisés).
 - **Taille** : la carte occupe de 256 à 768 px à l'écran, par pas de 64 ; le panneau suit.
 - **Zoom** : de 6 à 40 px par case, avec les boutons ou la molette sur la carte.
@@ -1416,3 +1429,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : ScummVM web : téléportation (mini-carte, lieux, sélecteur de niveau) (§ 10 bis).
 - **2026-11-13** : page : fiches des personnages dans une fenêtre modale (résumé vie / magie dans le panneau).
 - **2026-11-13** : ScummVM web : chargement des sauvegardes depuis la page (§ 10 bis).
+- **2026-11-13** : grande carte en fenêtre modale (Tab), avec téléportation (§ 11).

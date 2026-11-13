@@ -31,8 +31,9 @@
   const COLORS = { wall: "#2b2b2b", floor: "#8a7f68", doorOpen: "#d08a4a", doorClosed: "#a0522d",
     special: "#6f8f58", unknown: "#3a3550", fake: "#2f6b5c" };
 
-  const canvas = document.getElementById("mm-canvas");
-  const g = canvas.getContext("2d");
+  // canevas de dessin : mini-carte, ou grande carte (Tab) le temps de son dessin (drawBig)
+  let canvas = document.getElementById("mm-canvas");
+  let g = canvas.getContext("2d");
   const titleEl = document.querySelector("#mm-title span");
   const infoEl = document.getElementById("mm-info");
   const labelEl = document.getElementById("mm-label");
@@ -492,12 +493,14 @@
   }
   // tuiles à la taille courante des cases, mises en cache par niveau
   function tile(L, img, key, paint) {
-    if (!img.tiles || img.tiles.cell !== CELL) img.tiles = { cell: CELL, map: new Map() };
-    let c = img.tiles.map.get(key);
+    if (!img.tiles) img.tiles = new Map();          // une réserve de tuiles par taille de case
+    if (!img.tiles.has(CELL)) img.tiles.set(CELL, new Map());
+    const tiles = img.tiles.get(CELL);
+    let c = tiles.get(key);
     if (!c) {
       c = document.createElement("canvas"); c.width = c.height = CELL - 1;
       const t = c.getContext("2d"); t.imageSmoothingEnabled = true; t.imageSmoothingQuality = "high";
-      paint(t, CELL - 1); img.tiles.map.set(key, c);
+      paint(t, CELL - 1); tiles.set(key, c);
     }
     return c;
   }
@@ -751,7 +754,84 @@
     g.lineTo(cx + Math.cos(a + 2.4) * 6 * k, cy + Math.sin(a + 2.4) * 6 * k);
     g.lineTo(cx + Math.cos(a - 2.4) * 6 * k, cy + Math.sin(a - 2.4) * 6 * k);
     g.closePath(); g.stroke(); g.fill();
+    if (bigOpen && !drawingBig) drawBig();
   }
+
+  // --- Grande carte (touche Tab) ----------------------------------------------------------
+  // Même dessin que la mini-carte (draw), dans un canevas de fenêtre modale : case de la taille
+  // qui remplit l'écran, niveau entier centré. Double-clic : téléportation (version ScummVM).
+  const bigDlg = document.getElementById("bm-dlg"), bigCanvas = document.getElementById("bm-canvas");
+  const bigG = bigCanvas.getContext("2d"), bigHint = document.getElementById("bm-hint");
+  let bigOpen = false, drawingBig = false, bigCell = 20;
+  function drawBig() {
+    const save = [canvas, g, CELL, SIZE, follow, view];
+    drawingBig = true;
+    try {
+      canvas = bigCanvas; g = bigG; CELL = bigCell; SIZE = 32 * bigCell; follow = false;
+      draw(lastDraw[0], lastDraw[1]);
+    } finally {
+      [canvas, g, CELL, SIZE, follow, view] = save;
+      drawingBig = false;
+    }
+  }
+  function openBig() {
+    const box = Math.min(innerWidth - 380, innerHeight - 120);
+    bigCell = Math.max(10, Math.min(40, Math.floor(box / 32)));
+    bigCanvas.width = bigCanvas.height = 32 * bigCell;
+    bigCanvas.style.width = bigCanvas.style.height = 32 * bigCell + "px";
+    document.getElementById("bm-title").textContent = current ? `Niveau ${current.level} — ${current.fr}` : "Carte";
+    bigHint.textContent = MANAGE ? "Double-clic sur une case : s'y téléporter. Tab ou Échap : fermer." : "Tab ou Échap : fermer.";
+    bigDlg.showModal(); bigOpen = true;
+    bigDlg.appendChild(tipEl);                       // info-bulle au-dessus de la fenêtre
+    drawBig();
+  }
+  function closeBig() { if (bigDlg.open) bigDlg.close(); }
+  bigDlg.addEventListener("close", () => {
+    bigOpen = false; tipEl.hidden = true; document.body.appendChild(tipEl);
+    const f = document.getElementById("dos"); if (f && f.focus) f.focus();
+  });
+  const bigCellAt = (e) => {
+    const r = bigCanvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - r.left) / r.width * 32), y = Math.floor((e.clientY - r.top) / r.height * 32);
+    return x < 0 || y < 0 || x > 31 || y > 31 ? null : [x, y];
+  };
+  bigCanvas.addEventListener("mousemove", (e) => {
+    const c = current && bigCellAt(e);
+    if (!c) { tipEl.hidden = true; return; }
+    const key = c.join(",");
+    if (tipEl.hidden || tipEl.dataset.cell !== key) { tipEl.dataset.cell = key; showTip(cellInfo(c[0], c[1]), e.clientX, e.clientY); }
+    else { tipAt = [e.clientX, e.clientY]; placeTip(); }
+  });
+  bigCanvas.addEventListener("mouseleave", () => { tipEl.hidden = true; tipEl.dataset.cell = ""; });
+  bigCanvas.addEventListener("dblclick", (e) => {
+    const c = current && bigCellAt(e);
+    if (!c || !MANAGE) return;
+    const i = c[1] * 32 + c[0];
+    if (!visible(current, i)) { bigHint.textContent = "Case inexplorée."; return; }
+    if (opaque(current, i) && cellClass(current, i) !== "doorClosed") { bigHint.textContent = "Case pleine."; return; }
+    teleport(current.level, i).then(() => {
+      bigHint.textContent = tpMsg.textContent || "Téléporté.";
+      clearTimeout(bigHint.t); bigHint.t = setTimeout(() => { bigHint.textContent = "Double-clic sur une case : s'y téléporter. Tab ou Échap : fermer."; }, 3000);
+    });
+  });
+  document.getElementById("bm-close").addEventListener("click", closeBig);
+  bigDlg.addEventListener("click", (e) => { if (e.target === bigDlg) closeBig(); });
+  // Tab : ouvrir / fermer, depuis la page ou depuis le jeu (cadre ScummVM : écouteur dans sa fenêtre)
+  const onTab = (e) => {
+    if (e.code !== "Tab" || e.altKey || e.ctrlKey || e.metaKey) return;
+    const t = e.target, typing = t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA");
+    if (typing && !bigOpen) return;
+    const other = document.querySelector("dialog[open]:not(#bm-dlg)");
+    if (other) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if (bigOpen) closeBig(); else openBig();
+  };
+  addEventListener("keydown", onTab, true);
+  const hookFrame = () => { const f = document.querySelector("iframe#dos"); try { if (f && f.contentWindow) f.contentWindow.addEventListener("keydown", onTab, true); } catch (e) {} };
+  hookFrame();
+  { const f = document.querySelector("iframe#dos"); if (f) f.addEventListener("load", hookFrame); }
+  for (const ev of ["keyup", "keypress"]) bigDlg.addEventListener(ev, (e) => e.stopPropagation());
+  bigDlg.addEventListener("keydown", (e) => { if (e.code !== "Tab") e.stopPropagation(); });
 
   const LOCK_KIND = { porte: "Serrure de porte", passage: "Serrure (ouvre un passage)",
     receptacle: "Réceptacle de clé (mécanisme)", coffre: "Donne un objet (lieu)", inconnu: "Serrure" };
