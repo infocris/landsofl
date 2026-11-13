@@ -24,8 +24,9 @@ saisie d'un nom de sauvegarde (gui_lol.cpp), et ses actions ne servent qu'en exp
 
 Le navigateur ne télécharge scummvm.ini qu'une fois : s'il en garde déjà un (IndexedDB, base
 « /home/web_user »), la cible lol-fr peut y manquer et ScummVM s'arrête (exit 1). La page
-lol-game.html, générée à partir de scummvm.html, remplace donc la section [lol-fr] du fichier gardé
-par celle du serveur avant de charger scummvm.js. Le reste du fichier (réglages) est conservé.
+lol-game.html, générée à partir de scummvm.html, met donc à jour la section [lol-fr] du fichier
+gardé avant de charger scummvm.js : les clés du serveur (chemin, langue, touches) remplacent les
+siennes, les autres (sous-titres, volumes, réglages enregistrés par le jeu) sont gardées.
 
 Mini-carte, vue 3D et panneau, comme la version DOSBox : le moteur, modifié par
 tools/scummvm/lol-web-state.patch (déjà compilé dans web/scummvm/scummvm.wasm),
@@ -142,7 +143,19 @@ LAUNCH_JS = r"""<script src="volume.js"></script>
         if (rec && rec.contents && ours) {
           const old = new TextDecoder().decode(rec.contents);
           const cur = section(old);
-          const txt = cur ? old.replace(cur, ours) : old.replace(/\n*$/, "\n\n") + ours;
+          // fusion : les clés du serveur (chemin, langue, touches…) remplacent les leurs ; les autres
+          // (sous-titres, volumes, réglages du jeu enregistrés par ScummVM) sont gardées
+          const merged = () => {
+            const lines = cur.replace(/\n+$/, "").split("\n"), idx = new Map();
+            lines.forEach((l, i) => { const k = l.split("=")[0]; if (i && l.includes("=")) idx.set(k, i); });
+            for (const l of ours.replace(/\n+$/, "").split("\n").slice(1)) {
+              if (!l.includes("=")) continue;
+              const k = l.split("=")[0];
+              if (idx.has(k)) lines[idx.get(k)] = l; else { idx.set(k, lines.length); lines.push(l); }
+            }
+            return lines.join("\n") + "\n" + (cur.endsWith("\n\n") ? "\n" : "");
+          };
+          const txt = cur ? old.replace(cur, merged()) : old.replace(/\n*$/, "\n\n") + ours;
           if (txt !== old) st.put({ ...rec, timestamp: new Date(), contents: new TextEncoder().encode(txt) }, KEY);
         }
       };

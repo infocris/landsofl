@@ -697,6 +697,12 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     Sans la langue, le jeu est détecté en anglais et cherche `ENG/`.
   - Le navigateur ne télécharge ce `scummvm.ini` qu'au premier lancement, puis garde sa copie
     dans IndexedDB. Le lanceur `lol.html` remet à jour la section `[lol-fr]` (ci-dessous).
+  - **Correctif du 2026-11-13** : le lanceur remplaçait toute la section `[lol-fr]` par celle
+    du serveur. Or ScummVM y enregistre aussi les réglages du jeu : `subtitles`,
+    `speech_mute`, `music_volume`, `sfx_volume`, `speech_volume`, `walkspeed`… Ces réglages
+    étaient donc perdus à chaque lancement. Désormais, seules les clés du serveur (chemin,
+    langue, touches) remplacent les leurs, et les autres sont gardées. Vérifié : musique réglée
+    à 30 % (`music_volume=76`), toujours présente après rechargement de la page.
 - **Déplacements ZQSD** (vérifié 2026-11-09). Le moteur expose ses touches par le
   « keymapper » de ScummVM : clavier `lolkeyb`, actions `MVF`, `MVB`, `SLL`, `SLR`, `TL`, `TR`
   (`engine/lol.cpp`). Par défaut : flèches haut et bas, flèches gauche et droite (pas de
@@ -1445,3 +1451,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : ScummVM web : chargement des sauvegardes depuis la page (§ 10 bis).
 - **2026-11-13** : grande carte en fenêtre modale (Tab), avec téléportation (§ 11).
 - **2026-11-13** : ScummVM web : sauvegarde depuis la page (nouvelle sauvegarde, écraser) (§ 10 bis).
+- **2026-11-13** : ScummVM web : réglages du jeu (sous-titres, volumes) conservés d'un lancement à l'autre (§ 10 bis).

@@ -45,7 +45,19 @@
         if (rec && rec.contents && ours) {
           const old = new TextDecoder().decode(rec.contents);
           const cur = section(old);
-          const txt = cur ? old.replace(cur, ours) : old.replace(/\n*$/, "\n\n") + ours;
+          // fusion : les clés du serveur (chemin, langue, touches…) remplacent les leurs ; les autres
+          // (sous-titres, volumes, réglages du jeu enregistrés par ScummVM) sont gardées
+          const merged = () => {
+            const lines = cur.replace(/\n+$/, "").split("\n"), idx = new Map();
+            lines.forEach((l, i) => { const k = l.split("=")[0]; if (i && l.includes("=")) idx.set(k, i); });
+            for (const l of ours.replace(/\n+$/, "").split("\n").slice(1)) {
+              if (!l.includes("=")) continue;
+              const k = l.split("=")[0];
+              if (idx.has(k)) lines[idx.get(k)] = l; else { idx.set(k, lines.length); lines.push(l); }
+            }
+            return lines.join("\n") + "\n" + (cur.endsWith("\n\n") ? "\n" : "");
+          };
+          const txt = cur ? old.replace(cur, merged()) : old.replace(/\n*$/, "\n\n") + ours;
           if (txt !== old) st.put({ ...rec, timestamp: new Date(), contents: new TextEncoder().encode(txt) }, KEY);
         }
       };
