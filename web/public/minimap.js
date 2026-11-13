@@ -1518,6 +1518,41 @@
   spTarget.addEventListener("change", () => spTarget.blur());
   if (MANAGE) setInterval(() => { updateSpells().catch(() => {}); }, 1000);
 
+  // --- Volumes du jeu : musique, effets, voix (version ScummVM) -------------------------
+  // Le moteur publie les trois volumes (zone 0x7F000600 : 2 = coupé … 102, échelle du menu
+  // « Contrôles audio » du jeu) ; la commande « volume » les règle comme ce menu (setVolume,
+  // enregistré dans scummvm.ini). Voix à 0 : texte seul, comme dans le jeu.
+  if (MANAGE) {
+    const VOLS = 0x7F000600, moreBtn = document.getElementById("vol-more"), mix = document.getElementById("vol-mix");
+    const rows = ["Musique", "Effets", "Voix"].map((label, k) => {
+      const l = document.createElement("label"), t = document.createElement("span"), r = document.createElement("input"), o = document.createElement("output");
+      t.textContent = label; r.type = "range"; r.min = 0; r.max = 100; r.step = 1; o.textContent = "…";
+      l.append(t, r, o); mix.appendChild(l);
+      let timer = 0, dragging = false;
+      const show = () => { o.textContent = +r.value === 0 ? "coupé" : r.value + " %"; };
+      r.addEventListener("pointerdown", () => { dragging = true; });
+      r.addEventListener("input", () => {
+        show(); dragging = true; clearTimeout(timer);
+        timer = setTimeout(() => mem.cmd({ op: "volume", a: k, b: +r.value + 2 }).catch(() => {}), 120);
+      });
+      r.addEventListener("change", () => { setTimeout(() => { dragging = false; }, 600); r.blur(); });
+      for (const ev of ["keydown", "keyup"]) r.addEventListener(ev, (e) => e.stopPropagation());
+      return { r, show, busy: () => dragging };
+    });
+    moreBtn.hidden = false;
+    moreBtn.addEventListener("click", (e) => {
+      e.currentTarget.blur(); mix.hidden = !mix.hidden; moreBtn.classList.toggle("on", !mix.hidden);
+      if (!mix.hidden) readVols();
+    });
+    document.addEventListener("pointerdown", (e) => { if (!mix.hidden && !e.target.closest("#vol")) { mix.hidden = true; moreBtn.classList.remove("on"); } });
+    async function readVols() {
+      const r = await mem.read([[VOLS, 3]]);
+      if (!r) return;
+      rows.forEach((row, k) => { if (!row.busy()) { row.r.value = Math.max(0, Math.min(100, r[0][k] - 2)); row.show(); } });
+    }
+    setInterval(() => { if (!mix.hidden) readVols().catch(() => {}); }, 1000);
+  }
+
   // --- Annuaire des objets par catégorie (fenêtre modale) ------------------------------
   // Tous les objets de la table du jeu (viewer/data/items.json), classés comme sur la carte ;
   // « + » en crée un dans le sac (comme le champ « Créer un objet »), clic : fiche à droite

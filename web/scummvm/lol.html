@@ -223,9 +223,18 @@
     background: rgba(0,0,0,.6); color: #ddd; cursor: pointer; }
   body:has(#mm:not(.hidden)) #persp { right: calc(var(--mm-w) + 12px); }
   body:has(#v3d.hidden) #persp { display: none; }
-  #vol { position: fixed; right: 12px; bottom: 192px; z-index: 1000; display: flex; align-items: center; gap: 4px;
+  #vol { position: fixed; right: 12px; bottom: 192px; z-index: 1001; display: flex; align-items: center; gap: 4px;
     font: 12px/1 system-ui, sans-serif; padding: 3px 8px; border: 1px solid #555; border-radius: 6px; background: rgba(0,0,0,.6); }
   #vol-label { cursor: pointer; user-select: none; }
+  #vol-more { font: 12px/1 system-ui, sans-serif; padding: 2px 4px; border: 0; background: none; color: #a39578; cursor: pointer; }
+  #vol-more:hover, #vol-more.on { color: #c9a227; }
+  #vol-mix { position: absolute; right: -1px; bottom: calc(100% + 6px); width: 230px; padding: 10px 12px; border: 1px solid #555;
+    border-radius: 8px; background: #0f0d0a; color: #e8dcc0; font: 13px system-ui, sans-serif; }
+  #vol-mix[hidden] { display: none; }
+  #vol-mix .vm-h { color: #c9a227; font-weight: 600; margin-bottom: 6px; }
+  #vol-mix label { display: grid; grid-template-columns: 62px 1fr 34px; align-items: center; gap: 6px; margin-top: 6px; }
+  #vol-mix input { width: 100%; accent-color: #c9a227; }
+  #vol-mix output { color: #a39578; font-size: 11px; text-align: right; }
   #vol input { width: 90px; accent-color: #c9a227; }
   body:has(#mm:not(.hidden)) #vol { right: calc(var(--mm-w) + 12px); }
   #engine { position: fixed; right: 12px; bottom: 228px; z-index: 1000; display: flex; align-items: center; gap: 2px;
@@ -312,7 +321,8 @@
   <div id="cat-tabs"></div>
   <div class="cat-body"><ol id="cat-list"></ol><div id="cat-side"><div id="cat-msg"></div><div id="cat-hint">Clique sur un objet pour voir sa fiche ; « + » le crée dans le sac.</div></div></div>
 </dialog>
-<div id="vol"><span id="vol-label" title="Couper / rétablir le son">🔊</span><input type="range" id="vol-range" min="0" max="100" step="1" aria-label="Volume général"></div>
+<div id="vol"><span id="vol-label" title="Couper / rétablir le son">🔊</span><input type="range" id="vol-range" min="0" max="100" step="1" aria-label="Volume général"><button type="button" id="vol-more" hidden title="Volumes du jeu : musique, effets, voix">⚙</button>
+  <div id="vol-mix" hidden><div class="vm-h">Volumes du jeu</div></div></div>
 <button id="mmtoggle" type="button" title="Afficher/masquer la mini-carte (F9)">Carte</button>
 <button id="qload" type="button" title="Recharger l'état enregistré avec F6 (QUICK.SAV)" hidden>F7 · charger l'état</button>
 <button id="zqsd" type="button" title="Activer/désactiver les touches ZQSD (F8)"></button>
@@ -360,7 +370,7 @@ window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes
   sendPersp();
 })();
 </script>
-<script src="minimap.js?v=20261113f"></script>
+<script src="minimap.js?v=20261113g"></script>
 <script src="engine.js?v=20261113a"></script>
 </body>
 </html>

@@ -848,6 +848,16 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     normaux.
   - **Vérifié** : Michael, Étincelle niveau 1 → magie 6 → 1. Le soin ciblé n'est pas testé, faute
     de sort de soin en début de partie.
+- **Volumes du jeu** (version ScummVM, 2026-11-13) : bouton ⚙ à côté du volume général, avec
+  trois curseurs, Musique, Effets et Voix.
+  - **Lecture** : le moteur publie `getVolume(musique, effets, voix)` en zone `0x7F000600`
+    (3 octets). L'échelle est celle du menu « Contrôles audio » du jeu : 2 = coupé, jusqu'à 102.
+  - **Réglage** : la commande op 12 (a = type, b = 2 à 102) appelle `setVolume`, comme les
+    curseurs du menu (`clickedAudioMenu`), qui convertit vers le mixeur et enregistre
+    `music_volume`, `sfx_volume` et `speech_volume`. Puis `ConfMan.flushToDisk`.
+  - **Voix coupée** (2) : `getVolume` renvoie 2 et le jeu passe en texte seul.
+  - **Vérifié** : 75 / 75 / 75 au départ ; musique 30 et voix 0 → le moteur lit 31 (arrondi de
+    la conversion), 77 et 2.
 - **Attaque automatique** (version ScummVM, 2026-11-13 ; case « Attaque auto » à côté des triches).
   - **Commande** : bit 4 du masque de l'op 5, renvoyé avec les triches.
   - **Déclenchement** : au plus toutes les 200 ms, dans la boucle principale. Chaque personnage
@@ -1375,3 +1385,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : ScummVM web : sorts lancés depuis la page, montée de niveau par le moteur (correctif) ; annuaire des objets (§ 10 bis).
 - **2026-11-13** : ScummVM web : déblocage des sorts du joueur depuis la page (§ 10 bis).
 - **2026-11-13** : ScummVM web : mode attaque automatique (§ 10 bis).
+- **2026-11-13** : ScummVM web : volumes musique, effets et voix dans la page (§ 10 bis).
