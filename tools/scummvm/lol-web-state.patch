@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..9932b1ac 100644
+index 392e4c2d..71691184 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -39,6 +39,10 @@
@@ -13,7 +13,7 @@ index 392e4c2d..9932b1ac 100644
  namespace Kyra {
  
  const char *const LoLEngine::kMouseKeymapName = "lolmouse";
-@@ -929,6 +933,372 @@ void LoLEngine::startupNew() {
+@@ -929,6 +933,389 @@ void LoLEngine::startupNew() {
  	_screen->showMouse();
  }
  
@@ -34,6 +34,22 @@ index 392e4c2d..9932b1ac 100644
 +	const bool changed = mainLoop && EM_ASM_INT({ return Module.lolCmds && Module.lolCmds.length ? 1 : 0; });
 +	if (changed)
 +		webRunCommands();
++	// attaque automatique : chaque personnage prêt frappe le monstre le plus proche de la case
++	// devant le groupe, comme un clic sur son arme (clickedAttackButton). Monstres paisibles
++	// (mode 1, ex. gardes de Gladstone) et mourants (mode >= 13) épargnés.
++	if (mainLoop && _webAutoAttack && !(_updateFlags & 0x0F) && !_weaponsDisabled && _activeMagicMenu == -1 && now - _webAutoAttackTime >= 200) {
++		_webAutoAttackTime = now;
++		for (int i = 0; i < 4; i++) {
++			if (!(_characters[i].flags & 1) || (_characters[i].flags & 0x314C))
++				continue;
++			const uint16 t = getNearestMonsterFromCharacter(i);
++			if (t == 0xFFFF || !(t & 0x8000) || _monsters[t & 0x7FFF].mode == 1)
++				continue;
++			Button b;
++			b.arg = i;
++			clickedAttackButton(&b);
++		}
++	}
 +	for (int i = 0; i < 4 && mainLoop; i++) {	// triches : remettre au maximum (ce qui a été perdu avant l'activation)
 +		LoLCharacter &c = _characters[i];
 +		if (!(c.flags & 1) || (c.flags & 8))
@@ -244,6 +260,7 @@ index 392e4c2d..9932b1ac 100644
 +	if (op == 5) {	// triches : a = 1 vie infinie, 2 magie infinie (masque)
 +		_webInfiniteHp = (a & 1) != 0;
 +		_webInfiniteMp = (a & 2) != 0;
++		_webAutoAttack = (a & 4) != 0;
 +		return 0;
 +	}
 +	if (op == 7 || op == 8) {	// tests : dégâts d'un monstre (7) ou magie dépensée (8) : b points au perso a
@@ -386,7 +403,7 @@ index 392e4c2d..9932b1ac 100644
  void LoLEngine::runLoop() {
  	// Initialize debugger since how it should be fully usable
  	static_cast<Debugger_LoL *>(getDebugger())->initialize();
-@@ -957,6 +1327,7 @@ void LoLEngine::runLoop() {
+@@ -957,6 +1344,7 @@ void LoLEngine::runLoop() {
  		gui_updateInput();
  
  		update();
@@ -394,7 +411,7 @@ index 392e4c2d..9932b1ac 100644
  
  		updatePlayTimer();
  
-@@ -1477,6 +1848,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
+@@ -1477,6 +1865,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
  
  	int newVal = (mode == 2) ? (pointsMax + points) : (mode ? (pointsCur + points) : points);
  	newVal = CLIP(newVal, 0, pointsMax);
@@ -403,7 +420,7 @@ index 392e4c2d..9932b1ac 100644
  
  	if (type) {
  		c->magicPointsCur = newVal;
-@@ -2074,6 +2447,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
+@@ -2074,6 +2464,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
  
  void LoLEngine::delay(uint32 millis, bool doUpdate, bool) {
  	while (millis && !shouldQuit()) {
@@ -411,7 +428,7 @@ index 392e4c2d..9932b1ac 100644
  		if (doUpdate)
  			update();
  		else
-@@ -2092,6 +2466,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
+@@ -2092,6 +2483,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
  // spells
  
  int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
@@ -424,7 +441,7 @@ index 392e4c2d..9932b1ac 100644
  	_activeSpell.spell = spellType;
  	_activeSpell.p = &_spellProperties[spellType];
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index 2cfadf37..81e5f535 100644
+index 2cfadf37..ee13738a 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
 @@ -315,6 +315,11 @@ private:
@@ -439,13 +456,15 @@ index 2cfadf37..81e5f535 100644
  	void update() override;
  
  	// mouse
-@@ -1072,6 +1077,13 @@ private:
+@@ -1072,6 +1077,15 @@ private:
  
  	LoLItem *_itemsInPlay;
  	ItemProperty *_itemProperties;
 +	int _webNumItemProperties = 0;	// version web : taille de _itemProperties
 +	char _webMonsterShapeFile[3][13] = {};	// version web : fichier de sprites chargé dans chaque emplacement
 +	bool _webInfiniteHp = false, _webInfiniteMp = false;	// version web : triches vie / magie infinies
++	bool _webAutoAttack = false;	// version web : attaque automatique du monstre devant le groupe
++	uint32 _webAutoAttackTime = 0;
 +	bool _webInMenu = false;	// version web : menu (disquette) ouvert
 +	bool _webCasting = false;	// version web : sort en cours (animation dans la fenêtre de scène)
 +	bool _webLoadingLevel = false;	// version web : changement de niveau, jusqu'au retour dans la boucle principale

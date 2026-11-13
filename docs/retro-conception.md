@@ -848,6 +848,19 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     normaux.
   - **Vérifié** : Michael, Étincelle niveau 1 → magie 6 → 1. Le soin ciblé n'est pas testé, faute
     de sort de soin en début de partie.
+- **Attaque automatique** (version ScummVM, 2026-11-13 ; case « Attaque auto » à côté des triches).
+  - **Commande** : bit 4 du masque de l'op 5, renvoyé avec les triches.
+  - **Déclenchement** : au plus toutes les 200 ms, dans la boucle principale. Chaque personnage
+    actif et prêt (pas de `flags & 0x314C`) frappe comme un clic sur son arme
+    (`clickedAttackButton`).
+  - **Cible** : le monstre le plus proche du personnage dans la case devant le groupe
+    (`getNearestMonsterFromCharacter`, 0xFFFF = aucun). Mêmes armes, munitions, temps de
+    recharge et expérience qu'en jeu.
+  - **Exceptions** : les monstres paisibles (mode 1, comme les gardes de Gladstone) ne sont pas
+    attaqués. Le mode est suspendu pendant les dialogues et les scènes (`_updateFlags & 0x0F`),
+    quand les commandes sont désactivées (`_weaponsDisabled`) et quand un menu de magie est ouvert.
+  - **Vérifié** : niveau 6, case 7,7, avec la vie infinie. Face à un monstre, l'expérience de
+    combat de Michael passe de 1 à 9, puis à 13, sans aucun clic.
 - **Débloquer des sorts à l'avance** (version ScummVM, 2026-11-13).
   - **Les sorts du joueur** sont les types 0 à 6 : Étincelle, Soins, Gel, Boule de Feu, Poing
     Mortel, Brume Fatale, Foudre. Ils correspondent aux 7 cases de `_availableSpells`. Les types
@@ -1355,3 +1368,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : mini-carte : exploration progressive ; condition de la carte automatique du jeu (`_flagsTable[31] & 0x10`, octet 9 de la case) (§ 11).
 - **2026-11-13** : ScummVM web : sorts lancés depuis la page, montée de niveau par le moteur (correctif) ; annuaire des objets (§ 10 bis).
 - **2026-11-13** : ScummVM web : déblocage des sorts du joueur depuis la page (§ 10 bis).
+- **2026-11-13** : ScummVM web : mode attaque automatique (§ 10 bis).

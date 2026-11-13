@@ -1726,7 +1726,9 @@
   // à leur maximum (+57, +61). Un coup qui ferait passer la vie sous zéro entre deux
   // écritures resterait mortel : c'est une vie « quasi » infinie.
   const cheatHp = document.getElementById("cheat-hp"), cheatMp = document.getElementById("cheat-mp");
-  for (const [box, key] of [[cheatHp, "cheatHp"], [cheatMp, "cheatMp"]]) {
+  const cheatAuto = document.getElementById("cheat-auto");
+  if (!MANAGE) cheatAuto.parentNode.hidden = true;      // attaque auto : moteur ScummVM seulement
+  for (const [box, key] of [[cheatHp, "cheatHp"], [cheatMp, "cheatMp"], [cheatAuto, "autoAttack"]]) {
     try { box.checked = localStorage.getItem(key) === "on"; } catch (e) {}
     box.addEventListener("change", () => { try { localStorage.setItem(key, box.checked ? "on" : "off"); } catch (e) {} box.blur(); });
   }
@@ -1752,13 +1754,13 @@
   // changement et toutes les 3 s (le jeu peut avoir redémarré).
   let cheatSent = -1, cheatSentAt = 0;
   async function sendCheats() {
-    const mask = (cheatHp.checked ? 1 : 0) | (cheatMp.checked ? 2 : 0);
+    const mask = (cheatHp.checked ? 1 : 0) | (cheatMp.checked ? 2 : 0) | (cheatAuto.checked ? 4 : 0);
     if (mask === cheatSent && performance.now() - cheatSentAt < 3000) return;
     const r = await mem.cmd({ op: "cheat", a: mask }, 1500);
     if (r && r.code === 0) { cheatSent = mask; cheatSentAt = performance.now(); }
   }
   if (MANAGE) {
-    for (const box of [cheatHp, cheatMp]) box.addEventListener("change", () => { cheatSent = -1; sendCheats().catch(() => {}); });
+    for (const box of [cheatHp, cheatMp, cheatAuto]) box.addEventListener("change", () => { cheatSent = -1; sendCheats().catch(() => {}); });
     setInterval(() => { if (!previewing) sendCheats().catch(() => {}); }, 1000);
   }
 
