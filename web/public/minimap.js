@@ -1641,49 +1641,81 @@
   }
 
 
-  // --- Charger une sauvegarde (version ScummVM) ------------------------------------------
-  // Commande « listsaves » : le moteur relit les fichiers de sauvegarde (lol-fr.###) et publie
-  // n° + nom (zone 0x7F000700 : nombre u16, puis 42 octets par sauvegarde). « load » : comme le
-  // menu « Charger une partie » du jeu (_gameToLoad, chargé au tour de boucle suivant).
+  // --- Sauvegardes : sauvegarder et charger (version ScummVM) -------------------------------
+  // « listsaves » : le moteur relit les fichiers lol-fr.### et publie n° + nom (zone 0x7F000700 :
+  // nombre u16, puis 42 octets par sauvegarde ; noms en UTF-8, comme les enregistre le jeu).
+  // « load » : comme le menu « Charger une partie » (_gameToLoad, chargé au tour de boucle suivant).
+  // « save » : comme le menu « Sauvegarder » (saveGameStateIntern, miniature générée par le moteur) ;
+  // a = emplacement (-1 : premier libre), nom passé en texte avec la commande.
   if (MANAGE) {
     const SAVES = 0x7F000700, svDlg = document.getElementById("sv-dlg"), svList = document.getElementById("sv-list");
     const svMsg = document.getElementById("sv-msg"), svOpen = document.getElementById("sv-open");
+    const svName = document.getElementById("sv-name"), utf8 = new TextDecoder();
     svOpen.hidden = false;
-    async function listSaves() {
-      svMsg.textContent = "Lecture des sauvegardes…"; svList.replaceChildren();
-      const c = await mem.cmd({ op: "listsaves" }, 8000);
-      if (!c || c.code) { svMsg.textContent = "Le jeu ne répond pas (menu ou dialogue ouvert ?) : réessaie en exploration."; return; }
+    const defaultName = () => {
+      const d = new Date(), p2 = (n) => String(n).padStart(2, "0");
+      return `${current ? current.fr : "Partie"} ${p2(d.getDate())}/${p2(d.getMonth() + 1)} ${p2(d.getHours())}h${p2(d.getMinutes())}`.slice(0, 36);
+    };
+    async function readSaves() {
       await new Promise((r) => setTimeout(r, 400));             // publication suivante
       const r = await mem.read([[SAVES, 2 + 200 * 42]]);
-      if (!r) { svMsg.textContent = "Lecture impossible."; return; }
+      if (!r) return null;
       const b = r[0], n = b[0] | b[1] << 8;
-      if (n === 0xFFFF) { svMsg.textContent = "Liste pas encore prête : clique sur ↻."; return; }
+      if (n === 0xFFFF) return null;
       const saves = [];
       for (let i = 0; i < n; i++) {
         const o = 2 + i * 42, raw = b.subarray(o + 2, o + 42), z = raw.indexOf(0);
-        saves.push({ slot: b[o] | b[o + 1] << 8, name: cp850(z < 0 ? raw : raw.subarray(0, z)).trim() });
+        saves.push({ slot: b[o] | b[o + 1] << 8, name: utf8.decode(z < 0 ? raw : raw.subarray(0, z)).trim() });
       }
-      svMsg.textContent = saves.length ? `${saves.length} sauvegarde${saves.length > 1 ? "s" : ""}. La partie en cours non sauvegardée sera perdue.` : "Aucune sauvegarde.";
+      return saves;
+    }
+    const resetConfirms = () => svList.querySelectorAll("button.confirm").forEach((x) => { x.classList.remove("confirm"); x.textContent = x.dataset.label; });
+    const twoStep = (btn) => {                         // deuxième clic pour confirmer
+      if (btn.classList.contains("confirm")) return true;
+      resetConfirms(); btn.classList.add("confirm"); btn.textContent = "Confirmer"; return false;
+    };
+    function renderSaves(saves) {
       svList.replaceChildren(...saves.map((s) => {
         const li = document.createElement("li");
         const no = document.createElement("span"); no.className = "no"; no.textContent = s.slot;
         const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = s.name || "(sans nom)"; nm.title = s.name;
-        const go = document.createElement("button"); go.type = "button"; go.textContent = "Charger";
+        const ow = document.createElement("button"); ow.type = "button"; ow.className = "ow"; ow.dataset.label = ow.textContent = "Écraser";
+        ow.title = "Remplacer cette sauvegarde par la partie en cours (nom : celui du champ, sinon le sien)";
+        ow.addEventListener("click", () => { if (twoStep(ow)) save(s.slot, svName.value.trim() || s.name).catch(() => {}); });
+        const go = document.createElement("button"); go.type = "button"; go.dataset.label = go.textContent = "Charger";
+        go.title = "Charger cette sauvegarde (la partie en cours non sauvegardée est perdue)";
         go.addEventListener("click", async () => {
-          if (!go.classList.contains("confirm")) {          // deuxième clic pour confirmer
-            svList.querySelectorAll("button.confirm").forEach((x) => { x.classList.remove("confirm"); x.textContent = "Charger"; });
-            go.classList.add("confirm"); go.textContent = "Confirmer"; return;
-          }
+          if (!twoStep(go)) return;
           const res = await mem.cmd({ op: "load", a: s.slot }, 5000);
           if (!res || res.code) { svMsg.textContent = !res ? "Le jeu ne répond pas (menu ou dialogue ouvert ?)." : "Sauvegarde illisible."; return; }
           svMsg.textContent = `Chargement de « ${s.name} »…`;
           setTimeout(() => svDlg.close(), 600);
         });
-        li.append(no, nm, go);
+        li.append(no, nm, ow, go);
         return li;
       }));
+      svMsg.textContent = saves.length ? `${saves.length} sauvegarde${saves.length > 1 ? "s" : ""}.` : "Aucune sauvegarde pour l'instant.";
     }
-    svOpen.addEventListener("click", (e) => { e.currentTarget.blur(); svDlg.showModal(); listSaves().catch(() => {}); });
+    async function listSaves() {
+      svMsg.textContent = "Lecture des sauvegardes…";
+      const c = await mem.cmd({ op: "listsaves" }, 8000);
+      if (!c || c.code) { svMsg.textContent = "Le jeu ne répond pas (menu ou dialogue ouvert ?) : réessaie en exploration."; return; }
+      const saves = await readSaves();
+      if (!saves) { svMsg.textContent = "Liste pas encore prête : clique sur ↻."; return; }
+      renderSaves(saves);
+    }
+    async function save(slot, name) {
+      svMsg.textContent = "Sauvegarde…";
+      const r = await mem.cmd({ op: "save", a: slot, b: 0, text: name || defaultName() }, 10000);
+      if (!r || r.code) { svMsg.textContent = !r ? "Le jeu ne répond pas (menu ou dialogue ouvert ?) : réessaie en exploration." : "La sauvegarde a échoué."; return; }
+      const saves = await readSaves();
+      if (saves) renderSaves(saves);
+      svMsg.textContent = `Partie sauvegardée${slot >= 0 ? ` dans l'emplacement ${slot}` : ""} : « ${name || "…"} ».`;
+      svName.value = defaultName();
+    }
+    document.getElementById("sv-save").addEventListener("click", (e) => { e.currentTarget.blur(); save(-1, svName.value.trim() || defaultName()).catch(() => {}); });
+    svName.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); save(-1, svName.value.trim() || defaultName()).catch(() => {}); } });
+    svOpen.addEventListener("click", (e) => { e.currentTarget.blur(); svName.value = defaultName(); svDlg.showModal(); listSaves().catch(() => {}); });
     document.getElementById("sv-refresh").addEventListener("click", (e) => { e.currentTarget.blur(); listSaves().catch(() => {}); });
     document.getElementById("sv-close").addEventListener("click", () => svDlg.close());
     svDlg.addEventListener("click", (e) => { if (e.target === svDlg) svDlg.close(); });

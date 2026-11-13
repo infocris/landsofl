@@ -107,6 +107,14 @@
   #sv-dlg h2 { margin: 0; font-size: 20px; color: #c9a227; flex: 1; }
   #sv-dlg .cat-head button { font-size: 18px; background: none; border: 0; color: #a39578; cursor: pointer; padding: 0 4px; }
   #sv-dlg .cat-head button:hover { color: #fff; }
+  #sv-new { display: flex; gap: 8px; padding: 12px 16px 8px; }
+  #sv-name { flex: 1; min-width: 0; font: 15px system-ui, sans-serif; padding: 7px 10px; background: #17130e; color: #e8dcc0;
+    border: 1px solid #554a36; border-radius: 6px; }
+  #sv-save { font: 600 13px/1 system-ui, sans-serif; padding: 7px 12px; border: 1px solid #4ade80; border-radius: 6px;
+    background: #12201a; color: #d8ffe6; cursor: pointer; white-space: nowrap; }
+  #sv-save:hover { background: #1b3326; }
+  #sv-list button.ow { border-color: #6d5a3a; color: #cfc3a6; font-weight: 400; }
+  #sv-list button.ow.confirm { background: #8a3a2a; border-color: #8a3a2a; color: #fff; }
   #sv-list { list-style: none; margin: 0; padding: 6px 10px; overflow-y: auto; flex: 1; min-height: 80px; }
   #sv-list li { display: flex; align-items: center; gap: 12px; padding: 7px 8px; border-bottom: 1px solid #241f17; border-radius: 4px; }
   #sv-list li:hover { background: rgba(201, 162, 39, .08); }
@@ -385,14 +393,16 @@
 <button id="v3dtoggle" type="button" title="Afficher/masquer la vue 3D (F10)">3D</button>
 <button id="persp" type="button" title="Perspective de la vue 3D : celle du jeu d'origine ou une perspective réelle"></button>
 <div id="mm-tip" hidden></div>
-<button id="sv-open" type="button" hidden title="Charger une sauvegarde du jeu">Charger…</button>
+<button id="sv-open" type="button" hidden title="Sauvegarder la partie ou charger une sauvegarde">Sauvegardes…</button>
 <dialog id="bm-dlg" aria-labelledby="bm-title">
   <div class="cat-head"><h2 id="bm-title">Carte</h2><span id="bm-hint"></span><button type="button" id="bm-close" title="Fermer (Tab, Échap)">✕</button></div>
   <div class="bm-body"><canvas id="bm-canvas"></canvas></div>
 </dialog>
 <dialog id="sv-dlg" aria-labelledby="sv-h">
-  <div class="cat-head"><h2 id="sv-h">Charger une partie</h2><button type="button" id="sv-refresh" title="Relire la liste">↻</button>
+  <div class="cat-head"><h2 id="sv-h">Sauvegardes</h2><button type="button" id="sv-refresh" title="Relire la liste">↻</button>
     <button type="button" id="sv-close" title="Fermer (Échap)">✕</button></div>
+  <div id="sv-new"><input id="sv-name" maxlength="36" placeholder="Nom de la sauvegarde" autocomplete="off">
+    <button type="button" id="sv-save" title="Sauvegarder la partie en cours dans un nouvel emplacement">Nouvelle sauvegarde</button></div>
   <ol id="sv-list"></ol>
   <div id="sv-msg"></div>
 </dialog>
@@ -457,7 +467,7 @@ window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes
   sendPersp();
 })();
 </script>
-<script src="minimap.js?v=20261113k"></script>
+<script src="minimap.js?v=20261113l"></script>
 <script src="engine.js?v=20261113a"></script>
 </body>
 </html>

@@ -848,7 +848,21 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     normaux.
   - **Vérifié** : Michael, Étincelle niveau 1 → magie 6 → 1. Le soin ciblé n'est pas testé, faute
     de sort de soin en début de partie.
-- **Charger une sauvegarde depuis la page** (version ScummVM, 2026-11-13 ; bouton « Charger… »).
+- **Sauvegarder depuis la page** (version ScummVM, 2026-11-13 ; fenêtre « Sauvegardes… »).
+  - **Commande op 16** : a = emplacement (-1 = premier libre à partir de 0, comme
+    `getNextSavegameSlot` pour LoL). Le nom est transmis en texte : la page l'encode en octets
+    UTF-8, joints à la commande, que le moteur lit dans `Module.lolText`.
+  - **Comme le menu « Sauvegarder »** (`clickedSavenameMenu`) : `updatePlayTimer` puis
+    `saveGameStateIntern(slot, nom, nullptr)`. Sans miniature fournie, le moteur la génère
+    (`generateSaveThumbnail`). La liste est ensuite relue.
+  - **Encodage** : le jeu enregistre les noms en UTF-8 (`convertString_KYRAtoGUI`), et la liste
+    de la page les décode en UTF-8, et non en CP850.
+  - **Vérifié** :
+    - « Fontaine été » enregistrée en emplacement 0 ;
+    - nom par défaut « Gladstone 13/11 21h02 » en emplacement 1 ;
+    - le chargement de l'emplacement 0 ramène le groupe en 13,17.
+    - « Écraser » (même commande avec un emplacement donné) n'a pas été essayé.
+- **Charger une sauvegarde depuis la page** (version ScummVM, 2026-11-13 ; même fenêtre).
   - **Liste** : la commande op 14 relit les fichiers `lol-fr.###` (`listSavefiles`, en-tête lu
     par `readSaveHeader`, comme `KyraMetaEngine::listSaves`).
   - **Zone `0x7F000700`** : nombre (u16), puis n° (u16) et nom (40 octets) pour chaque
@@ -1430,3 +1444,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : page : fiches des personnages dans une fenêtre modale (résumé vie / magie dans le panneau).
 - **2026-11-13** : ScummVM web : chargement des sauvegardes depuis la page (§ 10 bis).
 - **2026-11-13** : grande carte en fenêtre modale (Tab), avec téléportation (§ 11).
+- **2026-11-13** : ScummVM web : sauvegarde depuis la page (nouvelle sauvegarde, écraser) (§ 10 bis).
