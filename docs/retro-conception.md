@@ -860,7 +860,9 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     parchemins). Pour les types supérieurs à 1, le jeu joue l'animation du sort qui passe du
     portrait au parchemin.
   - **Redessin** : la page 2 est redessinée, puis recopiée à l'écran, si le parchemin est
-    affiché (`_flagsTable[31] & 0x20`, levé ici dès le début de la partie). Code 6 = déjà connu.
+    affiché (`_flagsTable[31] & 0x20`). Avant le premier ajout, le parchemin n'était pas visible
+    à l'écran ; après, il l'est. On ne sait pas si c'est l'animation ou ce redessin qui l'affiche.
+    Code 6 = déjà connu.
   - **Vérifié** : en début de partie, les 6 sorts manquants ont été débloqués un par un puis
     avec « Tout ». Ils apparaissent dans le parchemin du jeu et dans le panneau Magie.
 - **Annuaire des objets** (deux versions) : fenêtre modale (bouton « Annuaire des objets… »
