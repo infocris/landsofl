@@ -1444,24 +1444,27 @@
   spTarget.addEventListener("change", () => spTarget.blur());
   if (MANAGE) setInterval(() => { updateSpells().catch(() => {}); }, 1000);
 
-  // --- Annuaire des objets par catégorie ----------------------------------------------
+  // --- Annuaire des objets par catégorie (fenêtre modale) ------------------------------
   // Tous les objets de la table du jeu (viewer/data/items.json), classés comme sur la carte ;
-  // « + » en crée un dans le sac (comme le champ « Créer un objet »), clic sur le nom : fiche.
-  const catEl = document.getElementById("cat"), catTabs = document.getElementById("cat-tabs");
+  // « + » en crée un dans le sac (comme le champ « Créer un objet »), clic : fiche à droite
+  // (la fiche de l'inventaire est déplacée dans la fenêtre le temps de son ouverture).
+  const catDlg = document.getElementById("cat-dlg"), catTabs = document.getElementById("cat-tabs");
   const catList = document.getElementById("cat-list"), catQ = document.getElementById("cat-q");
-  let catSel = "tout";
+  const catSide = document.getElementById("cat-side"), catMsg = document.getElementById("cat-msg");
+  const catHint = document.getElementById("cat-hint"), detailHome = detailEl.parentNode, detailNext = detailEl.nextSibling;
+  let catSel = "tout", catType = -1;
   try { catSel = localStorage.getItem("itemCatalogTab") || "tout"; } catch (e) {}
   const catKey = (t) => Object.keys(CATEGORIES).find((k) => CATEGORIES[k] === itemCategory(t));
   function catalogItems() {
     return itemInfo.map((it, t) => ({ it, t })).filter(({ it, t }) => t && !/^temp object$|^Objet illégal$/i.test(it.name));
   }
   function renderCatalog() {
-    if (!itemInfo || !catEl.open) return;
+    if (!itemInfo || !catDlg.open) return;
     const all = catalogItems();
     const counts = {}; for (const { t } of all) { const k = catKey(t); counts[k] = (counts[k] || 0) + 1; }
     catTabs.replaceChildren(...[["tout", `tout (${all.length})`], ...Object.keys(CATEGORIES).map((k) => [k, `${CATEGORIES[k].label} (${counts[k] || 0})`])].map(([k, label]) => {
       const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.classList.toggle("on", k === catSel);
-      b.addEventListener("click", () => { catSel = k; try { localStorage.setItem("itemCatalogTab", k); } catch (e) {} b.blur(); renderCatalog(); });
+      b.addEventListener("click", () => { catSel = k; try { localStorage.setItem("itemCatalogTab", k); } catch (e) {} renderCatalog(); catList.scrollTop = 0; });
       return b;
     }));
     const q = catQ.value.trim().toLowerCase();
@@ -1469,24 +1472,48 @@
       && (!q || it.name.toLowerCase().includes(q) || (it.kind || "").toLowerCase().includes(q) || (it.effects || []).join(" ").toLowerCase().includes(q)))
       .sort((x, y) => x.it.name.localeCompare(y.it.name, "fr"));
     catList.replaceChildren(...shown.map(({ it, t }) => {
-      const li = document.createElement("li");
+      const li = document.createElement("li"); li.classList.toggle("sel", t === catType);
       const icon = document.createElement("div"); icon.className = "slot full"; setIcon(icon, it.icon); icon.title = "Fiche de l'objet";
       const nm = document.createElement("span"); nm.className = "nm" + (owned.has(t) ? " own" : "");
       nm.textContent = it.name; nm.title = (owned.has(t) ? "Déjà possédé · " : "") + `type ${t} — cliquer pour la fiche`;
       const sm = document.createElement("small"); sm.textContent = [it.kind, ...(it.effects || [])].filter(Boolean).join(" · "); nm.appendChild(sm);
       const add = document.createElement("button"); add.type = "button"; add.className = "add"; add.textContent = "+";
       add.title = `Créer « ${it.name} » dans le sac`;
-      add.addEventListener("click", () => { add.blur(); createItem(t).catch(() => {}); });
-      const open = () => { showDetail(t, "annuaire"); detailEl.scrollIntoView({ block: "nearest" }); };
+      add.addEventListener("click", async () => {
+        add.blur(); addMsg.textContent = ""; catMsg.classList.remove("err"); catMsg.textContent = "…";
+        await createItem(t).catch(() => {});
+        const ok = /créé/.test(addMsg.textContent);
+        catMsg.textContent = addMsg.textContent || hintEl.textContent || "Création impossible.";
+        catMsg.classList.toggle("err", !ok);
+      });
+      const open = () => {
+        catType = t; showDetail(t, "annuaire"); catHint.hidden = true;
+        catList.querySelectorAll("li.sel").forEach((e) => e.classList.remove("sel")); li.classList.add("sel");
+      };
       icon.addEventListener("click", open); nm.addEventListener("click", open);
       li.append(icon, nm, add);
       return li;
     }));
     if (!shown.length) { const li = document.createElement("li"); li.textContent = "aucun objet"; catList.appendChild(li); }
   }
-  catEl.addEventListener("toggle", renderCatalog);
+  document.getElementById("cat-open").addEventListener("click", (e) => {
+    e.currentTarget.blur();
+    hideDetail(); catType = -1; catHint.hidden = false; catMsg.textContent = "";
+    catSide.appendChild(detailEl);
+    catDlg.showModal();
+    renderCatalog();
+    catQ.focus();
+  });
+  document.getElementById("cat-close").addEventListener("click", () => catDlg.close());
+  catDlg.addEventListener("click", (e) => { if (e.target === catDlg) catDlg.close(); });   // clic hors de la fenêtre
+  catDlg.addEventListener("close", () => {
+    hideDetail();
+    detailHome.insertBefore(detailEl, detailNext);
+    const f = document.getElementById("dos"); if (f && f.focus) f.focus();
+  });
   catQ.addEventListener("input", renderCatalog);
-  for (const ev of ["keydown", "keyup", "keypress"]) catQ.addEventListener(ev, (e) => e.stopPropagation());
+  // le clavier reste dans la fenêtre (sinon le jeu DOSBox reçoit les touches) ; Échap la ferme
+  for (const ev of ["keydown", "keyup", "keypress"]) catDlg.addEventListener(ev, (e) => e.stopPropagation());
 
   addInput.addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Enter") createItem().catch(() => {}); });
   addInput.addEventListener("keyup", (e) => e.stopPropagation());

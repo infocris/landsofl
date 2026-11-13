@@ -848,8 +848,9 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     normaux.
   - **Vérifié** : Michael, Étincelle niveau 1 → magie 6 → 1. Le soin ciblé n'est pas testé, faute
     de sort de soin en début de partie.
-- **Annuaire des objets** (deux versions) : les 283 objets de `items.json`, classés par onglets
-  (catégories de la mini-carte), avec un filtre texte. Le bouton « + » crée l'objet dans le sac
+- **Annuaire des objets** (deux versions) : fenêtre modale (bouton « Annuaire des objets… »
+  sous l'inventaire) avec les 283 objets de `items.json`, classés par onglets (catégories de la
+  mini-carte), avec un filtre texte. La fiche s'affiche à droite. Le bouton « + » crée l'objet dans le sac
   (op 3 sous ScummVM, écriture mémoire sous DOSBox) ; un clic ouvre la fiche.
 - **Apparence propre à chaque monstre** (2026-11-10, vue 3D, versions DOSBox et ScummVM).
   `LoLEngine::drawMonster` varie un même sprite de deux façons :
