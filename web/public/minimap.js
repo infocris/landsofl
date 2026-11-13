@@ -1887,6 +1887,38 @@
   addInput.addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Enter") createItem().catch(() => {}); });
   addInput.addEventListener("keyup", (e) => e.stopPropagation());
 
+  // --- Vider le sac (version ScummVM) : chaque case occupée est détruite par la commande
+  // « delete » du moteur (comme « Supprimer » dans la fiche d'un objet : deleteItem). Deuxième clic
+  // pour confirmer ; l'équipement des personnages et l'objet en main ne sont pas touchés.
+  {
+    const clearBtn = document.getElementById("inv-clear");
+    clearBtn.hidden = !MANAGE;
+    let clearTimer = 0, clearing = false;
+    clearBtn.addEventListener("click", async () => {
+      clearBtn.blur();
+      if (clearing) return;
+      const locs = lastInvData ? lastInvData.barTypes.map((t, k) => (t >= 0 ? k : -1)).filter((k) => k >= 0) : [];
+      if (!locs.length) { invMessage("Le sac est déjà vide."); return; }
+      if (!clearBtn.classList.contains("confirm")) {
+        clearBtn.classList.add("confirm"); clearBtn.textContent = `Vider ${locs.length} objet${locs.length > 1 ? "s" : ""} ?`;
+        clearTimeout(clearTimer); clearTimer = setTimeout(() => { clearBtn.classList.remove("confirm"); clearBtn.textContent = "Vider"; }, 4000);
+        return;
+      }
+      clearTimeout(clearTimer); clearBtn.classList.remove("confirm"); clearBtn.textContent = "Vider";
+      clearing = true; hideDetail();
+      let done = 0;
+      try {
+        for (const loc of locs) {
+          const r = await mem.cmd({ op: "delete", a: loc });
+          if (!r) { invMessage("Le jeu ne répond pas (menu ouvert ?) : réessaie en exploration."); break; }
+          if (!r.code) done++;
+        }
+      } finally { clearing = false; }
+      if (done) invMessage(`${done} objet${done > 1 ? "s" : ""} détruit${done > 1 ? "s" : ""}.`);
+      lastInv = ""; updateInventory().catch(() => {});
+    });
+  }
+
   // --- Export texte de l'inventaire ---------------------------------------------
   function inventoryText() {
     if (!lastInvData || !itemInfo) return null;

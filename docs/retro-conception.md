@@ -1536,3 +1536,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : fenêtre « Triches » : déblocage du livre de sorts (drapeau 0x20) (§ 10 bis).
 - **2026-11-13** : page DOSBox : le bouton ZQSD revient avec les autres boutons, en bas à droite (plus de placement à côté des flèches du jeu).
 - **2026-11-13** : attaque auto : arme ou sort (niveau max possible) par personnage (ScummVM) (§ 10 bis).
+- **2026-11-13** : inventaire : bouton « Vider » (ScummVM) ; chaque case occupée du sac est détruite par la commande op 2 (`deleteItem`), avec confirmation. Vérifié : 3 objets détruits, l'équipement est gardé.
