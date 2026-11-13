@@ -79,6 +79,27 @@
   .sp-row button small { font-weight: 400; color: #8fa0d8; }
   .sp-row button:hover:not(:disabled) { background: #22305a; color: #fff; }
   .sp-row button:disabled { opacity: .35; cursor: not-allowed; }
+  #ch-open { margin-left: 0; }
+  #ch-open[hidden] { display: none; }
+  #ch-dlg { width: min(560px, 94vw); padding: 0; border: 1px solid #6d5a3a; border-radius: 10px; color-scheme: dark;
+    background: #110e0a; color: #e8dcc0; font: 15px/1.4 system-ui, sans-serif; box-shadow: 0 20px 60px rgba(0,0,0,.7); }
+  #ch-dlg::backdrop { background: rgba(0, 0, 0, .65); }
+  #ch-dlg .cat-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; border-bottom: 1px solid #3a3226; }
+  #ch-dlg h2 { margin: 0; font-size: 20px; color: #c9a227; flex: 1; }
+  #ch-close { font-size: 20px; background: none; border: 0; color: #a39578; cursor: pointer; padding: 0 4px; }
+  #ch-close:hover { color: #fff; }
+  #ch-dlg .ch-body { padding: 4px 16px 16px; }
+  #ch-dlg h3 { margin: 14px 0 6px; font-size: 14px; color: #a39578; text-transform: uppercase; letter-spacing: .06em; }
+  .ch-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #241f17; }
+  .ch-row .ch-n { flex: 1; } .ch-row .ch-n small { display: block; color: #8a7f68; font-size: 12px; }
+  .ch-st { color: #4ade80; font-size: 13px; }
+  #ch-dlg button:not(#ch-close) { font: 600 13px/1 system-ui, sans-serif; padding: 7px 12px; border: 1px solid #c9a227; border-radius: 6px;
+    background: #1d1912; color: #e8dcc0; cursor: pointer; }
+  #ch-dlg button:not(#ch-close):hover:not(:disabled) { background: #2a2217; color: #fff; }
+  #ch-dlg button:disabled { opacity: .35; cursor: default; }
+  #ch-dlg #sp-learn { display: block; margin: 0; font-size: 15px; color: #e8dcc0; }
+  #ch-dlg #sp-learn .ch-row button.all { margin-top: 8px; }
+  #ch-msg { color: #a39578; font-size: 13px; min-height: 1.4em; margin-top: 10px; }
   #sp-learn { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; color: #a39578; font-size: 11px; }
   #sp-learn:empty { display: none; }
   #sp-learn button { font: 11px/1 system-ui, sans-serif; padding: 3px 6px; border: 1px dashed #6d5a3a; border-radius: 4px;
@@ -368,13 +389,13 @@
     <div id="cheats"><label><input type="checkbox" id="cheat-hp"> Vie infinie</label>
       <label><input type="checkbox" id="cheat-mp"> Magie infinie</label>
       <label title="Chaque personnage prêt frappe le monstre devant le groupe, comme un clic sur son arme (monstres paisibles épargnés)"><input type="checkbox" id="cheat-auto"> Attaque auto</label>
-      <button type="button" id="cheat-money" title="Ajoute 100 couronnes d'argent au groupe">+100 couronnes</button></div>
+      <button type="button" id="cheat-money" title="Ajoute 100 couronnes d'argent au groupe">+100 couronnes</button>
+      <button type="button" id="ch-open" hidden title="Débloquer l'atlas, la boussole et les sorts">Triches…</button></div>
     <div id="spells" hidden>
       <div class="inv-head"><span class="inv-title">Magie</span>
         <label>Lanceur <select id="sp-caster"></select></label>
         <label id="sp-target-l" hidden title="Soin de niveau 1 à 3 : personnage soigné (niveau 4 : tout le groupe)">Soigner <select id="sp-target"></select></label></div>
       <div id="sp-list"></div>
-      <div id="sp-learn"></div>
       <div id="sp-msg"></div>
     </div>
   </div>
@@ -396,6 +417,19 @@
 <button id="persp" type="button" title="Perspective de la vue 3D : celle du jeu d'origine ou une perspective réelle"></button>
 <div id="mm-tip" hidden></div>
 <button id="sv-open" type="button" hidden title="Sauvegarder la partie ou charger une sauvegarde">Sauvegardes…</button>
+<dialog id="ch-dlg" aria-labelledby="ch-h">
+  <div class="cat-head"><h2 id="ch-h">Triches</h2><button type="button" id="ch-close" title="Fermer (Échap)">✕</button></div>
+  <div class="ch-body">
+    <h3>Objets</h3>
+    <div class="ch-row"><span class="ch-n">Atlas <small>carte automatique du jeu (livre à droite, sous la boussole)</small></span><span class="ch-st" id="ch-atlas-st"></span>
+      <button type="button" id="ch-atlas">Débloquer</button></div>
+    <div class="ch-row"><span class="ch-n">Boussole <small>en haut à droite de l'écran de jeu</small></span><span class="ch-st" id="ch-compass-st"></span>
+      <button type="button" id="ch-compass">Débloquer</button></div>
+    <h3>Sorts</h3>
+    <div id="sp-learn"></div>
+    <div id="ch-msg"></div>
+  </div>
+</dialog>
 <dialog id="bm-dlg" aria-labelledby="bm-title">
   <div class="cat-head"><h2 id="bm-title">Carte</h2><span id="bm-hint"></span><button type="button" id="bm-close" title="Fermer (Tab, Échap)">✕</button></div>
   <div class="bm-body"><canvas id="bm-canvas"></canvas></div>
@@ -681,7 +715,7 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261113n"></script>
+<script src="minimap.js?v=20261113o"></script>
 <script src="engine.js?v=20261113a"></script>
 </body>
 </html>

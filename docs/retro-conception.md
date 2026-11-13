@@ -864,6 +864,21 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     normaux.
   - **Vérifié** : Michael, Étincelle niveau 1 → magie 6 → 1. Le soin ciblé n'est pas testé, faute
     de sort de soin en début de partie.
+- **Fenêtre « Triches » : atlas, boussole, sorts** (version ScummVM, 2026-11-13 ; bouton « Triches… »).
+  - **Drapeaux** : l'atlas et la boussole sont des drapeaux de `_flagsTable[31]`, c'est-à-dire
+    les drapeaux d'histoire 252 et 254 (octet 31 de la table publiée en `0x3E55C`).
+    - 0x10 : l'atlas. `gui_drawPlayField` dessine le livre à droite, sous la boussole ;
+      `clickedAutomap` ne s'ouvre qu'avec ce drapeau ; `updateAutoMap` ne note les cases vues
+      qu'avec lui.
+    - 0x40 : la boussole, dessinée en haut à droite et mise à jour par `updateCompass`.
+    - (0x20 : le parchemin des sorts ; 0x08 : la lampe.)
+  - **Commande op 18** (a = masque 0x10 et / ou 0x40) : elle lève les drapeaux, note la case
+    courante dans la carte automatique, redessine le terrain de jeu et rétablit la luminosité.
+    Refusée pendant un dialogue ou une scène.
+  - **Sorts** : les 7 sorts du joueur, avec leur état (connu ou non) et un bouton « Apprendre »
+    (commande op 11). Ce déblocage quitte le panneau Magie.
+  - **Vérifié** : en début de partie, l'atlas puis la boussole sont débloqués et apparaissent dans
+    l'écran de jeu ; Soins est appris depuis la fenêtre.
 - **Barre de vie des monstres dans la vue 3D** (version ScummVM, 2026-11-13).
   - **Points de vie actuels** : champ `hitPoints` du monstre, à +29 de la fiche de 46 octets,
     soit +22 depuis x dans `readMonsters`.
@@ -1498,3 +1513,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : ScummVM web : fichiers de la fin (FRE/FINALE*.PAK) ajoutés, la fin du jeu ne plante plus (§ 10 bis).
 - **2026-11-13** : ScummVM web : choix des compagnons du groupe (§ 10 bis).
 - **2026-11-13** : vue 3D : barre de vie au-dessus des monstres (ScummVM) (§ 10 bis).
+- **2026-11-13** : fenêtre « Triches » : atlas, boussole et déblocage des sorts (ScummVM) (§ 10 bis).

@@ -1530,7 +1530,7 @@
     for (let t = 0; t < 7; t++) {
       const b = r[2].subarray(t * 46, t * 46 + 46), raw = b.subarray(16, 46), z = raw.indexOf(0);
       const name = cp850(z < 0 ? raw : raw.subarray(0, z)).trim();
-      if (!known.has(t) && name) missing.push({ type: t, name });
+      if (name) missing.push({ type: t, name, known: known.has(t) });
     }
     const party = partyChars(r[1]).map((c) => {
       const u16 = (k) => c.at(k) | c.at(k + 1) << 8, s16 = (k) => (u16(k) << 16) >> 16;
@@ -1549,22 +1549,30 @@
     renderSpells(spells);
     renderLearn(missing);
   }
-  function renderLearn(missing) {
-    if (!missing.length) { spLearn.replaceChildren(); return; }
+  // fenêtre « Triches » : les 7 sorts du joueur, connus ou à apprendre
+  function renderLearn(all) {
     const mk = (label, title, types, cls) => {
       const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.title = title;
       if (cls) b.className = cls;
       b.addEventListener("click", () => { b.blur(); learn(types).catch(() => {}); });
       return b;
     };
-    spLearn.replaceChildren("À débloquer :",
-      ...missing.map((s) => mk(s.name, `Apprendre ${s.name} (ajouté au parchemin des sorts, comme dans le jeu)`, [s.type])),
-      ...(missing.length > 1 ? [mk("Tout", "Apprendre tous les sorts manquants", missing.map((s) => s.type), "all")] : []));
+    const todo = all.filter((s) => !s.known);
+    spLearn.replaceChildren(...all.map((s) => {
+      const row = document.createElement("div"); row.className = "ch-row";
+      const n = document.createElement("span"); n.className = "ch-n"; n.textContent = s.name;
+      const st = document.createElement("span"); st.className = "ch-st"; st.textContent = s.known ? "✓ connu" : "";
+      const b = mk("Apprendre", `Apprendre ${s.name} (ajouté au parchemin des sorts, comme dans le jeu)`, [s.type]);
+      b.disabled = s.known;
+      row.append(n, st, b);
+      return row;
+    }), ...(todo.length > 1 ? [mk("Tout apprendre", "Apprendre tous les sorts manquants", todo.map((s) => s.type), "all")] : []));
   }
   async function learn(types) {
     let ok = 0, last = null;
+    const spMsg = document.getElementById("ch-msg");
     for (const t of types) {
-      spMsg.textContent = "Apprentissage…";
+      spMsg.textContent = `Apprentissage… (${ok + 1} / ${types.length}, animation du jeu)`;
       last = await mem.cmd({ op: "learn", a: t, b: +spCaster.value }, 20000);
       if (!last || last.code) break;
       ok++;
@@ -1643,6 +1651,42 @@
     setInterval(() => { if (!mix.hidden) readVols().catch(() => {}); }, 1000);
   }
 
+
+  // --- Fenêtre « Triches » : atlas, boussole, sorts (version ScummVM) -------------------------
+  // Atlas et boussole : drapeaux de _flagsTable[31] (0x10 atlas = carte automatique, 0x40 boussole),
+  // lus dans les drapeaux publiés (0x3E55C + 31) ; commande « unlock » (masque), puis le jeu
+  // redessine son terrain de jeu. Les sorts : renderLearn / learn (section Magie).
+  if (MANAGE) {
+    const chDlg = document.getElementById("ch-dlg"), chMsg = document.getElementById("ch-msg");
+    const chOpen = document.getElementById("ch-open");
+    chOpen.hidden = false;
+    const ITEMS_UNLOCK = [["ch-atlas", 0x10, "Atlas"], ["ch-compass", 0x40, "Boussole"]];
+    async function readUnlocks() {
+      const r = await mem.read([[FLAGS + 31, 1]]);
+      if (!r) return;
+      for (const [id, bit] of ITEMS_UNLOCK) {
+        const on = !!(r[0][0] & bit);
+        document.getElementById(id + "-st").textContent = on ? "✓ débloqué" : "";
+        document.getElementById(id).disabled = on;
+      }
+    }
+    for (const [id, bit, label] of ITEMS_UNLOCK) document.getElementById(id).addEventListener("click", async (e) => {
+      e.currentTarget.blur();
+      const r = await mem.cmd({ op: "unlock", a: bit }, 5000);
+      chMsg.textContent = !r ? "Le jeu ne répond pas (menu ou dialogue ouvert ?) : réessaie en exploration."
+        : r.code ? "Impossible maintenant (dialogue ou scène en cours)." : `${label} débloqué${label === "Boussole" ? "e" : ""}.`;
+      setTimeout(() => readUnlocks().catch(() => {}), 400);
+    });
+    chOpen.addEventListener("click", (e) => {
+      e.currentTarget.blur(); chMsg.textContent = ""; chDlg.showModal();
+      readUnlocks().catch(() => {}); spellKey = ""; updateSpells().catch(() => {});
+    });
+    setInterval(() => { if (chDlg.open) readUnlocks().catch(() => {}); }, 1000);
+    document.getElementById("ch-close").addEventListener("click", () => chDlg.close());
+    chDlg.addEventListener("click", (e) => { if (e.target === chDlg) chDlg.close(); });
+    chDlg.addEventListener("close", () => { const f = document.getElementById("dos"); if (f && f.focus) f.focus(); });
+    for (const ev of ["keydown", "keyup", "keypress"]) chDlg.addEventListener(ev, (e) => e.stopPropagation());
+  }
 
   // --- Sauvegardes : sauvegarder et charger (version ScummVM) -------------------------------
   // « listsaves » : le moteur relit les fichiers lol-fr.### et publie n° + nom (zone 0x7F000700 :
