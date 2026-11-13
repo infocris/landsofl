@@ -685,6 +685,12 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     modifié.
 - **Lancement.** `python3 -I tools/scummvm_web.py` sert la page sur le port 8001, puis :
   `http://localhost:8001/lol.html` (page complète) ou `lol-game.html` (jeu seul).
+  - Ce serveur sert aussi la version DOSBox (`index.html`, fichiers de `web/public`).
+  - **Choix du moteur** (`web/public/engine.js`) : sélecteur « Moteur DOSBox | ScummVM » au-dessus
+    du volume, dans les deux pages. Le moteur actuel est en surbrillance (`window.LOL_ENGINE`).
+    Un clic demande confirmation, puis charge l'autre page : `index.html` ou `lol.html`. Sur le
+    port 8000, `lol.html` est cherchée sur le port 8001. Si ce serveur ne répond pas, le bouton
+    est grisé. Les sauvegardes ne passent pas d'un moteur à l'autre.
   - La cible `lol-fr` vient du `scummvm.ini` écrit par le script : chemin du jeu, `language=fr`.
     Sans la langue, le jeu est détecté en anglais et cherche `ENG/`.
   - Le navigateur ne télécharge ce `scummvm.ini` qu'au premier lancement, puis garde sa copie
@@ -1275,3 +1281,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-10** : ScummVM web : animations d'attaque des monstres, image du jeu dans la vue 3D (cinématiques, dialogues, lieux), musique en pause dans le menu ; volume général (§ 10 bis).
 - **2026-11-10** : vue 3D : objets posés au sol (images du jeu) (§ 10 bis).
 - **2026-11-10** : vue 3D : giclées des coups sur les monstres ; recopie de l'image du jeu retirée. Correctif : une erreur de syntaxe dans la page ScummVM désactivait la vie infinie, l'inventaire et les couronnes (§ 10 bis).
+- **2026-11-13** : sélecteur du moteur d'émulation (DOSBox / ScummVM) dans les deux pages (§ 10 bis).

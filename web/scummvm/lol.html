@@ -165,10 +165,18 @@
   #vol-label { cursor: pointer; user-select: none; }
   #vol input { width: 90px; accent-color: #c9a227; }
   body:has(#mm:not(.hidden)) #vol { right: calc(var(--mm-w) + 12px); }
+  #engine { position: fixed; right: 12px; bottom: 228px; z-index: 1000; display: flex; align-items: center; gap: 2px;
+    font: 12px/1 system-ui, sans-serif; padding: 3px 4px 3px 8px; border: 1px solid #555; border-radius: 6px; background: rgba(0,0,0,.6); color: #a39578; }
+  #engine .eng-title { margin-right: 4px; }
+  #engine button { font: inherit; padding: 3px 7px; border: 1px solid transparent; border-radius: 4px; background: none; color: #aaa; cursor: pointer; }
+  #engine button:hover:not(:disabled):not(.on) { color: #fff; border-color: #555; }
+  #engine button.on { color: #c9a227; border-color: #c9a227; cursor: default; }
+  #engine button:disabled { opacity: .35; cursor: not-allowed; }
+  body:has(#mm:not(.hidden)) #engine { right: calc(var(--mm-w) + 12px); }
   #v3dtoggle { position: fixed; right: 12px; bottom: 120px; z-index: 1000;
     font: 12px/1 system-ui, sans-serif; padding: 6px 10px; border: 1px solid #555; border-radius: 6px;
     background: rgba(0,0,0,.6); color: #aaa; cursor: pointer; }
-  @media (max-width: 800px) { #mm { display: none; } #zqsd, #mmtoggle, #qload, #v3dtoggle { right: 12px !important; } }
+  @media (max-width: 800px) { #mm { display: none; } #zqsd, #mmtoggle, #qload, #v3dtoggle, #engine { right: 12px !important; } }
   #zqsd {
     position: fixed; right: 12px; bottom: 12px; z-index: 1000;
     font: 12px/1 system-ui, sans-serif; padding: 6px 10px;
@@ -273,5 +281,6 @@ window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes
 })();
 </script>
 <script src="minimap.js?v=20261110g"></script>
+<script src="engine.js?v=20261113a"></script>
 </body>
 </html>
