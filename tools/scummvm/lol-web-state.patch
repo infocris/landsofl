@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..d604ad2a 100644
+index 392e4c2d..430aed72 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -39,6 +39,10 @@
@@ -13,7 +13,7 @@ index 392e4c2d..d604ad2a 100644
  namespace Kyra {
  
  const char *const LoLEngine::kMouseKeymapName = "lolmouse";
-@@ -929,6 +933,402 @@ void LoLEngine::startupNew() {
+@@ -929,6 +933,420 @@ void LoLEngine::startupNew() {
  	_screen->showMouse();
  }
  
@@ -288,6 +288,24 @@ index 392e4c2d..d604ad2a 100644
 +		gui_drawCharPortraitWithStats(a);
 +		return 0;
 +	}
++	if (op == 13) {	// téléportation dans le niveau : case a, direction b (0-3, sinon inchangée)
++		// comme olol_setGlobalVar(0) des scripts (téléporteurs), puis la scène est redessinée
++		if (a < 0 || a > 1023 || (_updateFlags & 0x0F) || _weaponsDisabled || _activeMagicMenu != -1)
++			return 1;
++		for (int i = 0; i < 4; i++)	// case pleine (mur sur ses quatre faces) : refusée
++			if (!(_wllWallFlags[_levelBlockProperties[a].walls[i]] & 7))
++				break;
++			else if (i == 3)
++				return 1;
++		completeDoorOperations();
++		_currentBlock = a;
++		if (b >= 0 && b < 4)
++			_currentDirection = b;
++		calcCoordinates(_partyPosX, _partyPosY, _currentBlock, 0x80, 0x80);
++		updateAutoMap(_currentBlock);
++		gui_drawScene(0);
++		return 0;
++	}
 +	if (op == 12) {	// volume a (0 musique, 1 effets, 2 voix) à b (2 = coupé … 102), comme le menu « Contrôles audio »
 +		if (a < 0 || a > 2 || b < 2 || b > 102)
 +			return 1;
@@ -416,7 +434,7 @@ index 392e4c2d..d604ad2a 100644
  void LoLEngine::runLoop() {
  	// Initialize debugger since how it should be fully usable
  	static_cast<Debugger_LoL *>(getDebugger())->initialize();
-@@ -957,6 +1357,7 @@ void LoLEngine::runLoop() {
+@@ -957,6 +1375,7 @@ void LoLEngine::runLoop() {
  		gui_updateInput();
  
  		update();
@@ -424,7 +442,7 @@ index 392e4c2d..d604ad2a 100644
  
  		updatePlayTimer();
  
-@@ -1477,6 +1878,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
+@@ -1477,6 +1896,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
  
  	int newVal = (mode == 2) ? (pointsMax + points) : (mode ? (pointsCur + points) : points);
  	newVal = CLIP(newVal, 0, pointsMax);
@@ -433,7 +451,7 @@ index 392e4c2d..d604ad2a 100644
  
  	if (type) {
  		c->magicPointsCur = newVal;
-@@ -2074,6 +2477,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
+@@ -2074,6 +2495,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
  
  void LoLEngine::delay(uint32 millis, bool doUpdate, bool) {
  	while (millis && !shouldQuit()) {
@@ -441,7 +459,7 @@ index 392e4c2d..d604ad2a 100644
  		if (doUpdate)
  			update();
  		else
-@@ -2092,6 +2496,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
+@@ -2092,6 +2514,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
  // spells
  
  int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {

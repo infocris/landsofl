@@ -848,6 +848,23 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     normaux.
   - **Vérifié** : Michael, Étincelle niveau 1 → magie 6 → 1. Le soin ciblé n'est pas testé, faute
     de sort de soin en début de partie.
+- **Téléportation** (version ScummVM, 2026-11-13).
+  - **Dans le niveau** : commande op 13 (a = case, b = direction ou -1). Elle fait comme
+    `olol_setGlobalVar(0, …)`, utilisé par les téléporteurs des scripts : `_currentBlock`,
+    `calcCoordinates(… 0x80, 0x80)` et `updateAutoMap`, plus `completeDoorOperations`, puis la
+    scène est redessinée (`gui_drawScene(0)`). Aucun script de case n'est lancé à l'arrivée.
+  - **Refus** : case pleine (les quatre faces ont `_wllWallFlags & 7`), dialogue ou scène
+    (`_updateFlags & 0x0F`), commandes désactivées ou menu de magie ouvert.
+  - **Vers un autre niveau** : la commande op 4, déjà présente (comme `olol_loadNewLevel`).
+  - **Page** :
+    - double-clic sur une case explorée et non pleine de la mini-carte ;
+    - double-clic sur un lieu de la liste ;
+    - sélecteur « Aller à » (niveau, puis lieu ou passage). La case libre la plus proche du lieu
+      est choisie : grille vivante pour le niveau courant, carte d'origine pour les autres.
+  - **Vérifié** :
+    - Gladstone 13,17 → Fontaine (12,12) ;
+    - double-clic 13,17 → 13,15 ;
+    - « Aller à » Forêt du Nord → niveau 2, case 13,1.
 - **Volumes du jeu** (version ScummVM, 2026-11-13) : bouton ⚙ à côté du volume général, avec
   trois curseurs, Musique, Effets et Voix.
   - **Lecture** : le moteur publie `getVolume(musique, effets, voix)` en zone `0x7F000600`
@@ -1386,3 +1403,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : ScummVM web : déblocage des sorts du joueur depuis la page (§ 10 bis).
 - **2026-11-13** : ScummVM web : mode attaque automatique (§ 10 bis).
 - **2026-11-13** : ScummVM web : volumes musique, effets et voix dans la page (§ 10 bis).
+- **2026-11-13** : ScummVM web : téléportation (mini-carte, lieux, sélecteur de niveau) (§ 10 bis).

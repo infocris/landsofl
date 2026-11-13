@@ -155,6 +155,13 @@
         showTip(`<b>Lieu ${p.n} : ${escHtml(niceName(p.text))}</b> <span class="t">· case ${p.x},${p.y}</span>` + placeFigure(L, p), r.right, r.top);
       });
       li.addEventListener("mouseleave", () => { hoverCell = -1; draw(lastDraw[0], lastDraw[1]); tipEl.hidden = true; });
+      if (MANAGE) {                             // double-clic : téléportation près du lieu
+        li.title = "Double-clic : téléporter le groupe à ce lieu";
+        li.addEventListener("dblclick", () => {
+          const b = freeNear(L, p.x, p.y, (i) => opaque(L, i) && cellClass(L, i) !== "doorClosed");
+          if (b >= 0) teleport(L.level, b, niceName(p.text));
+        });
+      }
       placesEl.appendChild(li);
     }
   }
@@ -1868,6 +1875,87 @@
   window.LoLMinimap = { attach() {}, preview, monsters: debugMonsters, spriteChoice };
 
   setInterval(() => { updateInventory().catch(() => {}); }, 1000);
-  loadLevels().then(() => setInterval(tick, 200),
+
+  // --- Téléportation (version ScummVM) -------------------------------------------------
+  // Dans le niveau : commande « teleport » (case, comme olol_setGlobalVar(0) des scripts,
+  // direction conservée) ; vers un autre niveau : « goto » (chargement du niveau, comme
+  // olol_loadNewLevel). Destination : une case du niveau, ou la case libre la plus proche d'un lieu.
+  let levelsLoaded = false;
+  const tpBox = document.getElementById("mm-tp"), tpLevel = document.getElementById("tp-level");
+  const tpPlace = document.getElementById("tp-place"), tpMsg = document.getElementById("tp-msg");
+  function solidStatic(L, i) {             // mur sur les 4 faces dans la carte d'origine
+    let n = 0;
+    for (let f = 0; f < 4; f++) { const t = L.wallTypes[L.faces[i * 4 + f]]; if (t && (t[0] & 1)) n++; }
+    return n === 4;
+  }
+  function freeNear(L, x, y, solid) {
+    for (let r = 0; r < 6; r++)
+      for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const cx = x + dx, cy = y + dy;
+        if (cx >= 0 && cy >= 0 && cx < 32 && cy < 32 && !solid(cy * 32 + cx)) return cy * 32 + cx;
+      }
+    return -1;
+  }
+  let tpBusy = false;
+  async function teleport(level, block, label) {
+    if (tpBusy) return;
+    tpBusy = true; tpMsg.textContent = "…";
+    try {
+      const same = current && level === current.level;
+      const r = await mem.cmd(same ? { op: "teleport", a: block, b: -1 } : { op: "goto", a: level, b: block }, same ? 3000 : 15000);
+      tpMsg.textContent = !r ? "le jeu ne répond pas (menu ou dialogue ouvert ?)"
+        : r.code ? "impossible ici (case pleine, dialogue ou menu ouvert)" : `→ ${label || `case ${block % 32},${block >> 5}`}`;
+    } finally { tpBusy = false; setTimeout(() => { if (!tpBusy) tpMsg.textContent = ""; }, 4000); }
+  }
+  function fillTpPlaces() {
+    const L = levels.find((l) => l.level === +tpLevel.value);
+    const opts = [];
+    if (L) for (const p of L.places) opts.push([p.x, p.y, niceName(p.text)]);
+    for (const e of (L && L.exits) || []) if (!e.teleport && e.level) {
+      const to = levels.find((l) => l.level === e.level);
+      opts.push([e.x, e.y, `passage vers ${to ? to.fr : "niveau " + e.level}`]);
+    }
+    tpPlace.replaceChildren(...(opts.length ? opts : [[-1, -1, "entrée du niveau"]]).map(([x, y, t]) => {
+      const o = document.createElement("option"); o.value = `${x},${y}`; o.textContent = t; return o;
+    }));
+  }
+  if (MANAGE) {
+    tpBox.hidden = false;
+    const ready = () => {             // une fois toutes les cartes chargées
+      if (!levelsLoaded) return setTimeout(ready, 500);
+      tpLevel.replaceChildren(...levels.map((L) => { const o = document.createElement("option"); o.value = L.level; o.textContent = `${L.level}. ${L.fr}`; return o; }));
+      if (current) tpLevel.value = current.level;
+      fillTpPlaces();
+    };
+    ready();
+    tpLevel.addEventListener("change", () => { fillTpPlaces(); tpLevel.blur(); });
+    tpPlace.addEventListener("change", () => tpPlace.blur());
+    document.getElementById("tp-go").addEventListener("click", (e) => {
+      e.currentTarget.blur();
+      const L = levels.find((l) => l.level === +tpLevel.value);
+      if (!L) return;
+      let [x, y] = tpPlace.value.split(",").map(Number);
+      const same = current === L;
+      const solid = same ? (i) => opaque(L, i) && cellClass(L, i) !== "doorClosed" : (i) => solidStatic(L, i);
+      let block = -1;
+      if (x >= 0) block = freeNear(L, x, y, solid);
+      else for (let i = 0; i < 1024 && block < 0; i++) if (!solid(i) && L.faces.slice(i * 4, i * 4 + 4).some((v) => v)) block = i;
+      if (block < 0) { tpMsg.textContent = "pas de case libre trouvée"; return; }
+      teleport(L.level, block, tpPlace.selectedOptions[0] ? tpPlace.selectedOptions[0].textContent : "");
+    });
+    canvas.addEventListener("dblclick", (e) => {
+      if (!current) return;
+      const r = canvas.getBoundingClientRect();
+      const x = Math.floor(((e.clientX - r.left) / r.width * SIZE + Math.round(view[0])) / CELL);
+      const y = Math.floor(((e.clientY - r.top) / r.height * SIZE + Math.round(view[1])) / CELL);
+      if (x < 0 || y < 0 || x > 31 || y > 31) return;
+      const i = y * 32 + x;
+      if (!visible(current, i)) { tpMsg.textContent = "case inexplorée"; return; }
+      if (opaque(current, i) && cellClass(current, i) !== "doorClosed") { tpMsg.textContent = "case pleine"; return; }
+      teleport(current.level, i);
+    });
+  }
+  loadLevels().then(() => { levelsLoaded = true; setInterval(tick, 200); },
     (e) => { infoEl.textContent = "cartes introuvables (viewer/data) : " + e.message; });
 })();

@@ -205,6 +205,12 @@
   #mm-title #mm-tex.on, #mm-title #mm-fog.on { border-color: #c9a227; color: #c9a227; }
   #mm-title #mm-fog, #mm-title #mm-forget { width: 28px; }
   #mm-info { color: #a39578; min-height: 1.4em; }
+  #mm-tp { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; color: #a39578; font-size: 11px; }
+  #mm-tp[hidden] { display: none; }
+  #mm-tp select { font: 11px system-ui, sans-serif; background: #17130e; color: #e8dcc0; border: 1px solid #554a36; border-radius: 4px; padding: 2px 3px; max-width: 150px; }
+  #mm-tp button { font: 11px/1 system-ui, sans-serif; padding: 3px 7px; border: 1px solid #c9a227; border-radius: 4px; background: #1d1912; color: #e8dcc0; cursor: pointer; }
+  #mm-tp button:hover { background: #2a2217; color: #fff; }
+  #tp-msg { color: #8a7f68; }
   #mm-canvas { width: var(--mm-size); height: var(--mm-size); align-self: center; border: 1px solid #3a3226; flex: none; }
   #mm-label { color: #c9a227; font-weight: 600; letter-spacing: .04em; min-height: 1.4em; }
   #mm-legend { color: #a39578; font-size: 11px; }
@@ -273,6 +279,8 @@
 <aside id="mm" aria-label="Mini-carte">
   <div id="mm-title"><span>Mini-carte</span><button id="mm-tex" type="button" title="Cases illustrées avec les textures du lieu / couleurs simples">▦</button><button id="mm-fog" type="button" title="Exploration progressive : n'afficher que les cases déjà vues / toute la carte">◐</button><button id="mm-forget" type="button" title="Oublier l'exploration de ce niveau (nouvelle partie)" disabled>↺</button><button id="mm-center" type="button" title="Centrer automatiquement la carte sur le groupe / carte fixe">⌖</button><span class="mm-grp" title="Taille de la carte à l'écran">Taille</span><button id="mm-smaller" type="button" title="Réduire la mini-carte">−</button><button id="mm-bigger" type="button" title="Agrandir la mini-carte">+</button><span class="mm-grp" title="Zoom (aussi : molette sur la carte)">Zoom</span><button id="mm-zout" type="button" title="Dézoomer (molette)">−</button><button id="mm-zin" type="button" title="Zoomer (molette)">+</button></div>
   <div id="mm-info">chargement…</div>
+  <div id="mm-tp" hidden><span>Aller à</span><select id="tp-level" aria-label="Niveau"></select><select id="tp-place" aria-label="Lieu"></select>
+    <button type="button" id="tp-go" title="Téléporter le groupe (aussi : double-clic sur une case de la carte ou sur un lieu de la liste)">Téléporter</button><span id="tp-msg"></span></div>
   <canvas id="mm-canvas"></canvas>
   <div id="mm-label"></div>
   <div id="mm-legend"><i style="background:#8a7f68"></i>sol<i style="background:#2b2b2b;outline:1px solid #555"></i>mur<i style="background:#a0522d"></i>porte fermée<i style="background:#d08a4a"></i>ouverte<i style="background:#d22"></i>lieu<i style="background:#28dce6"></i>objets<i style="background:none;border:2px solid #ffd700;border-radius:50%;width:5px;height:5px"></i>serrure<i style="background:#8b5a2b;border-top:2px solid #ffd700;height:5px"></i>coffre<i style="background:#8fe3ff;clip-path:polygon(50% 0,100% 100%,0 100%)"></i>monte<i style="background:#c58cff;clip-path:polygon(0 0,100% 0,50% 100%)"></i>descend<i style="background:#111;border:1px solid #9a9a9a;border-radius:50%"></i>trou<i style="background:#fff;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)"></i>passage<i style="background:radial-gradient(circle,#fff 0,#ff4fd8 40%,#5a0078 100%);border-radius:50%"></i>téléporteur<i style="background:#7cfc00;height:4px"></i>levier<i style="background:#c77dff;border-radius:50%;width:6px;height:6px"></i>cliquable<i style="background:linear-gradient(135deg,transparent 40%,#ff7a1a 40%,#ff7a1a 60%,transparent 60%)"></i>mur fragile<i style="background:#2f6b5c;outline:1px dashed #5ef2c2;outline-offset:-1px"></i>passage caché<i style="background:#4ade80;border-radius:50%"></i>paisible<i style="background:#ff3b30;border-radius:50%"></i>hostile<i style="background:#ff8c00;border-radius:50%"></i>autre</div>
@@ -575,7 +583,7 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261113g"></script>
+<script src="minimap.js?v=20261113h"></script>
 <script src="engine.js?v=20261113a"></script>
 </body>
 </html>
