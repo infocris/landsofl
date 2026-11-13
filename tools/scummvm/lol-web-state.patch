@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..18ec873b 100644
+index 392e4c2d..10633727 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -32,6 +32,7 @@
@@ -21,7 +21,7 @@ index 392e4c2d..18ec873b 100644
  namespace Kyra {
  
  const char *const LoLEngine::kMouseKeymapName = "lolmouse";
-@@ -929,6 +934,519 @@ void LoLEngine::startupNew() {
+@@ -929,6 +934,521 @@ void LoLEngine::startupNew() {
  	_screen->showMouse();
  }
  
@@ -159,9 +159,11 @@ index 392e4c2d..18ec873b 100644
 +		for (int k = 0; k < 30; k++) u8(n && k < (int)strlen(n) ? (uint8)n[k] : 0);
 +	}
 +	end();
-+	// points de vie maximum des 5 types de monstres du niveau (u16 ; type = champ +32 du monstre)
++	// points de vie maximum des 5 types de monstres du niveau (u16 ; type = champ +32 du monstre),
++	// puis leurs drapeaux (u16 ; 0x800 = translucide, 0x200 = image retournée, 0xC000 = sang)
 +	begin(0x7F000900);
 +	for (int t = 0; t < 5; t++) u16(_monsterProperties ? _monsterProperties[t].hitPoints : 0);
++	for (int t = 0; t < 5; t++) u16(_monsterProperties ? _monsterProperties[t].flags : 0);
 +	end();
 +	// personnages prédéfinis (table de addCharacter) : nombre u8, puis id i16 + nom 11 octets + raceClassSex
 +	begin(0x7F000800);
@@ -541,7 +543,7 @@ index 392e4c2d..18ec873b 100644
  void LoLEngine::runLoop() {
  	// Initialize debugger since how it should be fully usable
  	static_cast<Debugger_LoL *>(getDebugger())->initialize();
-@@ -957,6 +1475,7 @@ void LoLEngine::runLoop() {
+@@ -957,6 +1477,7 @@ void LoLEngine::runLoop() {
  		gui_updateInput();
  
  		update();
@@ -549,7 +551,7 @@ index 392e4c2d..18ec873b 100644
  
  		updatePlayTimer();
  
-@@ -1178,6 +1697,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
+@@ -1178,6 +1699,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
  	return size;
  }
  
@@ -647,7 +649,7 @@ index 392e4c2d..18ec873b 100644
  bool LoLEngine::addCharacter(int id) {
  	const uint16 *cdf[] = {
  		_charDefsMan, _charDefsMan, _charDefsMan, _charDefsWoman,
-@@ -1477,6 +2087,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
+@@ -1477,6 +2089,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
  
  	int newVal = (mode == 2) ? (pointsMax + points) : (mode ? (pointsCur + points) : points);
  	newVal = CLIP(newVal, 0, pointsMax);
@@ -656,7 +658,7 @@ index 392e4c2d..18ec873b 100644
  
  	if (type) {
  		c->magicPointsCur = newVal;
-@@ -2074,6 +2686,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
+@@ -2074,6 +2688,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
  
  void LoLEngine::delay(uint32 millis, bool doUpdate, bool) {
  	while (millis && !shouldQuit()) {
@@ -664,7 +666,7 @@ index 392e4c2d..18ec873b 100644
  		if (doUpdate)
  			update();
  		else
-@@ -2092,6 +2705,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
+@@ -2092,6 +2707,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
  // spells
  
  int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {

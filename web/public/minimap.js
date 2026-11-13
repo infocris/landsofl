@@ -1033,11 +1033,12 @@
       // ScummVM : image de chaque monstre telle que le jeu la dessine (attaques, coups, marche)
       // + giclée d'un coup reçu : réduction 1-4 (0 = aucune), couleur 0-3, décalage hitOffsX/Y
       // + points de vie maximum du type (zone 0x7F000900 : 5 × u16) pour la barre de vie de la vue 3D
-      const f = await mem.read([[0x7F000200, 120], [0x7F000900, 10]]);
+      const f = await mem.read([[0x7F000200, 120], [0x7F000900, 20]]);
       if (f) for (const m of monsters) {
         const k = m.slot * 4;
         m.frame = f[0][k]; m.flip = !!f[0][k + 1]; m.blood = f[0][k + 2]; m.bloodType = f[0][k + 3];
         m.hpMax = m.type < 5 ? f[1][m.type * 2] | f[1][m.type * 2 + 1] << 8 : 0;
+        m.translucent = m.type < 5 && !!(f[1][10 + m.type * 2 + 1] & 0x08);    // drapeau 0x800 du type
       }
     }
     const inScene = r[4][0] === 1;

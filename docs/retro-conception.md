@@ -897,6 +897,41 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
   - **Vérifié** : en début de partie, l'atlas puis la boussole sont débloqués et apparaissent dans
     l'écran de jeu ; Soins est appris depuis la fenêtre. Le livre de sorts débloqué fait apparaître
     le parchemin, avec Étincelle.
+- **Monstres translucides** (2026-11-14 ; ex. TCABAL, niveau 27).
+  - **Drapeau** : le type de monstre a le bit 0x800 (`LoLMonsterProperty::flags`, 28ᵉ argument
+    de `olol_loadMonsterProperties`, fonction de script 0x3F). `drawMonster` passe alors
+    `flg |= 0x20`, et `drawDoorOrMonsterEquipment` dessine avec 0x1000 et les tables de
+    transparence (`drawShapePlotType21`).
+  - **Statique** : dans le script, cet argument est calculé et ne se lit pas en statique. Le moteur
+    publie donc les drapeaux des 5 types en zone `0x7F000900` + 10 (5 × u16).
+  - **Vérifié** au niveau 27 : type 1 (TCABAL) 0xF810, translucide ; type 2 (HATCHETS) 0xE000,
+    opaque, bien que ses couleurs soient aussi entièrement entre 2 et 20.
+  - **Tables** : `LEVELnn.TLC` (chargé par `loadLevelGraphics`), T1 de 256 octets puis T2 de
+    20 × 256.
+  - **Rendu dans le jeu** (`drawShapePlotType21`), pour chaque pixel :
+    1. couleur c (table de couleurs du dessin) ;
+    2. t = T1[c] ; si t < 0x80, la couleur devient T2[t × 256 + couleur du décor]. Les couleurs 2 à
+       20 donnent t = 1 à 19 ; la couleur 0 donne t = 0, la ligne identité, donc rien ;
+    3. puis la surcouche de luminosité de la distance (table d'atténuation), appliquée au résultat ;
+    4. si le résultat est non nul, il est dessiné.
+  - **Vue 3D** : la planche `levelNN_ghost.png` est exportée pour les sprites dont au moins 50 %
+    des pixels sont entre 2 et 20.
+    - Chaque indice t y est approché par « teinte + opacité » : moindres carrés de
+      `(1 - a) × décor + a × teinte` sur les 256 couleurs du décor. On obtient a ≈ 0,35, avec un
+      écart d'environ 22/255.
+    - Le mélange avec le décor se fait au dessin, puis l'assombrissement par la distance.
+    - La planche n'est utilisée que pour les monstres translucides : drapeau du moteur sous
+      ScummVM, liste `TRANSLUCENT_KNOWN` = {TCABAL} sous DOSBox.
+  - **Reste** : la teinte obtenue est plus grise que dans le jeu, où les TCABAL paraissent
+    bleutés. L'approximation linéaire de T2 ne rend pas cette nuance ; à revoir.
+  - **Surcouches de luminosité** (`generateOverlay`, notées pour référence) :
+    - surcouche i (0 à 6) : chaque couleur est mélangée à (100 - i × W) % vers la « couleur
+      spéciale », puis remplacée par la plus proche des couleurs 1 à 127 autre qu'elle-même ;
+    - couleurs 128 à 255 inchangées ; surcouche 7 = identité ;
+    - couleur spéciale et W : arguments 2 et 3 de `olol_loadLevelGraphics` (fonction 0x09), par
+      exemple 1 et 12 au niveau 27 ;
+    - choix de la surcouche d'un monstre (`drawItemOrMonster`) : `r = 7 - (couche / 3 - 1)`,
+      avec couche = profondeur / 32, soit 8 couches par case.
 - **Barre de vie des monstres dans la vue 3D** (version ScummVM, 2026-11-13).
   - **Points de vie actuels** : champ `hitPoints` du monstre, à +29 de la fiche de 46 octets,
     soit +22 depuis x dans `readMonsters`.
@@ -1537,3 +1572,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : page DOSBox : le bouton ZQSD revient avec les autres boutons, en bas à droite (plus de placement à côté des flèches du jeu).
 - **2026-11-13** : attaque auto : arme ou sort (niveau max possible) par personnage (ScummVM) (§ 10 bis).
 - **2026-11-13** : inventaire : bouton « Vider » (ScummVM) ; chaque case occupée du sac est détruite par la commande op 2 (`deleteItem`), avec confirmation. Vérifié : 3 objets détruits, l'équipement est gardé.
+- **2026-11-14** : vue 3D : monstres translucides (TCABAL) rendus translucides ; drapeaux des types publiés par le moteur ; tables LEVELnn.TLC décodées (§ 10 bis).

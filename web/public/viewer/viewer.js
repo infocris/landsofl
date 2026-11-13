@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261110c";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261114c";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) FOV = 2 * Math.atan(1.375);
   let dirty = true;
@@ -180,6 +180,15 @@
     if (!EMBED) store.set("level", n);
     dirty = true;
     drawMapBase();
+    // planche translucide (monstres à drapeau 0x800), assombrie par la distance comme les autres
+    // sprites ; chargée après le niveau, sans bloquer le rendu (version opaque en attendant)
+    L.ghostImgs = null;
+    if (L.ghostRects && L.ghostRects.length) {
+      loadImage(`data/level${nn}_ghost.png?v=${DATA_V}`).then((gimg) => {
+        if (L !== data) return;
+        data.ghostImgs = darken(gimg, SHADES); dirty = true;
+      }, () => {});
+    }
   }
 
   // --- Grille -----------------------------------------------------------------
@@ -582,7 +591,22 @@
   // table de l'image 16 du sprite) et jusqu'à 4 pièces d'équipement dessinées par-dessus le corps
   // (images 17 + jeu * 16 + image). L'image composée et ses niveaux d'ombre sont gardés en cache.
   // -> { imgs, rx, ry, rw, rh } (planche commune quand le monstre n'a ni variante ni équipement).
+  // Monstres translucides (drapeau 0x800 du type, publié par le moteur ScummVM ; sous DOSBox, liste
+  // de l'export) : planche translucide (export : tables LEVELnn.TLC, indices de transparence en
+  // teinte + opacité), sans variantes de couleurs ni équipement.
+  function ghostIds(name, m) {
+    const g = L.spriteGhost && L.spriteGhost[name];
+    if (!g) return null;
+    const on = m.translucent !== undefined ? m.translucent : (L.spriteGhostAuto || []).includes(name);
+    return on ? g : null;
+  }
   function monsterLook(name, ids, pose, m) {
+    const gh = L.ghostImgs ? ghostIds(name, m) : null;
+    if (gh) {
+      const engineFrame0 = m.frame !== undefined && m.frame !== 255 && gh.length >= 16;
+      const gid = engineFrame0 ? gh[m.frame] ?? gh[0] : spriteFrame(gh, pose, m), gr = L.ghostRects[gid];
+      if (gr) return { imgs: L.ghostImgs, rx: gr[0], ry: gr[1], rw: gr[2], rh: gr[3] };
+    }
     // image dessinée par le jeu (version ScummVM : attaques, coups, marche), sinon choisie ici
     const engineFrame = m.frame !== undefined && m.frame !== 255 && ids.length >= 16;
     const id = engineFrame ? ids[m.frame] ?? ids[0] : spriteFrame(ids, pose, m), rect = L.spriteRects[id];

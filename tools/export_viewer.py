@@ -40,6 +40,12 @@ class Image:
             self.px[o:o + 3] = rgb
             self.px[o + 3] = 255
 
+    def put_rgba(self, x, y, rgb, a):
+        if 0 <= x < self.w and 0 <= y < self.h:
+            o = (y * self.w + x) * 4
+            self.px[o:o + 3] = rgb
+            self.px[o + 3] = a
+
     def alpha(self, x, y):
         return self.px[(y * self.w + x) * 4 + 3]
 
@@ -48,7 +54,7 @@ class Image:
             for x in range(other.w):
                 o = (y * other.w + x) * 4
                 if other.px[o + 3]:
-                    self.put(dx + x, dy + y, other.px[o:o + 3])
+                    self.put_rgba(dx + x, dy + y, other.px[o:o + 3], other.px[o + 3])
 
     def save(self, path):
         lolgfx.write_png_rgba(path, self.w, self.h, self.px)
@@ -111,6 +117,66 @@ def frame_image(frame, pal):
         if c is not None:
             img.put(i % w, i // w, rgb(pal, c))
     return img
+
+
+# Monstres translucides (propriété 0x800, ex. TCABAL) : le jeu (drawShapePlotType21) prend la
+# couleur c du sprite comme indice de transparence t = T1[c] (couleurs 2 à 20 -> t = 1 à 19 ;
+# t >= 0x80 : couleur opaque) et affiche T2[t * 256 + couleur du décor]. Tables du niveau :
+# LEVELnn.TLC (T1 : 256 octets, T2 : 20 × 256). Pour la vue 3D, chaque t est approché par un
+# mélange « teinte + opacité » : résultat = (1 - a) × décor + a × teinte (moindres carrés sur les
+# 256 couleurs du décor, a commun aux trois composantes).
+def transparency_fit(tlc, pal):
+    t1, t2 = tlc[:256], tlc[256:]
+    P = [rgb(pal, c) for c in range(256)]
+    fit = {}
+    for t in range(1, 20):
+        xs = P; ys = [P[t2[t * 256 + bg]] for bg in range(256)]
+        n = len(xs)
+        mx = [sum(p[c] for p in xs) / n for c in range(3)]
+        my = [sum(p[c] for p in ys) / n for c in range(3)]
+        num = sum((xs[i][c] - mx[c]) * (ys[i][c] - my[c]) for i in range(n) for c in range(3))
+        den = sum((xs[i][c] - mx[c]) ** 2 for i in range(n) for c in range(3)) or 1
+        k = max(0.0, min(1.0, num / den)); a = 1 - k
+        tint = bytes(max(0, min(255, round((my[c] - k * mx[c]) / a))) if a > 1e-3 else 0 for c in range(3))
+        fit[t] = (tint, max(1, min(255, round(a * 255))))
+    return t1, fit
+
+
+def ghost_image(frame, pal, t1, fit):
+    """Image du sprite telle que le jeu la dessine en translucide (drawShapePlotType21) : indice de
+    transparence -> teinte semi-opaque (mélangée au décor par la vue 3D) ; sinon couleur opaque.
+    La surcouche de luminosité (distance) s'applique ensuite au résultat, dans le jeu comme dans la
+    vue 3D (assombrissement par la distance)."""
+    w, h, px = frame
+    img = Image(w, h)
+    for i, c in enumerate(px):
+        if not c:
+            continue
+        t = t1[c]
+        if t < 0x80 and t in fit:
+            img.put_rgba(i % w, i // w, *fit[t])
+        else:
+            img.put(i % w, i // w, rgb(pal, c))
+    return img
+
+
+# Sprites dont le type a le drapeau translucide 0x800, vérifié dans le moteur (ScummVM : drapeaux
+# publiés en 0x7F000900) : TCABAL (niveau 27, type 1 : 0xF810). La version DOSBox n'a pas ce
+# drapeau ; elle s'appuie sur cette liste. (HATCHETS, entièrement dans les mêmes couleurs, n'est
+# pas translucide : 0xE000 ; le drapeau, calculé dans le script du niveau, ne se lit pas en statique.)
+TRANSLUCENT_KNOWN = {"TCABAL"}
+
+
+def translucent_share(frames):
+    """Part des pixels du sprite (images 0-15) dans les couleurs d'indice de transparence (2 à 20)."""
+    tot = tr = 0
+    for f in frames[:16]:
+        if not f:
+            continue
+        for c in f[2]:
+            if c:
+                tot += 1; tr += 2 <= c <= 20
+    return tr / tot if tot else 0
 
 
 def mirrored(src):
@@ -492,6 +558,10 @@ def main(game_dir, maps_dir, out_dir):
         sprite_names = sorted({s for m in level["monsters"] for s in m["sprites"]})
         sprite_sigs, sprite_variants, sprite_equip = {}, {}, {}
         sprites, sprite_imgs = {}, []
+        sprite_ghost, ghost_auto = {}, []
+        tlc = files.get(f"LEVEL{n}.TLC")
+        tfit = transparency_fit(tlc, pal) if tlc and len(tlc) >= 256 + 20 * 256 else None
+        ghost_imgs = []                  # images de la planche translucide (levelNN_ghost.png)
         for sname in sprite_names:
             data = None
             for pak in [f"L{n:02d}.PAK", "MONSTER.PAK"] + [f"L{k:02d}.PAK" for k in range(1, 30)]:
@@ -515,6 +585,20 @@ def main(game_dir, maps_dir, out_dir):
                 else:                                   # image absente : première de son groupe
                     entry.append(entry[fi - fi % 4] if fi % 4 and entry else (entry[0] if entry else None))
             sprites[sname] = entry
+            # version translucide (propriété 0x800 : dite par le moteur sous ScummVM ; sous DOSBox,
+            # liste TRANSLUCENT_KNOWN). Exportée pour les sprites surtout en couleurs d'indice de transparence.
+            share = translucent_share(frames)
+            if tfit and share >= 0.5:
+                ghost = []
+                for fi in range(16):
+                    if fi < len(frames) and frames[fi] and frames[fi][0] > 8:
+                        ghost.append(len(ghost_imgs))
+                        ghost_imgs.append(ghost_image(frames[fi], pal, *tfit))
+                    else:
+                        ghost.append(ghost[fi - fi % 4] if fi % 4 and ghost else (ghost[0] if ghost else None))
+                sprite_ghost[sname] = ghost
+                if sname in TRANSLUCENT_KNOWN:
+                    ghost_auto.append(sname)
             # variantes de couleurs (image 16, comme LoLEngine::loadMonsterShapes) : colonne 0 =
             # couleurs d'origine, colonne d = remplacements de la variante d (drapeaux du monstre & 7)
             if len(frames) > 16 and frames[16]:
@@ -552,6 +636,19 @@ def main(game_dir, maps_dir, out_dir):
         for img, r in zip(sprite_imgs, rects):
             sheet.blit(img, r[0], 0)
         sheet.save(os.path.join(out_dir, f"level{n:02d}_spr.png"))
+        # planche translucide
+        ghost_rects = []
+        gp = f"level{n:02d}_ghost.png"
+        if ghost_imgs:
+            gx = 0
+            for v in ghost_imgs:
+                ghost_rects.append([gx, 0, v.w, v.h]); gx += v.w + 1
+            gsheet = Image(max(1, gx), max(v.h for v in ghost_imgs))
+            for v, rc in zip(ghost_imgs, ghost_rects):
+                gsheet.blit(v, rc[0], 0)
+            gsheet.save(os.path.join(out_dir, gp))
+        elif os.path.exists(os.path.join(out_dir, gp)):
+            os.remove(os.path.join(out_dir, gp))
 
         # images des lieux (scènes fixes)
         scenes = level_scenes(files, n)
@@ -584,6 +681,9 @@ def main(game_dir, maps_dir, out_dir):
             "spriteSigs": sprite_sigs,
             "spriteVariants": sprite_variants,     # nom -> {variante: [[r, g, b, r2, g2, b2]…]}
             "spriteEquip": sprite_equip,           # nom -> 4 jeux × 16 numéros d'image (ou null)
+            "spriteGhost": sprite_ghost,           # nom -> 16 numéros d'image de levelNN_ghost.png (ghostRects)
+            "ghostRects": ghost_rects,
+            "spriteGhostAuto": ghost_auto,         # translucides connus (version DOSBox, sans drapeau du moteur)
             "spriteConds": sprite_conditions(files[f"LEVEL{n}.INI"]) if f"LEVEL{n}.INI" in files else {},
             "scenes": scenes,   # case -> image du lieu (data/scenes/)
             "locks": locks_by_level.get(n, []),   # serrures : case + clé (tools/locks.py)
