@@ -871,14 +871,18 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
       `clickedAutomap` ne s'ouvre qu'avec ce drapeau ; `updateAutoMap` ne note les cases vues
       qu'avec lui.
     - 0x40 : la boussole, dessinée en haut à droite et mise à jour par `updateCompass`.
-    - (0x20 : le parchemin des sorts ; 0x08 : la lampe.)
-  - **Commande op 18** (a = masque 0x10 et / ou 0x40) : elle lève les drapeaux, note la case
+    - 0x20 : le livre de sorts, c'est-à-dire le parchemin en haut à gauche. Sans lui,
+      `gui_drawPlayField` remet `_selectedSpell` à 0 et n'affiche pas la liste. Non levé en début
+      de partie (vérifié).
+    - (0x08 : la lampe.)
+  - **Commande op 18** (a = masque de 0x10, 0x20 et 0x40) : elle lève les drapeaux, note la case
     courante dans la carte automatique, redessine le terrain de jeu et rétablit la luminosité.
     Refusée pendant un dialogue ou une scène.
   - **Sorts** : les 7 sorts du joueur, avec leur état (connu ou non) et un bouton « Apprendre »
     (commande op 11). Ce déblocage quitte le panneau Magie.
   - **Vérifié** : en début de partie, l'atlas puis la boussole sont débloqués et apparaissent dans
-    l'écran de jeu ; Soins est appris depuis la fenêtre.
+    l'écran de jeu ; Soins est appris depuis la fenêtre. Le livre de sorts débloqué fait apparaître
+    le parchemin, avec Étincelle.
 - **Barre de vie des monstres dans la vue 3D** (version ScummVM, 2026-11-13).
   - **Points de vie actuels** : champ `hitPoints` du monstre, à +29 de la fiche de 46 octets,
     soit +22 depuis x dans `readMonsters`.
@@ -989,7 +993,8 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     portrait au parchemin.
   - **Redessin** : la page 2 est redessinée, puis recopiée à l'écran, si le parchemin est
     affiché (`_flagsTable[31] & 0x20`). Avant le premier ajout, le parchemin n'était pas visible
-    à l'écran ; après, il l'est. On ne sait pas si c'est l'animation ou ce redessin qui l'affiche.
+    à l'écran ; après, il l'est. Le drapeau 0x20 n'étant pas levé au départ (voir « Triches »), c'est
+    sans doute l'animation de transfert qui dessine le parchemin (non vérifié).
     Code 6 = déjà connu.
   - **Vérifié** : en début de partie, les 6 sorts manquants ont été débloqués un par un puis
     avec « Tout ». Ils apparaissent dans le parchemin du jeu et dans le panneau Magie.
@@ -1514,3 +1519,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : ScummVM web : choix des compagnons du groupe (§ 10 bis).
 - **2026-11-13** : vue 3D : barre de vie au-dessus des monstres (ScummVM) (§ 10 bis).
 - **2026-11-13** : fenêtre « Triches » : atlas, boussole et déblocage des sorts (ScummVM) (§ 10 bis).
+- **2026-11-13** : fenêtre « Triches » : déblocage du livre de sorts (drapeau 0x20) (§ 10 bis).

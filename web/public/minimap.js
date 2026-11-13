@@ -1653,14 +1653,15 @@
 
 
   // --- Fenêtre « Triches » : atlas, boussole, sorts (version ScummVM) -------------------------
-  // Atlas et boussole : drapeaux de _flagsTable[31] (0x10 atlas = carte automatique, 0x40 boussole),
+  // Atlas, livre de sorts et boussole : drapeaux de _flagsTable[31] (0x10 atlas = carte automatique,
+  // 0x20 livre de sorts = parchemin, 0x40 boussole),
   // lus dans les drapeaux publiés (0x3E55C + 31) ; commande « unlock » (masque), puis le jeu
   // redessine son terrain de jeu. Les sorts : renderLearn / learn (section Magie).
   if (MANAGE) {
     const chDlg = document.getElementById("ch-dlg"), chMsg = document.getElementById("ch-msg");
     const chOpen = document.getElementById("ch-open");
     chOpen.hidden = false;
-    const ITEMS_UNLOCK = [["ch-atlas", 0x10, "Atlas"], ["ch-compass", 0x40, "Boussole"]];
+    const ITEMS_UNLOCK = [["ch-atlas", 0x10, "Atlas"], ["ch-book", 0x20, "Livre de sorts"], ["ch-compass", 0x40, "Boussole"]];
     async function readUnlocks() {
       const r = await mem.read([[FLAGS + 31, 1]]);
       if (!r) return;
