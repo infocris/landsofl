@@ -78,6 +78,10 @@
   .sp-row button:hover:not(:disabled) { background: #22305a; color: #fff; }
   .sp-row button:disabled { opacity: .35; cursor: not-allowed; }
   #ch-open { margin-left: 0; }
+  #auto-cfg { display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; align-items: center; margin-top: 6px; font-size: 11px; color: #a39578; }
+  #auto-cfg[hidden] { display: none; }
+  #auto-cfg .h { grid-column: 1 / -1; color: #c9a227; }
+  #auto-cfg select { font: 11px system-ui, sans-serif; background: #17130e; color: #e8dcc0; border: 1px solid #554a36; border-radius: 4px; padding: 2px 3px; }
   #ch-open[hidden] { display: none; }
   #ch-dlg { width: min(560px, 94vw); padding: 0; border: 1px solid #6d5a3a; border-radius: 10px; color-scheme: dark;
     background: #110e0a; color: #e8dcc0; font: 15px/1.4 system-ui, sans-serif; box-shadow: 0 20px 60px rgba(0,0,0,.7); }
@@ -391,6 +395,7 @@
       <label title="Chaque personnage prêt frappe le monstre devant le groupe, comme un clic sur son arme (monstres paisibles épargnés)"><input type="checkbox" id="cheat-auto"> Attaque auto</label>
       <button type="button" id="cheat-money" title="Ajoute 100 couronnes d'argent au groupe">+100 couronnes</button>
       <button type="button" id="ch-open" hidden title="Débloquer l'atlas, la boussole et les sorts">Triches…</button></div>
+    <div id="auto-cfg" hidden></div>
     <div id="spells" hidden>
       <div class="inv-head"><span class="inv-title">Magie</span>
         <label>Lanceur <select id="sp-caster"></select></label>
@@ -509,7 +514,7 @@ window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes
   sendPersp();
 })();
 </script>
-<script src="minimap.js?v=20261113p"></script>
+<script src="minimap.js?v=20261113q"></script>
 <script src="engine.js?v=20261113a"></script>
 </body>
 </html>

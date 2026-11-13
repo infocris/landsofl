@@ -864,6 +864,20 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     normaux.
   - **Vérifié** : Michael, Étincelle niveau 1 → magie 6 → 1. Le soin ciblé n'est pas testé, faute
     de sort de soin en début de partie.
+- **Attaque auto par sort** (version ScummVM, 2026-11-13).
+  - **Réglage** : chaque personnage attaque avec son arme ou avec un sort offensif connu
+    (Étincelle 0, Gel 2, Boule de Feu 3, Poing Mortel 4, Brume Fatale 5, Foudre 6). Commande op 19
+    (a = personnage, b = sort, ou -1 pour l'arme). Le moteur garde le choix dans `_webAutoSpell`,
+    et la page le renvoie toutes les 3 s.
+  - **Sort** :
+    - il part quand `getSpellTargetBlock` (portée 3 cases) trouve un monstre hostile ;
+    - le niveau est le plus haut dont `mpRequired` et `hpRequired` sont couverts ;
+    - le lancement passe par `webCastSpell`, la même fonction que la commande op 9 (comme
+      `clickedMagicSubmenu`) ;
+    - si aucun niveau n'est possible, le personnage frappe avec son arme sur la case devant.
+  - **Vérifié** au niveau 6, avec Michael sur Étincelle :
+    - magie 6 → 1 (niveau 1, qui coûte 5) ; expérience de magie 1 → 11 avec le monstre tué ;
+    - ensuite, sans magie, il frappe avec son arme : expérience de combat 1 → 34.
 - **Fenêtre « Triches » : atlas, boussole, sorts** (version ScummVM, 2026-11-13 ; bouton « Triches… »).
   - **Drapeaux** : l'atlas et la boussole sont des drapeaux de `_flagsTable[31]`, c'est-à-dire
     les drapeaux d'histoire 252 et 254 (octet 31 de la table publiée en `0x3E55C`).
@@ -1521,3 +1535,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : fenêtre « Triches » : atlas, boussole et déblocage des sorts (ScummVM) (§ 10 bis).
 - **2026-11-13** : fenêtre « Triches » : déblocage du livre de sorts (drapeau 0x20) (§ 10 bis).
 - **2026-11-13** : page DOSBox : le bouton ZQSD revient avec les autres boutons, en bas à droite (plus de placement à côté des flèches du jeu).
+- **2026-11-13** : attaque auto : arme ou sort (niveau max possible) par personnage (ScummVM) (§ 10 bis).

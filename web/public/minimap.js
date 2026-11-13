@@ -1547,8 +1547,50 @@
     spellParty = party;
     spTargetL.hidden = !spells.some((s) => s.type === HEAL);
     renderSpells(spells);
+    renderAutoCfg(spells, party);
     renderLearn(missing);
   }
+  // Attaque auto : arme ou sort offensif de chaque personnage (sort lancé par le moteur au plus haut
+  // niveau que sa magie et sa vie permettent, sur un monstre jusqu'à 3 cases devant ; sinon l'arme).
+  // Choix mémorisé par nom de personnage, renvoyé au moteur à chaque changement et toutes les 3 s.
+  const OFFENSIVE = new Set([0, 2, 3, 4, 5, 6]);       // Étincelle, Gel, Boule de feu, Poing mortel, Brume fatale, Foudre
+  const autoCfg = document.getElementById("auto-cfg");
+  let autoParty = [], autoKey = "", autoSentAt = 0;
+  const autoChoice = (name) => { try { const v = localStorage.getItem("autoSpell:" + name); return v === null ? -1 : +v; } catch (e) { return -1; } };
+  function renderAutoCfg(spells, party) {
+    autoParty = party;
+    const offensive = spells.filter((s) => OFFENSIVE.has(s.type));
+    const key = JSON.stringify([offensive.map((s) => [s.type, s.name]), party.map((c) => [c.slot, c.name])]);
+    if (key === autoKey) return;
+    autoKey = key;
+    autoCfg.replaceChildren(Object.assign(document.createElement("span"), { className: "h", textContent: "Attaque auto de chaque personnage" }),
+      ...party.flatMap((c) => {
+        const n = document.createElement("span"); n.textContent = c.name;
+        const sel = document.createElement("select");
+        sel.title = "Arme, ou sort lancé au plus haut niveau possible (l'arme quand la magie manque)";
+        for (const [v, t] of [[-1, "Arme"], ...offensive.map((s) => [s.type, `${s.name} (niveau max)`])]) {
+          const o = document.createElement("option"); o.value = v; o.textContent = t; sel.appendChild(o);
+        }
+        const cur = autoChoice(c.name);
+        sel.value = offensive.some((s) => s.type === cur) ? cur : -1;
+        sel.addEventListener("change", () => {
+          try { localStorage.setItem("autoSpell:" + c.name, sel.value); } catch (e) {}
+          sel.blur(); sendAutoSpells(true).catch(() => {});
+        });
+        return [n, sel];
+      }));
+    sendAutoSpells(true).catch(() => {});
+  }
+  async function sendAutoSpells(force) {
+    if (!MANAGE || (!force && performance.now() - autoSentAt < 3000)) return;
+    autoSentAt = performance.now();
+    for (const c of autoParty) await mem.cmd({ op: "autospell", a: c.slot, b: autoChoice(c.name) }, 1500);
+  }
+  if (MANAGE) setInterval(() => {
+    autoCfg.hidden = !document.getElementById("cheat-auto").checked || !autoParty.length;
+    sendAutoSpells(false).catch(() => {});
+  }, 1000);
+
   // fenêtre « Triches » : les 7 sorts du joueur, connus ou à apprendre
   function renderLearn(all) {
     const mk = (label, title, types, cls) => {
