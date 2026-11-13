@@ -1690,20 +1690,19 @@
       possibles: L ? (L.monsterTypes[m.type] || []).join("/") : "" }));
   }
   // --- Caractéristiques --------------------------------------------------------
+  // Panneau : résumé (vie, magie) ; fiches complètes dans une fenêtre modale (bouton « Fiches… »
+  // ou clic sur le résumé), avec la triche de montée de niveau.
   const stMoney = document.getElementById("st-money"), stChars = document.getElementById("st-chars");
+  const stMini = document.getElementById("st-mini"), stMoney2 = document.getElementById("st-money2");
+  const stDlg = document.getElementById("st-dlg");
   let lastStats = "";
-  // fiches repliées (clic sur le nom), mémorisées par nom de personnage
-  let foldedChars = new Set();
-  try { foldedChars = new Set(JSON.parse(localStorage.getItem("foldedChars") || "[]")); } catch (e) {}
-  stChars.addEventListener("click", (e) => {
-    const nm = e.target.closest(".st-char .nm");
-    if (!nm) return;
-    const box = nm.parentElement, name = box.dataset.name;
-    if (foldedChars.has(name)) foldedChars.delete(name); else foldedChars.add(name);
-    box.classList.toggle("folded", foldedChars.has(name));
-    nm.title = `Cliquer pour ${foldedChars.has(name) ? "déplier" : "replier"}`;
-    try { localStorage.setItem("foldedChars", JSON.stringify([...foldedChars])); } catch (err) {}
-  });
+  const openStats = () => { lastStats = ""; stDlg.showModal(); updateStats().catch(() => {}); };
+  document.getElementById("st-open").addEventListener("click", (e) => { e.currentTarget.blur(); openStats(); });
+  stMini.addEventListener("click", openStats);
+  document.getElementById("st-close").addEventListener("click", () => stDlg.close());
+  stDlg.addEventListener("click", (e) => { if (e.target === stDlg) stDlg.close(); });
+  stDlg.addEventListener("close", () => { const f = document.getElementById("dos"); if (f && f.focus) f.focus(); });
+  for (const ev of ["keydown", "keyup", "keypress"]) stDlg.addEventListener(ev, (e) => e.stopPropagation());
   async function updateStats() {
     if (previewing) return;
     const r = await mem.read([PARTY_RANGE(), [STATS.money, 2], [XP.table, 4 * 11]]);
@@ -1726,7 +1725,7 @@
     const key = JSON.stringify(st);
     if (key === lastStats) return;
     lastStats = key;
-    stMoney.textContent = `${money} couronnes`;
+    stMoney.textContent = stMoney2.textContent = `${money} couronnes`;
     const bar = (cls, label, [cur, max]) => {
       const pct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0;
       return `<span>${label}</span><div class="bar ${cls}"><i style="width:${pct}%"></i><span>${cur} / ${max}</span></div>`;
@@ -1736,14 +1735,17 @@
         const next = c.lv[k] < XP.maxLevel ? xpTable[c.lv[k]] : null;
         const btn = next !== null
           ? `<button type="button" class="lvup" data-slot="${c.slot}" data-skill="${k}" title="Monter ${n} au niveau ${c.lv[k] + 1} (comme le jeu : expérience au seuil, bonus de vie ou de magie)">+</button>` : "";
-        return `${n} ${c.lv[k]} (${c.xp[k]}${next !== null ? " / " + next : ""} xp)${btn}`;
-      }).join(" · ");
-      const folded = foldedChars.has(c.name);
-      return `<div class="st-char${folded ? " folded" : ""}" data-name="${escHtml(c.name)}"><div class="nm" title="Cliquer pour ${folded ? "déplier" : "replier"}"><b></b><span class="sum">Vie ${c.hp[0]}/${c.hp[1]} · Magie ${c.mp[0]}/${c.mp[1]}</span></div>${bar("hp", "Vie", c.hp)}${bar("mp", "Magie", c.mp)}
+        return `<span class="sk"><b>${n} ${c.lv[k]}</b><small>${c.xp[k]}${next !== null ? " / " + next : ""} xp</small>${btn}</span>`;
+      }).join("");
+      return `<div class="st-char" data-name="${escHtml(c.name)}"><div class="nm"><b></b></div>${bar("hp", "Vie", c.hp)}${bar("mp", "Magie", c.mp)}
         <span>Force</span><span>${c.force}</span><span>Protection</span><span>${c.prot}</span>
         <div class="st-skills">${cls}</div></div>`;
     }).join("");
     stChars.querySelectorAll(".nm b").forEach((el, i) => { el.textContent = st.chars[i].name; });
+    const mini = (cls, [cur, max]) => `<div class="bar ${cls}"><i style="width:${max > 0 ? Math.max(0, Math.min(100, cur / max * 100)) : 0}%"></i><span>${cur} / ${max}</span></div>`;
+    stMini.innerHTML = st.chars.map((c) => `<span class="n"></span>${mini("hp", c.hp)}${mini("mp", c.mp)}`).join("");
+    stMini.querySelectorAll(".n").forEach((el, i) => { el.textContent = st.chars[i].name; });
+    stMini.title = "Cliquer pour les fiches complètes";
   }
   setInterval(() => { updateStats().catch(() => {}); }, 1000);
 

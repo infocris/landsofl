@@ -1404,3 +1404,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : ScummVM web : mode attaque automatique (§ 10 bis).
 - **2026-11-13** : ScummVM web : volumes musique, effets et voix dans la page (§ 10 bis).
 - **2026-11-13** : ScummVM web : téléportation (mini-carte, lieux, sélecteur de niveau) (§ 10 bis).
+- **2026-11-13** : page : fiches des personnages dans une fenêtre modale (résumé vie / magie dans le panneau).

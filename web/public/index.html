@@ -45,7 +45,10 @@
   #mm-places-title { color: #a39578; font-size: 12px; border-top: 1px solid #3a3226; padding-top: 6px; }
   #stats { border-top: 1px solid #3a3226; padding-top: 6px; font-size: 12px; color: #cfc3a6; }
   #st-money { color: #e8dcc0; }
-  #cheats { display: flex; gap: 14px; margin-top: 4px; color: #a39578; font-size: 11px; }
+  #cheats { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 6px; color: #a39578; font-size: 11px; }
+  #cheats label { white-space: nowrap; }
+  #stats .inv-head { display: flex; align-items: baseline; gap: 8px; }
+  #stats .inv-title { color: #c9a227; font-weight: 600; }
   #cheats input { accent-color: #c9a227; vertical-align: -2px; }
   #cheats button { margin-left: auto; font: 11px/1 system-ui, sans-serif; padding: 3px 7px; cursor: pointer;
     background: #1d1912; color: #e8dcc0; border: 1px solid #6d5a3a; border-radius: 4px; }
@@ -83,6 +86,32 @@
   #sp-learn button:hover { border-style: solid; border-color: #c9a227; color: #fff; }
   #sp-learn button.all { border: 1px solid #c9a227; color: #c9a227; }
   #sp-msg { color: #a39578; font-size: 11px; min-height: 1.3em; margin-top: 2px; }
+  #st-open { margin-left: auto; font: 11px/1 system-ui, sans-serif; padding: 3px 7px; border: 1px solid #c9a227; border-radius: 4px;
+    background: #1d1912; color: #c9a227; cursor: pointer; }
+  #st-open:hover { background: #2a2217; color: #fff; }
+  #st-mini { display: grid; grid-template-columns: auto 1fr 1fr; gap: 3px 8px; margin-top: 4px; align-items: center; cursor: pointer; }
+  #st-mini .n { color: #a39578; font-weight: 600; }
+  #st-mini .bar { height: 12px; }
+  /* fiches des personnages : fenêtre modale, texte plus grand */
+  #st-dlg { width: min(1000px, 94vw); max-height: 90vh; padding: 0; border: 1px solid #6d5a3a; border-radius: 10px;
+    color-scheme: dark; background: #110e0a; color: #e8dcc0; font: 15px/1.4 system-ui, sans-serif; box-shadow: 0 20px 60px rgba(0,0,0,.7); }
+  #st-dlg::backdrop { background: rgba(0, 0, 0, .65); }
+  #st-dlg .cat-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px 10px; border-bottom: 1px solid #3a3226; }
+  #st-dlg h2 { margin: 0; font-size: 20px; color: #c9a227; }
+  #st-money2 { margin-left: auto; color: #e8dcc0; }
+  #st-close { font-size: 20px; background: none; border: 0; color: #a39578; cursor: pointer; padding: 0 4px; }
+  #st-close:hover { color: #fff; }
+  #st-chars { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; padding: 14px 16px 18px; }
+  #st-dlg .st-char { gap: 6px 10px; margin: 0; padding: 12px; border: 1px solid #3a3226; border-radius: 8px; background: #17130e; align-content: start; }
+  #st-dlg .st-char .nm { font-size: 18px; color: #e8dcc0; cursor: default; }
+  #st-dlg .st-char .nm::before, #st-dlg .st-char .nm .sum { display: none; }
+  #st-dlg .st-char > span { color: #a39578; }
+  #st-dlg .bar { height: 16px; } #st-dlg .bar span { font-size: 12px; line-height: 16px; inset: 0 6px; }
+  #st-dlg .st-skills { margin-top: 6px; display: grid; gap: 4px; }
+  #st-dlg .st-skills .sk { display: flex; align-items: center; gap: 6px; }
+  #st-dlg .st-skills .sk b { color: #e8dcc0; min-width: 72px; }
+  #st-dlg .st-skills .sk small { color: #8a7f68; font-size: 12px; }
+  #st-dlg .lvup { margin-left: auto; font-size: 13px; line-height: 20px; padding: 0 8px; }
   #cat-open { margin-top: 8px; width: 100%; font: 600 12px/1 system-ui, sans-serif; padding: 6px; border: 1px solid #c9a227;
     border-radius: 4px; background: #1d1912; color: #c9a227; cursor: pointer; }
   #cat-open:hover { background: #2a2217; color: #fff; }
@@ -287,8 +316,9 @@
   <div id="mm-places-title">Lieux du niveau</div>
   <ol id="mm-places"></ol>
   <div id="stats">
-    <div class="inv-head"><span class="inv-title">Caractéristiques</span><span id="st-money"></span></div>
-    <div id="st-chars"></div>
+    <div class="inv-head"><span class="inv-title">Caractéristiques</span><span id="st-money"></span>
+      <button type="button" id="st-open" title="Fiches complètes des personnages : vie, magie, force, protection, niveaux et expérience">Fiches…</button></div>
+    <div id="st-mini"></div>
     <div id="cheats"><label><input type="checkbox" id="cheat-hp"> Vie infinie</label>
       <label><input type="checkbox" id="cheat-mp"> Magie infinie</label>
       <label title="Chaque personnage prêt frappe le monstre devant le groupe, comme un clic sur son arme (monstres paisibles épargnés)"><input type="checkbox" id="cheat-auto"> Attaque auto</label>
@@ -319,6 +349,11 @@
 <button id="v3dtoggle" type="button" title="Afficher/masquer la vue 3D (F10)">3D</button>
 <button id="persp" type="button" title="Perspective de la vue 3D : celle du jeu d'origine ou une perspective réelle"></button>
 <div id="mm-tip" hidden></div>
+<dialog id="st-dlg" aria-labelledby="st-h">
+  <div class="cat-head"><h2 id="st-h">Caractéristiques des personnages</h2><span id="st-money2"></span>
+    <button type="button" id="st-close" title="Fermer (Échap)">✕</button></div>
+  <div id="st-chars"></div>
+</dialog>
 <dialog id="cat-dlg" aria-labelledby="cat-h">
   <div class="cat-head"><h2 id="cat-h">Annuaire des objets</h2>
     <input id="cat-q" type="search" placeholder="Filtrer par nom ou effet…" autocomplete="off">
@@ -583,7 +618,7 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261113h"></script>
+<script src="minimap.js?v=20261113i"></script>
 <script src="engine.js?v=20261113a"></script>
 </body>
 </html>
