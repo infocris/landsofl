@@ -1591,3 +1591,11 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
     - Ajoutées, 12 serrures que l'ancienne lecture ratait, souvent par paires de cases voisines
       (les deux côtés d'une porte) : niveau 23, Clefs Mystiques et Bleues ; niveau 26 ;
       niveau 27, Petite Clef ; niveau 29, Clefs Émoussée, de la Mort et Huileuse.
+- **2026-11-14** : grande carte (Tab).
+  - **Autres niveaux** : le sélecteur affiche n'importe quel niveau, dessiné à partir de sa
+    grille de départ, sans monstres, avec son exploration mémorisée. Le double-clic sur une case
+    charge ce niveau sur la case visée (commande `goto`). Vérifié : Forêt du Nord, case 13,3.
+  - **Options reprises** de la mini-carte et synchronisées avec elle : cases illustrées, brouillard,
+    oubli de l'exploration du niveau affiché. La légende est recopiée sous la carte.
+  - **Retrait** : la téléportation quitte la mini-carte (ligne « Aller à », double-clic sur la
+    carte et sur les lieux) ; elle ne reste que dans la grande carte.

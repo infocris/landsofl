@@ -89,7 +89,7 @@
   const mem = new LoLMem.RemoteMemory();
   const levels = [];          // { level, name, faces: Uint8Array(4096), wallTypes, labels }
   let current = null, lastHash = -1, lastIdentify = 0;
-  const live = new Uint8Array(4096);
+  let live = new Uint8Array(4096);     // grille vivante (remplacée le temps du dessin d'un autre niveau : grande carte)
 
   // Chargement un par un, avec nouvelles tentatives : le petit serveur local
   // (python -m http.server) supporte mal les requêtes simultanées.
@@ -156,13 +156,6 @@
         showTip(`<b>Lieu ${p.n} : ${escHtml(niceName(p.text))}</b> <span class="t">· case ${p.x},${p.y}</span>` + placeFigure(L, p), r.right, r.top);
       });
       li.addEventListener("mouseleave", () => { hoverCell = -1; draw(lastDraw[0], lastDraw[1]); tipEl.hidden = true; });
-      if (MANAGE) {                             // double-clic : téléportation près du lieu
-        li.title = "Double-clic : téléporter le groupe à ce lieu";
-        li.addEventListener("dblclick", () => {
-          const b = freeNear(L, p.x, p.y, (i) => opaque(L, i) && cellClass(L, i) !== "doorClosed");
-          if (b >= 0) teleport(L.level, b, niceName(p.text));
-        });
-      }
       placesEl.appendChild(li);
     }
   }
@@ -744,7 +737,8 @@
       g.strokeStyle = col; g.lineWidth = 1.5;
       g.beginPath(); g.moveTo(mx, my); g.lineTo(mx + Math.cos(a) * 5.5 * k, my + Math.sin(a) * 5.5 * k); g.stroke();
     }
-    // groupe : flèche orientée
+    // groupe : flèche orientée (pas de flèche sur un autre niveau : grande carte)
+    if (block > 1023) return;
     const cx = (block % 32) * CELL + CELL / 2, cy = Math.floor(block / 32) * CELL + CELL / 2;
     const a = [-Math.PI / 2, 0, Math.PI / 2, Math.PI][dir & 3];
     g.fillStyle = "#fff"; g.strokeStyle = "#000"; g.lineWidth = 1.5;
@@ -763,23 +757,71 @@
   const bigDlg = document.getElementById("bm-dlg"), bigCanvas = document.getElementById("bm-canvas");
   const bigG = bigCanvas.getContext("2d"), bigHint = document.getElementById("bm-hint");
   let bigOpen = false, drawingBig = false, bigCell = 20;
+  // Autre niveau choisi dans la grande carte : le temps d'un dessin ou d'une info-bulle, il devient
+  // le niveau « courant », avec sa grille de départ et sans monstres (données exportées).
+  let bigLevel = null;                     // n° du niveau affiché (null : celui du groupe)
+  const bigOther = () => bigLevel !== null && (!current || bigLevel !== current.level) ? levels.find((l) => l.level === bigLevel) : null;
+  function withBigLevel(fn) {
+    const Lb = bigOther();
+    if (!Lb) return fn(null);
+    const save = [current, live, monsters, lastDraw];
+    current = Lb; live = Lb.faces; monsters = [];
+    try { return fn(Lb); } finally { [current, live, monsters, lastDraw] = save; }
+  }
   function drawBig() {
     const save = [canvas, g, CELL, SIZE, follow, view];
     drawingBig = true;
     try {
       canvas = bigCanvas; g = bigG; CELL = bigCell; SIZE = 32 * bigCell; follow = false;
-      draw(lastDraw[0], lastDraw[1]);
+      withBigLevel((Lb) => (Lb ? draw(0xFFFF, 0) : draw(lastDraw[0], lastDraw[1])));
     } finally {
       [canvas, g, CELL, SIZE, follow, view] = save;
       drawingBig = false;
     }
+    if ((current ? current.level : null) !== bigFilledFor) fillBigLevels();     // le groupe a changé de niveau
+    const shown = bigOther() || current;
+    document.getElementById("bm-title").textContent = shown ? `Niveau ${shown.level} — ${shown.fr}` : "Carte";
   }
+  // options d'affichage de la mini-carte, reprises dans la fenêtre (mêmes réglages) : cases
+  // illustrées, brouillard ; ↺ oublie l'exploration du niveau affiché ; légende recopiée
+  const bmTex = document.getElementById("bm-tex"), bmFog = document.getElementById("bm-fog"), bmForget = document.getElementById("bm-forget");
+  function syncBigOpts() {
+    bmTex.classList.toggle("on", texMode); bmFog.classList.toggle("on", fogOn); bmForget.disabled = !fogOn;
+  }
+  bmTex.addEventListener("click", (e) => { e.currentTarget.blur(); setTexMode(!texMode); syncBigOpts(); });
+  bmFog.addEventListener("click", (e) => { e.currentTarget.blur(); fogBtn.click(); syncBigOpts(); });
+  bmForget.addEventListener("click", (e) => {
+    e.currentTarget.blur();
+    const L = bigOther() || current;
+    if (!L || !confirm(`Oublier l'exploration du niveau ${L.level} (${L.fr}) sur la carte ?`)) return;
+    seenFor(L).fill(0); saveSeen(L);
+    if (L === current && lastDraw[0] < 1024) explore(current, lastDraw[0], lastDraw[1]);
+    refreshFog();
+  });
+  const bigLevelSel = document.getElementById("bm-level");
+  let bigFilledFor = undefined;
+  function fillBigLevels() {
+    if (!levels.length) return;
+    const cur = current ? current.level : null;
+    bigFilledFor = cur;
+    bigLevelSel.replaceChildren(...levels.map((L) => {
+      const o = document.createElement("option"); o.value = L.level;
+      o.textContent = `${L.level}. ${L.fr}${L.level === cur ? " (groupe)" : ""}`; return o;
+    }));
+    bigLevelSel.value = bigLevel !== null ? bigLevel : cur !== null ? cur : levels[0].level;
+  }
+  bigLevelSel.addEventListener("change", () => {
+    const v = +bigLevelSel.value;
+    bigLevel = current && v === current.level ? null : v;
+    bigLevelSel.blur(); tipEl.hidden = true; drawBig();
+  });
   function openBig() {
-    const box = Math.min(innerWidth - 380, innerHeight - 120);
+    const box = Math.min(innerWidth - 120, innerHeight - 200);     // place pour l'en-tête et la légende
     bigCell = Math.max(10, Math.min(40, Math.floor(box / 32)));
     bigCanvas.width = bigCanvas.height = 32 * bigCell;
     bigCanvas.style.width = bigCanvas.style.height = 32 * bigCell + "px";
-    document.getElementById("bm-title").textContent = current ? `Niveau ${current.level} — ${current.fr}` : "Carte";
+    bigLevel = null; fillBigLevels(); syncBigOpts();
+    document.getElementById("bm-legend").innerHTML = document.getElementById("mm-legend").innerHTML;
     bigHint.textContent = MANAGE ? "Double-clic sur une case : s'y téléporter. Tab ou Échap : fermer." : "Tab ou Échap : fermer.";
     bigDlg.showModal(); bigOpen = true;
     bigDlg.appendChild(tipEl);                       // info-bulle au-dessus de la fenêtre
@@ -796,21 +838,25 @@
     return x < 0 || y < 0 || x > 31 || y > 31 ? null : [x, y];
   };
   bigCanvas.addEventListener("mousemove", (e) => {
-    const c = current && bigCellAt(e);
+    const c = (current || bigOther()) && bigCellAt(e);
     if (!c) { tipEl.hidden = true; return; }
-    const key = c.join(",");
-    if (tipEl.hidden || tipEl.dataset.cell !== key) { tipEl.dataset.cell = key; showTip(cellInfo(c[0], c[1]), e.clientX, e.clientY); }
+    const key = (bigLevel ?? "") + ":" + c.join(",");
+    if (tipEl.hidden || tipEl.dataset.cell !== key) { tipEl.dataset.cell = key; showTip(withBigLevel(() => cellInfo(c[0], c[1])), e.clientX, e.clientY); }
     else { tipAt = [e.clientX, e.clientY]; placeTip(); }
   });
   bigCanvas.addEventListener("mouseleave", () => { tipEl.hidden = true; tipEl.dataset.cell = ""; });
   bigCanvas.addEventListener("dblclick", (e) => {
-    const c = current && bigCellAt(e);
+    const c = (current || bigOther()) && bigCellAt(e);
     if (!c || !MANAGE) return;
     const i = c[1] * 32 + c[0];
-    if (!visible(current, i)) { bigHint.textContent = "Case inexplorée."; return; }
-    if (opaque(current, i) && cellClass(current, i) !== "doorClosed") { bigHint.textContent = "Case pleine."; return; }
-    teleport(current.level, i).then(() => {
-      bigHint.textContent = tpMsg.textContent || "Téléporté.";
+    // mêmes règles que sur le niveau du groupe ; un autre niveau est chargé (commande goto)
+    const check = withBigLevel(() => !visible(current, i) ? "Case inexplorée." : opaque(current, i) && cellClass(current, i) !== "doorClosed" ? "Case pleine." : "");
+    if (check) { bigHint.textContent = check; return; }
+    const target = bigOther() || current;
+    bigHint.textContent = target !== current ? `Chargement du niveau ${target.level}…` : "";
+    teleport(target.level, i).then((msg) => {
+      bigLevel = null; fillBigLevels(); drawBig();
+      bigHint.textContent = msg || "Téléporté.";
       clearTimeout(bigHint.t); bigHint.t = setTimeout(() => { bigHint.textContent = "Double-clic sur une case : s'y téléporter. Tab ou Échap : fermer."; }, 3000);
     });
   });
@@ -2242,86 +2288,21 @@
 
   setInterval(() => { updateInventory().catch(() => {}); }, 1000);
 
-  // --- Téléportation (version ScummVM) -------------------------------------------------
-  // Dans le niveau : commande « teleport » (case, comme olol_setGlobalVar(0) des scripts,
-  // direction conservée) ; vers un autre niveau : « goto » (chargement du niveau, comme
-  // olol_loadNewLevel). Destination : une case du niveau, ou la case libre la plus proche d'un lieu.
-  let levelsLoaded = false;
-  const tpBox = document.getElementById("mm-tp"), tpLevel = document.getElementById("tp-level");
-  const tpPlace = document.getElementById("tp-place"), tpMsg = document.getElementById("tp-msg");
-  function solidStatic(L, i) {             // mur sur les 4 faces dans la carte d'origine
-    let n = 0;
-    for (let f = 0; f < 4; f++) { const t = L.wallTypes[L.faces[i * 4 + f]]; if (t && (t[0] & 1)) n++; }
-    return n === 4;
-  }
-  function freeNear(L, x, y, solid) {
-    for (let r = 0; r < 6; r++)
-      for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
-        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
-        const cx = x + dx, cy = y + dy;
-        if (cx >= 0 && cy >= 0 && cx < 32 && cy < 32 && !solid(cy * 32 + cx)) return cy * 32 + cx;
-      }
-    return -1;
-  }
+  // --- Téléportation (version ScummVM ; grande carte, touche Tab) ----------------------------
+  // Dans le niveau : commande « teleport » (case, comme olol_setGlobalVar(0) des scripts, direction
+  // conservée) ; vers un autre niveau : « goto » (chargement du niveau, comme olol_loadNewLevel).
+  // Renvoie le message à afficher.
   let tpBusy = false;
-  async function teleport(level, block, label) {
-    if (tpBusy) return;
-    tpBusy = true; tpMsg.textContent = "…";
+  async function teleport(level, block) {
+    if (tpBusy) return "";
+    tpBusy = true;
     try {
       const same = current && level === current.level;
       const r = await mem.cmd(same ? { op: "teleport", a: block, b: -1 } : { op: "goto", a: level, b: block }, same ? 3000 : 15000);
-      tpMsg.textContent = !r ? "le jeu ne répond pas (menu ou dialogue ouvert ?)"
-        : r.code ? "impossible ici (case pleine, dialogue ou menu ouvert)" : `→ ${label || `case ${block % 32},${block >> 5}`}`;
-    } finally { tpBusy = false; setTimeout(() => { if (!tpBusy) tpMsg.textContent = ""; }, 4000); }
+      return !r ? "Le jeu ne répond pas (menu ou dialogue ouvert ?)."
+        : r.code ? "Impossible ici (case pleine, dialogue ou menu ouvert)." : `Téléporté : case ${block % 32},${block >> 5}.`;
+    } finally { tpBusy = false; }
   }
-  function fillTpPlaces() {
-    const L = levels.find((l) => l.level === +tpLevel.value);
-    const opts = [];
-    if (L) for (const p of L.places) opts.push([p.x, p.y, niceName(p.text)]);
-    for (const e of (L && L.exits) || []) if (!e.teleport && e.level) {
-      const to = levels.find((l) => l.level === e.level);
-      opts.push([e.x, e.y, `passage vers ${to ? to.fr : "niveau " + e.level}`]);
-    }
-    tpPlace.replaceChildren(...(opts.length ? opts : [[-1, -1, "entrée du niveau"]]).map(([x, y, t]) => {
-      const o = document.createElement("option"); o.value = `${x},${y}`; o.textContent = t; return o;
-    }));
-  }
-  if (MANAGE) {
-    tpBox.hidden = false;
-    const ready = () => {             // une fois toutes les cartes chargées
-      if (!levelsLoaded) return setTimeout(ready, 500);
-      tpLevel.replaceChildren(...levels.map((L) => { const o = document.createElement("option"); o.value = L.level; o.textContent = `${L.level}. ${L.fr}`; return o; }));
-      if (current) tpLevel.value = current.level;
-      fillTpPlaces();
-    };
-    ready();
-    tpLevel.addEventListener("change", () => { fillTpPlaces(); tpLevel.blur(); });
-    tpPlace.addEventListener("change", () => tpPlace.blur());
-    document.getElementById("tp-go").addEventListener("click", (e) => {
-      e.currentTarget.blur();
-      const L = levels.find((l) => l.level === +tpLevel.value);
-      if (!L) return;
-      let [x, y] = tpPlace.value.split(",").map(Number);
-      const same = current === L;
-      const solid = same ? (i) => opaque(L, i) && cellClass(L, i) !== "doorClosed" : (i) => solidStatic(L, i);
-      let block = -1;
-      if (x >= 0) block = freeNear(L, x, y, solid);
-      else for (let i = 0; i < 1024 && block < 0; i++) if (!solid(i) && L.faces.slice(i * 4, i * 4 + 4).some((v) => v)) block = i;
-      if (block < 0) { tpMsg.textContent = "pas de case libre trouvée"; return; }
-      teleport(L.level, block, tpPlace.selectedOptions[0] ? tpPlace.selectedOptions[0].textContent : "");
-    });
-    canvas.addEventListener("dblclick", (e) => {
-      if (!current) return;
-      const r = canvas.getBoundingClientRect();
-      const x = Math.floor(((e.clientX - r.left) / r.width * SIZE + Math.round(view[0])) / CELL);
-      const y = Math.floor(((e.clientY - r.top) / r.height * SIZE + Math.round(view[1])) / CELL);
-      if (x < 0 || y < 0 || x > 31 || y > 31) return;
-      const i = y * 32 + x;
-      if (!visible(current, i)) { tpMsg.textContent = "case inexplorée"; return; }
-      if (opaque(current, i) && cellClass(current, i) !== "doorClosed") { tpMsg.textContent = "case pleine"; return; }
-      teleport(current.level, i);
-    });
-  }
-  loadLevels().then(() => { levelsLoaded = true; setInterval(tick, 200); },
+  loadLevels().then(() => setInterval(tick, 200),
     (e) => { infoEl.textContent = "cartes introuvables (viewer/data) : " + e.message; });
 })();
