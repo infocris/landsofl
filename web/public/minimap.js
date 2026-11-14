@@ -1274,6 +1274,20 @@
     invChars = document.getElementById("inv-chars"), invCount = document.getElementById("inv-count");
   getJSON("viewer/data/items.json?v=20261114a").then((d) => { itemInfo = d; if (current) renderItemList(current); }, () => {});
 
+  // Emplacements d'équipement vides : image du jeu (GAMESHP.SHP, slotShapes de
+  // gui_drawCharInventoryItem : silhouette de l'arme, du bouclier, du casque…), exportée dans
+  // viewer/data/slot_shapes.png ; mise à l'échelle de la case (22 px du jeu -> 28 px de contenu).
+  let slotShapes = null;
+  getJSON("viewer/data/slot_shapes.json?v=20261114b").then((d) => { slotShapes = d; lastInv = ""; updateInventory().catch(() => {}); }, () => {});
+  function slotPlaceholder(d, loc) {
+    if (!slotShapes || loc === undefined || loc < 200) return;
+    const r = slotShapes.slots[(loc - 200) % 11];
+    if (!r) return;
+    const k = 28 / 22, [x, y, w, h] = r;
+    d.classList.add("ph");
+    d.style.backgroundSize = `${slotShapes.w * k}px ${slotShapes.h * k}px`;
+    d.style.backgroundPosition = `${-x * k + (28 - w * k) / 2}px ${-y * k + (28 - h * k) / 2}px`;
+  }
   function slot(type, label, loc) {
     const d = document.createElement("div");
     d.className = "slot";
@@ -1285,7 +1299,10 @@
       d.dataset.type = type;
       d.addEventListener("click", () => showDetail(type, label, d));
       setIcon(d, it.icon);
-    } else if (label) d.title = `${label} : vide`;
+    } else {
+      if (label) d.title = `${label} : vide`;
+      slotPlaceholder(d, loc);
+    }
     return d;
   }
   function setIcon(d, icon) {

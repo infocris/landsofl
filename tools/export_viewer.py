@@ -772,6 +772,22 @@ def main(game_dir, maps_dir, out_dir):
             json.dump({"rects": rects, "types": types, "blood": blood}, fh)
         print(f"objets au sol : {len(imgs)} images pour {len(types)} types")
 
+        # emplacements d'équipement vides (LoLEngine::gui_drawCharInventoryItem, version CD) : image
+        # slotShapes[emplacement] de GAMESHP.SHP — arme 0x30, bouclier 0x34, tête 0x2E, corps 0x2F,
+        # cou 0x32, poignets 0x33, pieds 0x31, anneaux 0x35 (emplacements 0 à 10)
+        slot_shapes = [0x30, 0x34, 0x30, 0x34, 0x2E, 0x2F, 0x32, 0x33, 0x31, 0x35, 0x35]
+        # une case de 22 × 22 par image, image centrée (les anneaux font 12 × 11) : pas de débordement
+        order = sorted(set(slot_shapes))
+        C = max(max(game_shp[k][0], game_shp[k][1]) for k in order)
+        at = {k: i * (C + 1) for i, k in enumerate(order)}
+        sheet = Image(len(order) * (C + 1), C)
+        for k in order:
+            w_, h_ = game_shp[k][0], game_shp[k][1]
+            sheet.blit(frame_image(game_shp[k], pal), at[k] + (C - w_) // 2, (C - h_) // 2)
+        sheet.save(os.path.join(out_dir, "slot_shapes.png"))
+        with open(os.path.join(out_dir, "slot_shapes.json"), "w", encoding="utf-8") as fh:
+            json.dump({"w": len(order) * (C + 1), "h": C, "slots": [[at[k], 0, C, C] for k in slot_shapes]}, fh)
+
 
 if __name__ == "__main__":
     main(*sys.argv[1:4])

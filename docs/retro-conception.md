@@ -1599,3 +1599,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
     oubli de l'exploration du niveau affiché. La légende est recopiée sous la carte.
   - **Retrait** : la téléportation quitte la mini-carte (ligne « Aller à », double-clic sur la
     carte et sur les lieux) ; elle ne reste que dans la grande carte.
+- **2026-11-14** : fenêtre d'inventaire : emplacements d'équipement vides affichés avec la silhouette du jeu (`gui_drawCharInventoryItem`, `slotShapes` de la version CD : images 0x2E à 0x35 de GAMESHP.SHP — tête 0x2E, corps 0x2F, arme 0x30, pieds 0x31, cou 0x32, poignets 0x33, bouclier 0x34, anneau 0x35), exportées dans `viewer/data/slot_shapes.png`.

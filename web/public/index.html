@@ -283,6 +283,8 @@
     background-image: url("viewer/data/item_icons.png"); background-size: 480px auto; background-repeat: no-repeat;
     cursor: pointer; }
   .slot.full:hover { border-color: #c9a227; }
+  /* emplacement d'équipement vide : silhouette du jeu (slot_shapes.png) */
+  .slot.ph { background-image: url("viewer/data/slot_shapes.png?v=20261114b"); background-repeat: no-repeat; image-rendering: pixelated; }
   .slot.sel { outline: 2px solid #c9a227; outline-offset: -1px; }
   /* gestion de l'inventaire (version ScummVM) : glisser-déposer et actions de la fiche */
   .slot.drop { outline: 2px dashed #28dce6; outline-offset: -1px; }
@@ -742,7 +744,7 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261114g"></script>
+<script src="minimap.js?v=20261114i"></script>
 <script src="engine.js?v=20261113a"></script>
 </body>
 </html>
