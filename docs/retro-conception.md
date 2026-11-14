@@ -878,7 +878,7 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
   - **Vérifié** au niveau 6, avec Michael sur Étincelle :
     - magie 6 → 1 (niveau 1, qui coûte 5) ; expérience de magie 1 → 11 avec le monstre tué ;
     - ensuite, sans magie, il frappe avec son arme : expérience de combat 1 → 34.
-- **Fenêtre « Triches » : atlas, boussole, sorts** (version ScummVM, 2026-11-13 ; bouton « Triches… »).
+- **Fenêtre « Débloquer » : atlas, boussole, sorts** (version ScummVM, 2026-11-13 ; bouton « Débloquer… », d'abord appelé « Triches »).
   - **Drapeaux** : l'atlas et la boussole sont des drapeaux de `_flagsTable[31]`, c'est-à-dire
     les drapeaux d'histoire 252 et 254 (octet 31 de la table publiée en `0x3E55C`).
     - 0x10 : l'atlas. `gui_drawPlayField` dessine le livre à droite, sous la boussole ;
@@ -1574,3 +1574,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : inventaire : bouton « Vider » (ScummVM) ; chaque case occupée du sac est détruite par la commande op 2 (`deleteItem`), avec confirmation. Vérifié : 3 objets détruits, l'équipement est gardé.
 - **2026-11-14** : vue 3D : monstres translucides (TCABAL) rendus translucides ; drapeaux des types publiés par le moteur ; tables LEVELnn.TLC décodées (§ 10 bis).
 - **2026-11-14** : page : inventaire et équipement dans une fenêtre modale (bouton « Gérer… » ou touche I, agrandie ; fiche de l'objet en colonne de droite) ; le panneau ne garde que le nombre de cases occupées.
+- **2026-11-14** : la fenêtre « Triches » devient « Débloquer » (bouton « Débloquer… »).

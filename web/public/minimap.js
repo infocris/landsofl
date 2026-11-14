@@ -1593,7 +1593,7 @@
     sendAutoSpells(false).catch(() => {});
   }, 1000);
 
-  // fenêtre « Triches » : les 7 sorts du joueur, connus ou à apprendre
+  // fenêtre « Débloquer » : les 7 sorts du joueur, connus ou à apprendre
   function renderLearn(all) {
     const mk = (label, title, types, cls) => {
       const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.title = title;
@@ -1696,7 +1696,7 @@
   }
 
 
-  // --- Fenêtre « Triches » : atlas, boussole, sorts (version ScummVM) -------------------------
+  // --- Fenêtre « Débloquer » : atlas, livre de sorts, boussole, sorts (version ScummVM) -------------------------
   // Atlas, livre de sorts et boussole : drapeaux de _flagsTable[31] (0x10 atlas = carte automatique,
   // 0x20 livre de sorts = parchemin, 0x40 boussole),
   // lus dans les drapeaux publiés (0x3E55C + 31) ; commande « unlock » (masque), puis le jeu
