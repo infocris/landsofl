@@ -179,6 +179,29 @@ def translucent_share(frames):
     return tr / tot if tot else 0
 
 
+def loaded_monster_types(files, n):
+    """Types de monstres du niveau d'après ses scripts, même sans monstre placé par une constante
+    (ex. squelettes MOLDER du Haut du Bois d'Opin, niveau 17, type 2) :
+    fonction 0x0B (olol_loadMonsterShapes : fichier .SHP, emplacement) et fonction 0x3F
+    (olol_loadMonsterProperties : type, emplacement). -> {type: [noms de sprites]}"""
+    slots, types = {}, {}
+    for kind in ("INI", "INF"):
+        if f"LEVEL{n}.{kind}" not in files:
+            continue
+        ck = emc.chunks(files[f"LEVEL{n}.{kind}"])
+        T = emc.texts(ck)
+        for _, fn, a in emc.calls(ck):
+            fn &= 0xFF
+            if fn == 0x0B and len(a) >= 2 and a[0] is not None and a[1] is not None and a[0] < len(T):
+                name = T[a[0]].rsplit(".", 1)[0]
+                lst = slots.setdefault(a[1], [])
+                if name not in lst:
+                    lst.append(name)
+            elif fn == 0x3F and len(a) >= 2 and a[0] is not None and a[1] is not None:
+                types[a[0]] = a[1]
+    return {t: slots[s] for t, s in types.items() if s in slots}
+
+
 def mirrored(src):
     out = Image(src.w, src.h)
     for y in range(src.h):
@@ -555,7 +578,12 @@ def main(game_dir, maps_dir, out_dir):
         ceil_img.save(os.path.join(out_dir, f"level{n:02d}_ceil.png"))
 
         # sprites des monstres : images 0-15 (face, profil, dos par groupes de 4, puis attaque)
-        sprite_names = sorted({s for m in level["monsters"] for s in m["sprites"]})
+        # types du niveau : monstres placés, plus ceux que les scripts chargent sans en placer
+        mtypes = {str(m["type"]): list(m["sprites"]) for m in level["monsters"] if m["type"] is not None and m["sprites"]}
+        for t, names in loaded_monster_types(files, n).items():
+            cur = mtypes.setdefault(str(t), [])
+            cur.extend(x for x in names if x not in cur)
+        sprite_names = sorted({s for m in level["monsters"] for s in m["sprites"]} | {s for v in mtypes.values() for s in v})
         sprite_sigs, sprite_variants, sprite_equip = {}, {}, {}
         sprites, sprite_imgs = {}, []
         sprite_ghost, ghost_auto = {}, []
@@ -676,8 +704,7 @@ def main(game_dir, maps_dir, out_dir):
             "monsters": [{k: m[k] for k in ("x", "y", "xOffs", "yOffs", "direction", "sprites", "spawn")}
                          for m in level["monsters"]],
             # type de monstre -> sprite (positions réelles lues en mémoire par la page du jeu)
-            "monsterTypes": {str(m["type"]): m["sprites"] for m in level["monsters"]
-                             if m["type"] is not None and m["sprites"]},
+            "monsterTypes": mtypes,
             "spriteSigs": sprite_sigs,
             "spriteVariants": sprite_variants,     # nom -> {variante: [[r, g, b, r2, g2, b2]…]}
             "spriteEquip": sprite_equip,           # nom -> 4 jeux × 16 numéros d'image (ou null)

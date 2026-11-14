@@ -1600,3 +1600,14 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
   - **Retrait** : la téléportation quitte la mini-carte (ligne « Aller à », double-clic sur la
     carte et sur les lieux) ; elle ne reste que dans la grande carte.
 - **2026-11-14** : fenêtre d'inventaire : emplacements d'équipement vides affichés avec la silhouette du jeu (`gui_drawCharInventoryItem`, `slotShapes` de la version CD : images 0x2E à 0x35 de GAMESHP.SHP — tête 0x2E, corps 0x2F, arme 0x30, pieds 0x31, cou 0x32, poignets 0x33, bouclier 0x34, anneau 0x35), exportées dans `viewer/data/slot_shapes.png`.
+- **2026-11-14** : vue 3D : types de monstres chargés par les scripts sans monstre placé.
+  - **Le cas** : les squelettes du Haut du Bois d'Opin (niveau 17) sont du type 2, sprite
+    MOLDER. Le script charge `MOLDER.SHP` dans l'emplacement 1 (fonction 0x0B) et associe le
+    type 2 à cet emplacement (fonction 0x3F). Mais aucun monstre de ce type n'est placé par une
+    valeur constante : ils apparaissent autrement. Le sprite n'était donc pas exporté, et la vue 3D
+    ne pouvait pas les dessiner.
+  - **Correction** : l'export (`loaded_monster_types`) ajoute ces types et leurs sprites à
+    `monsterTypes` et aux planches.
+  - **Effet** : des types en plus aux niveaux 2, 3, 7, 10, 17, 23, 24 et 29.
+  - **Vérifié** au niveau 17 : les squelettes apparaissent en 3D. Écart restant : dans le jeu,
+    ils portent des armes différentes (épée, hache), alors qu'en 3D les deux ont la même.
