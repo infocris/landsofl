@@ -1573,3 +1573,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-13** : attaque auto : arme ou sort (niveau max possible) par personnage (ScummVM) (§ 10 bis).
 - **2026-11-13** : inventaire : bouton « Vider » (ScummVM) ; chaque case occupée du sac est détruite par la commande op 2 (`deleteItem`), avec confirmation. Vérifié : 3 objets détruits, l'équipement est gardé.
 - **2026-11-14** : vue 3D : monstres translucides (TCABAL) rendus translucides ; drapeaux des types publiés par le moteur ; tables LEVELnn.TLC décodées (§ 10 bis).
+- **2026-11-14** : page : inventaire et équipement dans une fenêtre modale (bouton « Gérer… » ou touche I, agrandie ; fiche de l'objet en colonne de droite) ; le panneau ne garde que le nombre de cases occupées.

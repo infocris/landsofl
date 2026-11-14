@@ -78,6 +78,31 @@
   .sp-row button:hover:not(:disabled) { background: #22305a; color: #fff; }
   .sp-row button:disabled { opacity: .35; cursor: not-allowed; }
   #ch-open { margin-left: 0; }
+  #inv-mini { display: flex; align-items: baseline; gap: 8px; border-top: 1px solid #3a3226; padding-top: 6px; font-size: 12px; color: #cfc3a6; }
+  #inv-mini .inv-title { color: #c9a227; font-weight: 600; }
+  #inv-open { margin-left: auto; font: 11px/1 system-ui, sans-serif; padding: 3px 7px; border: 1px solid #c9a227; border-radius: 4px;
+    background: #1d1912; color: #c9a227; cursor: pointer; }
+  #inv-open:hover { background: #2a2217; color: #fff; }
+  /* inventaire et équipement : fenêtre modale, tout agrandi (zoom) */
+  #inv-dlg { width: min(1220px, 97vw); max-height: 94vh; padding: 0; border: 1px solid #6d5a3a; border-radius: 10px; color-scheme: dark;
+    background: #0f0d0a; color: #e8dcc0; font: 15px/1.4 system-ui, sans-serif; box-shadow: 0 20px 60px rgba(0,0,0,.7); }
+  #inv-dlg[open] { display: flex; flex-direction: column; }
+  #inv-dlg::backdrop { background: rgba(0, 0, 0, .65); }
+  #inv-dlg .cat-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px 10px; border-bottom: 1px solid #3a3226; }
+  #inv-dlg h2 { margin: 0; font-size: 20px; color: #c9a227; flex: 1; }
+  #inv-close { font-size: 20px; background: none; border: 0; color: #a39578; cursor: pointer; padding: 0 4px; }
+  #inv-close:hover { color: #fff; }
+  #inv-dlg .inv-body { overflow-y: auto; padding: 4px 16px 16px; display: flex; gap: 18px; align-items: flex-start; }
+  #inv-dlg #inv { border-top: 0; zoom: 1.45; flex: none; }
+  /* fiche de l'objet : colonne de droite */
+  #inv-side { flex: 1; min-width: 260px; position: sticky; top: 0; padding-top: 10px; }
+  #inv-side-hint { color: #8a7f68; font-size: 14px; padding: 12px; border: 1px dashed #3a3226; border-radius: 8px; }
+  #inv-side:has(#inv-detail:not([hidden])) #inv-side-hint { display: none; }
+  #inv-side #inv-detail { margin-top: 0; font-size: 14px; }
+  #inv-side #inv-detail .nm { font-size: 17px; }
+  #inv-side #inv-detail .note, #inv-side #inv-detail .cmp { font-size: 13px; }
+  #inv-side #inv-detail .acts button { font-size: 13px; padding: 5px 10px; }
+  @media (max-width: 900px) { #inv-dlg .inv-body { flex-direction: column; } #inv-dlg #inv { zoom: 1.2; } #inv-side { position: static; } }
   #auto-cfg { display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; align-items: center; margin-top: 6px; font-size: 11px; color: #a39578; }
   #auto-cfg[hidden] { display: none; }
   #auto-cfg .h { grid-column: 1 / -1; color: #c9a227; }
@@ -407,17 +432,8 @@
       <div id="sp-msg"></div>
     </div>
   </div>
-  <div id="inv">
-    <div class="inv-head"><span class="inv-title">Inventaire</span><span id="inv-count">en attente du jeu…</span><span class="inv-actions"><button type="button" id="inv-copy" title="Copier le contenu de l'inventaire en texte">Copier</button><button type="button" id="inv-save" title="Enregistrer le contenu de l'inventaire dans un fichier texte">.txt</button><button type="button" id="inv-clear" hidden title="Détruire tous les objets du sac (l'équipement et l'objet en main sont gardés) — deuxième clic pour confirmer">Vider</button></span></div>
-    <div id="inv-bar" class="inv-grid"></div>
-    <div id="inv-handrow">En main <span id="inv-hand"></span></div>
-    <div id="inv-chars"></div>
-    <div id="inv-hint"></div>
-    <div id="inv-add"><input id="inv-add-name" list="inv-add-list" placeholder="Créer un objet : nom ou numéro…" autocomplete="off">
-      <datalist id="inv-add-list"></datalist><button type="button" id="inv-add-btn">Créer</button><span id="inv-add-msg"></span></div>
-    <div id="inv-detail" hidden></div>
-    <button type="button" id="cat-open" title="Tous les objets du jeu, par catégorie : fiche et création dans le sac">Annuaire des objets…</button>
-  </div>
+  <div id="inv-mini"><span class="inv-title">Inventaire</span><span id="inv-mini-count">en attente du jeu…</span>
+    <button type="button" id="inv-open" title="Gérer le sac et l'équipement (touche I)">Gérer…</button></div>
   <div id="mm-items-title">Objets du niveau</div>
   <ol id="mm-items"></ol>
 </aside>
@@ -425,6 +441,23 @@
 <button id="persp" type="button" title="Perspective de la vue 3D : celle du jeu d'origine ou une perspective réelle"></button>
 <div id="mm-tip" hidden></div>
 <button id="sv-open" type="button" hidden title="Sauvegarder la partie ou charger une sauvegarde">Sauvegardes…</button>
+<dialog id="inv-dlg" aria-label="Inventaire et équipement">
+  <div class="cat-head"><h2>Inventaire et équipement</h2><button type="button" id="inv-close" title="Fermer (Échap, I)">✕</button></div>
+  <div class="inv-body">
+    <div id="inv">
+      <div class="inv-head"><span class="inv-title">Inventaire</span><span id="inv-count">en attente du jeu…</span><span class="inv-actions"><button type="button" id="inv-copy" title="Copier le contenu de l'inventaire en texte">Copier</button><button type="button" id="inv-save" title="Enregistrer le contenu de l'inventaire dans un fichier texte">.txt</button><button type="button" id="inv-clear" hidden title="Détruire tous les objets du sac (l'équipement et l'objet en main sont gardés) — deuxième clic pour confirmer">Vider</button></span></div>
+      <div id="inv-bar" class="inv-grid"></div>
+      <div id="inv-handrow">En main <span id="inv-hand"></span></div>
+      <div id="inv-chars"></div>
+      <div id="inv-hint"></div>
+      <div id="inv-add"><input id="inv-add-name" list="inv-add-list" placeholder="Créer un objet : nom ou numéro…" autocomplete="off">
+        <datalist id="inv-add-list"></datalist><button type="button" id="inv-add-btn">Créer</button><span id="inv-add-msg"></span></div>
+      <button type="button" id="cat-open" title="Tous les objets du jeu, par catégorie : fiche et création dans le sac">Annuaire des objets…</button>
+    </div>
+    <div id="inv-side"><div id="inv-side-hint">Clique sur un objet (sac, main ou équipement) pour voir sa fiche et ses actions.</div>
+      <div id="inv-detail" hidden></div></div>
+  </div>
+</dialog>
 <dialog id="ch-dlg" aria-labelledby="ch-h">
   <div class="cat-head"><h2 id="ch-h">Triches</h2><button type="button" id="ch-close" title="Fermer (Échap)">✕</button></div>
   <div class="ch-body">
@@ -517,7 +550,7 @@ window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes
   sendPersp();
 })();
 </script>
-<script src="minimap.js?v=20261114a"></script>
+<script src="minimap.js?v=20261114c"></script>
 <script src="engine.js?v=20261113a"></script>
 </body>
 </html>

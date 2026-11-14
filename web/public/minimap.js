@@ -1361,6 +1361,7 @@
 
     invBar.replaceChildren(...barTypes.map((t, k) => slot(t, `case ${k + 1}`, k)));
     invCount.textContent = `${barTypes.filter((t) => t >= 0).length} / ${INV.barSlots} cases occupées`;
+    document.getElementById("inv-mini-count").textContent = invCount.textContent;
     invHand.replaceChildren(slot(handType, "en main", LOC_HAND));
     document.querySelectorAll("#inv .slot.sel").forEach((e) => e.classList.remove("sel"));
     invChars.replaceChildren();
@@ -1918,6 +1919,34 @@
       if (done) invMessage(`${done} objet${done > 1 ? "s" : ""} détruit${done > 1 ? "s" : ""}.`);
       lastInv = ""; updateInventory().catch(() => {});
     });
+  }
+
+  // --- Fenêtre « Inventaire et équipement » (bouton « Gérer… » ou touche I) ---------------------
+  {
+    const invDlg = document.getElementById("inv-dlg");
+    const openInv = () => { if (!invDlg.open && !document.querySelector("dialog[open]")) { lastInv = ""; invDlg.showModal(); updateInventory().catch(() => {}); } };
+    document.getElementById("inv-open").addEventListener("click", (e) => { e.currentTarget.blur(); openInv(); });
+    document.getElementById("inv-close").addEventListener("click", () => invDlg.close());
+    invDlg.addEventListener("click", (e) => { if (e.target === invDlg) invDlg.close(); });
+    invDlg.addEventListener("close", () => { hideDetail(); const f = document.getElementById("dos"); if (f && f.focus) f.focus(); });
+    for (const ev of ["keyup", "keypress"]) invDlg.addEventListener(ev, (e) => e.stopPropagation());
+    invDlg.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      const t = e.target;
+      if (e.code === "KeyI" && !(t && (t.tagName === "INPUT" || t.tagName === "SELECT"))) { e.preventDefault(); invDlg.close(); }
+    });
+    // touche I : depuis la page ou depuis le jeu (cadre ScummVM), hors saisie
+    const onI = (e) => {
+      if (e.code !== "KeyI" || e.altKey || e.ctrlKey || e.metaKey) return;
+      const t = e.target;
+      if (t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA")) return;
+      if (document.querySelector("dialog[open]")) return;
+      e.preventDefault(); e.stopImmediatePropagation(); openInv();
+    };
+    addEventListener("keydown", onI, true);
+    const hook = () => { const f = document.querySelector("iframe#dos"); try { if (f && f.contentWindow) f.contentWindow.addEventListener("keydown", onI, true); } catch (e) {} };
+    hook();
+    { const f = document.querySelector("iframe#dos"); if (f) f.addEventListener("load", hook); }
   }
 
   // --- Export texte de l'inventaire ---------------------------------------------
