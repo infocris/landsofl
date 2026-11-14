@@ -1575,3 +1575,19 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
 - **2026-11-14** : vue 3D : monstres translucides (TCABAL) rendus translucides ; drapeaux des types publiés par le moteur ; tables LEVELnn.TLC décodées (§ 10 bis).
 - **2026-11-14** : page : inventaire et équipement dans une fenêtre modale (bouton « Gérer… » ou touche I, agrandie ; fiche de l'objet en colonne de droite) ; le panneau ne garde que le nombre de cases occupées.
 - **2026-11-14** : la fenêtre « Triches » devient « Débloquer » (bouton « Débloquer… »).
+- **2026-11-14** : serrures (`tools/locks.py`) : faux positifs corrigés.
+  - **Le cas** : les trous d'arbre de la Forêt du Nord (niveau 2, cases 7,2 et 15,7) appellent le
+    sous-programme 848. Celui-ci teste la direction du groupe, puis le drapeau d'histoire 191 ou
+    190, puis vérifie que la main est **vide**. Un personnage fait alors une remarque, le jeu lève
+    le drapeau et donne l'objet : Aloès (217) ou Ginseng (218). Les numéros de drapeau tombaient
+    sur ceux des Clefs de Jade et Tachetée.
+  - **Règle corrigée** : un sous-programme n'est une serrure que s'il lit l'objet en main
+    (fonction 0x53) **et** son type (0x12, `getItemPara`). Son corps est lu jusqu'au point d'entrée
+    suivant, et non plus jusqu'au premier retour : une vraie serrure sort d'abord si la main est
+    vide, puis compare le type.
+  - **Effet** : 60 serrures avant, 68 après.
+    - Retirées : niveau 2 (les 2 trous d'arbre), niveau 10 en 10,11 et niveau 22 en 24,11. Ce
+      sont des cases qui donnent un objet.
+    - Ajoutées, 12 serrures que l'ancienne lecture ratait, souvent par paires de cases voisines
+      (les deux côtés d'une porte) : niveau 23, Clefs Mystiques et Bleues ; niveau 26 ;
+      niveau 27, Petite Clef ; niveau 29, Clefs Émoussée, de la Mort et Huileuse.

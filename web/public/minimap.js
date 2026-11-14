@@ -100,9 +100,9 @@
     }
   }
   async function loadLevels() {
-    const index = await getJSON("viewer/data/levels.json?v=20261109o");
+    const index = await getJSON("viewer/data/levels.json?v=20261114a");
     for (const l of index) {
-      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261109p`);
+      const d = await getJSON(`viewer/data/level${String(l.level).padStart(2, "0")}.json?v=20261114a`);
       levels.push({ level: l.level, name: l.name, fr: l.frName || l.name.split(" — ")[0], faces: Uint8Array.from(d.faces), wallTypes: d.wallTypes,
         labels: d.labels, places: numberPlaces(d.labels || []), groups: groupItems(d.items || []), monsterTypes: d.monsterTypes || {},
         spriteSigs: d.spriteSigs || {}, spriteConds: d.spriteConds || {}, spriteOf: null, scenes: d.scenes || {}, locks: d.locks || [],
@@ -1226,7 +1226,7 @@
   const ICON = 20, ICON_COLS = 16, SCALE = 1.5;
   const invBar = document.getElementById("inv-bar"), invHand = document.getElementById("inv-hand"),
     invChars = document.getElementById("inv-chars"), invCount = document.getElementById("inv-count");
-  getJSON("viewer/data/items.json?v=20261109k").then((d) => { itemInfo = d; if (current) renderItemList(current); }, () => {});
+  getJSON("viewer/data/items.json?v=20261114a").then((d) => { itemInfo = d; if (current) renderItemList(current); }, () => {});
 
   function slot(type, label, loc) {
     const d = document.createElement("div");

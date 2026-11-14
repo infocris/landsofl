@@ -4,7 +4,11 @@ Quand on clique sur un mur, le jeu exécute le script de la case (table ORDR, §
 serrure lit l'objet en main (fonction 0x53), prend son type (fonction 0x12, paramètre 4)
 et le compare au type de la clé. Deux formes rencontrées :
   - comparaison directe dans le script de la case : « push <clé> ; eval == » ;
-  - appel d'un sous-programme du niveau qui lit l'objet en main, avec la clé en argument.
+  - appel d'un sous-programme du niveau qui lit l'objet en main ET son type (fonctions 0x53 puis
+    0x12), avec la clé en argument. Un sous-programme qui ne lit que l'objet en main (main vide ?)
+    n'est pas une serrure : ex. trous d'arbre de la Forêt du Nord (niveau 2, sous-programme 848),
+    qui donnent une herbe si la main est vide, une seule fois (drapeau d'histoire 190 / 191 en
+    argument, mêmes numéros que les Clefs Tachetée et de Jade).
 La case de la serrure est celle dont le script contient la comparaison ou l'appel.
 Clés = types d'objets dont le drapeau 0x0100 est présent (octets 3-4 de la table, § 8.2).
 
@@ -17,6 +21,7 @@ from pak import read_pak
 import emc
 
 FN_ITEM_IN_HAND = 0x53
+FN_ITEM_PARA = 0x12           # olol_getItemPara(objet, 4) = type de l'objet
 TABLE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "items_fr.json")
 
 
@@ -43,20 +48,35 @@ def level_locks(inf, keys):
 
     memo = {}
 
-    def reads_hand(target, depth=0):          # le sous-programme (ou un qu'il appelle) lit l'objet en main
+    # points d'entrée des sous-programmes (cibles d'appel) : le corps d'un sous-programme va jusqu'au
+    # suivant ; il peut contenir plusieurs retours (ex. sortie si la main est vide, puis test du type)
+    entries = sorted({ins[k + 1][2] for k in range(len(ins) - 1)
+                      if ins[k][1] == 2 and ins[k][2] == 1 and ins[k + 1][1] == 0})
+
+    def body_end(target):
+        nxt = [e for e in entries if e > target]
+        return nxt[0] if nxt else 1 << 30
+
+    def reads_hand(target, depth=0):          # le sous-programme (ou un qu'il appelle) lit le type de l'objet en main
         if (target, depth) in memo:
             return memo[(target, depth)]
         k, res = idx.get(target), False
         if k is not None and depth <= 3:
+            hand = para = False
+            end = body_end(target)
             for m in range(k, min(k + 400, len(ins))):
-                _, op, p = ins[m]
+                a, op, p = ins[m]
+                if a >= end:
+                    break
                 if op == 14 and p & 0xFF == FN_ITEM_IN_HAND:
+                    hand = True
+                if op == 14 and p & 0xFF == FN_ITEM_PARA:
+                    para = True
+                if hand and para:
                     res = True; break
                 if op == 2 and p == 1 and m + 1 < len(ins) and ins[m + 1][1] == 0 \
                         and reads_hand(ins[m + 1][2], depth + 1):
                     res = True; break
-                if op == 8 and p == 1:        # retour
-                    break
         memo[(target, depth)] = res
         return res
 
