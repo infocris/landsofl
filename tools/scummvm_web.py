@@ -102,6 +102,33 @@ def write_ini():
 # Lanceur : met à jour la section [lol-fr] du scummvm.ini gardé par le navigateur, puis charge ScummVM
 LAUNCH_JS = r"""<script src="volume.js"></script>
 <script>
+// Fichiers du jeu : ScummVM (backends/fs/emscripten/http-fs.cpp) les télécharge par fetch() une seule
+// fois, et un échec (réseau, proxy Tailscale qui bloque une requête) arrête le jeu : « couldn't load file
+// 'L20.PAK' ». Pour data/ : délai de 15 s par essai, contrôle de la taille annoncée, jusqu'à 5 essais.
+(() => {
+  const native = window.fetch.bind(window), sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  window.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    if (!/(^|\/)data\//.test(new URL(url, location.href).pathname) || (init && init.signal)) return native(input, init);
+    let last;
+    for (let n = 1; n <= 5; n++) {
+      const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 15000);
+      try {
+        const r = await native(input, { ...init, signal: ctl.signal });
+        if (r.status >= 500) throw new Error(`HTTP ${r.status}`);
+        if (!r.ok) return r;                                     // 404 : fichier absent, réponse normale
+        const body = await r.arrayBuffer(), len = r.headers.get("Content-Length");
+        if (len !== null && +len !== body.byteLength) throw new Error(`taille ${body.byteLength}/${len}`);
+        return new Response(body, { status: r.status, statusText: r.statusText, headers: r.headers });
+      } catch (e) {
+        last = e;
+        console.warn(`Téléchargement de ${url} : essai ${n} échoué (${e.message || e})`);
+        await sleep(500 * n);
+      } finally { clearTimeout(t); }
+    }
+    throw last;
+  };
+})();
 // SDL3 (emscripten) s'abonne au clavier de window à chaque création de fenêtre sans retirer l'abonnement
 // précédent : un appui arrive plusieurs fois (le jeu voit des répétitions : Échap ouvre puis referme le
 // menu, lettres en double dans les noms de sauvegarde). Seul le dernier abonnement (fenêtre active) est
@@ -335,6 +362,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return p
 
 
+class Server(http.server.ThreadingHTTPServer):
+    """ScummVM demande une quarantaine de PAK à la fois au démarrage (FILEDATA.FDT). File d'attente de 5
+    connexions par défaut : les suivantes sont perdues et le proxy du portail (Caddy, port 8920) renvoie
+    502 « dial tcp :8000: i/o timeout » au bout de 3 s, d'où « couldn't load file 'L20.PAK' »."""
+    request_queue_size = 256
+    daemon_threads = True
+
+
 def prepare():
     if not os.path.exists(os.path.join(SITE, "scummvm.wasm")):
         sys.exit("web/scummvm/scummvm.wasm absent (voir l'en-tête de ce script : import).")
@@ -415,4 +450,4 @@ if __name__ == "__main__":
     prepare()
     print(f"http://localhost:{port}/lol.html")
     handler = functools.partial(Handler, directory=SITE)
-    http.server.ThreadingHTTPServer(("127.0.0.1", port), handler).serve_forever()
+    Server(("127.0.0.1", port), handler).serve_forever()

@@ -1611,3 +1611,14 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
   - **Effet** : des types en plus aux niveaux 2, 3, 7, 10, 17, 23, 24 et 29.
   - **Vérifié** au niveau 17 : les squelettes apparaissent en 3D. Écart restant : dans le jeu,
     ils portent des armes différentes (épée, hache), alors qu'en 3D les deux ont la même.
+- **2026-11-15** : ScummVM web : « couldn't load file 'L20.PAK' » au démarrage via le portail (port 8920).
+  - **Cause** : au démarrage, le jeu charge tous les PAK listés dans `FILEDATA.FDT` (`Resource::loadFileList`).
+    Le système de fichiers HTTP de ScummVM (`backends/fs/emscripten/http-fs.cpp`) les télécharge alors presque
+    tous en même temps, sans réessayer. Or le serveur Python n'accepte que 5 connexions en attente
+    (`request_queue_size`). Les connexions suivantes sont perdues ; Caddy renvoie 502
+    (« dial tcp :8000: i/o timeout » au bout de 3 s) et le moteur s'arrête. Le PAK touché varie d'une fois à l'autre.
+  - **Correction** :
+    - `tools/scummvm_web.py` accepte 256 connexions en attente ;
+    - la page du jeu (`lol-game.html`) entoure `fetch` pour les fichiers de `data/` : 15 s maximum par essai,
+      contrôle de la taille annoncée (`Content-Length`), jusqu'à 5 essais.
+  - **Vérifié** : 96 PAK demandés en parallèle via le portail, 3 fois de suite, tous en 200 ; le jeu démarre sans erreur.
