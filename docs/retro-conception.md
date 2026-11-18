@@ -583,6 +583,35 @@ grand qu'en perspective réelle.
 vivante (§ 12.2), donc l'état réel des portes. Pour que ces identifiants aient une
 texture, l'export produit une texture pour tous les types de mur du niveau.
 
+### 9.3 ter Transitions de déplacement — vérifié dans ScummVM (2026-11-19)
+
+**Principe.** Rien n'est prégénéré : la vue est recomposée à chaque pas à partir des morceaux
+du `.VMP` et des décorations, et les transitions sont calculées en direct par des déformations
+2D de l'image de la vue. Les fonctions de ScummVM sont `movePartySmoothScroll*` dans
+`scene_lol.cpp` et `smoothScroll*` dans `screen_lol.cpp`.
+
+**Avancer.** La nouvelle vue est dessinée hors écran.
+- L'image courante est agrandie depuis un rectangle centré qui se resserre, en 5 étapes. Les
+  marges de ces étapes sont lues dans des tables fixes de `LANDS.EXE` (`kLoLScrollXTop`,
+  `kLoLScrollYTop`, `kLoLScrollXBottom`, `kLoLScrollYBottom`).
+- Les moitiés haute (`smoothScrollZoomStepTop`) et basse (`smoothScrollZoomStepBottom`) sont
+  agrandies séparément.
+- La nouvelle vue est ensuite affichée d'un coup.
+
+**Reculer.** Même agrandissement, appliqué à la nouvelle vue.
+
+**Pas de côté.** Glissement horizontal de l'ancienne et de la nouvelle vue par bandes de 22 px
+(`smoothScrollHorizontalStep`).
+
+**Tourner.** Trois images intermédiaires qui mêlent l'ancienne et la nouvelle vue
+(`smoothScrollTurnStep1` à `3`), avec un délai double par étape.
+
+**Bloqué par un mur.** Agrandissement, puis retour à la vue de départ (`movePartySmoothScrollBlocked`).
+
+**Réglages.** L'option du jeu « défilement doux » (`smooth_scrolling` dans ScummVM) supprime
+ces transitions : la vue change sans étape intermédiaire. En mode rapide
+(`_smoothScrollModeNormal` faux), une étape sur deux est sautée.
+
 ### 9.4 Décorations — `.DAT` — vérifié pour la vue de face
 
 ```
