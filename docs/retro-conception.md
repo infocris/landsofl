@@ -972,6 +972,25 @@ pas. Le sens des fonctions, lui, s'y lit directement. Confrontation avec nos dé
     monstre est derrière un mur (`zbuf`), s'il est mourant (mode ≥ 13) ou s'il est à 0.
   - **Vérifié** au niveau 6, face aux rats : barres pleines, puis la plus proche passe au jaune
     sous l'attaque auto.
+- **Carte automatique du jeu, tous niveaux** (version ScummVM, 2026-11-19 ; mode « ◐ jeu » des cartes).
+  - **Marquage** : `updateAutoMap` pose `flags |= 7` sur la case du groupe et sur ses 8 voisines.
+    Une voisine n'est pas marquée si un mur la sépare : `_wllAutomapData[mur] & 0xC0`.
+    Le marquage n'a lieu que si l'atlas est possédé (`_flagsTable[31] & 0x10`). Sans atlas, rien n'est noté.
+  - **Où c'est rangé** :
+    - niveau en cours : `_levelBlockProperties[i].flags`, l'octet 9 de la grille en DOS ;
+    - niveaux quittés : `_lvlTempData[n-1]->flags`, copie des drapeaux de toutes les cases ;
+    - niveaux visités : `_hasTempDataFlags`, bit n-1 pour le niveau n. Ces données sont sauvegardées avec la partie.
+  - **Lecture par le jeu** : la carte du jeu (`displayAutomap`) parcourt les niveaux visités avec ses
+    flèches (`automapForwardButton`). Pour chacun, elle recharge ces données (`restoreBlockTempData`).
+  - **Zone publiée `0x7F001000`** :
+    - niveaux visités : u32, plus le niveau en cours ;
+    - puis 29 × 128 octets, un bit par case (`flags & 7`). La case i d'un niveau est le bit `i & 7` de l'octet `i >> 3`.
+  - **Mode « ◐ jeu »** : le bouton ◐ des cartes passe de « toute la carte » à « exploration de la page »,
+    puis à « carte du jeu ». En mode jeu, on voit exactement les cases du jeu ; les boutons ↺ sont désactivés.
+    Sous DOSBox, seul le niveau en cours est connu (grille vivante).
+  - **Vérifié** :
+    - nouvelle partie : 0 case avant l'atlas, 8 après 5 pas ;
+    - changement de niveau (op 4) : les 8 cases du niveau 1 restent publiées et s'affichent sur la grande carte.
 - **Choisir les compagnons** (version ScummVM, 2026-11-13 ; fenêtre des fiches, « Compagnons »).
   - **Taille du groupe** : 3 personnages au plus (`addCharacter` refuse au-delà), rangés sans trou à
     partir de la place 0 (`countActiveCharacters` s'arrête au premier personnage inactif). La
@@ -1656,3 +1675,4 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
     du `localStorage`. L'exploration de l'autre moteur et les autres réglages sont gardés.
   - Les cases marquées par la carte automatique du jeu sur le niveau en cours (octet 9 & 7) réapparaissent,
     car elles font partie de la partie elle-même.
+- **2026-11-19** : cartes : mode « ◐ jeu », synchronisé avec la carte automatique du jeu (zone `0x7F001000`, § 10 bis).

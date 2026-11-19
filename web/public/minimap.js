@@ -383,11 +383,37 @@
   // côtés (profondeur de la vue), arrêt au premier mur ou porte fermée. S'y ajoutent les marques
   // de la carte automatique du jeu (octet 9 de la case, & 7) quand le jeu les pose.
   // Mémorisé par moteur et par niveau (localStorage) ; ↺ oublie le niveau affiché.
+  // Mode « jeu » (◐ jeu) : la carte montre exactement les cases de la carte automatique du jeu, sans
+  // l'exploration de la page. ScummVM publie celle de tous les niveaux visités (zone 0x7F001000 :
+  // niveaux visités u32, puis 29 × 128 octets, un bit par case) ; DOSBox : niveau en cours seulement.
+  // Le jeu ne marque les cases qu'une fois l'atlas trouvé (updateAutoMap, drapeau 0x10 de l'octet 31).
   const SEEN_KEY = (level) => `minimapSeen:${window.LOL_ENGINE || "dosbox"}:${level}`;
   const seenOf = new Map();                     // n° de niveau -> Uint8Array(1024)
   const gameSeen = new Uint8Array(1024);        // marques du jeu dans la grille vivante
-  let fogOn = true;
-  try { fogOn = localStorage.getItem("minimapFog") !== "0"; } catch (e) {}
+  let fogOn = true, fogGame = false;
+  try { const v = localStorage.getItem("minimapFog"); fogOn = v !== "0"; fogGame = v === "game"; } catch (e) {}
+  const gameMaps = new Map();                   // n° de niveau -> Uint8Array(1024), autres niveaux (ScummVM)
+  let gameSeenLevel = null;                     // niveau de la grille vivante (gameSeen)
+  const NO_CELLS = new Uint8Array(1024);
+  const gameMapFor = (L) => L.level === gameSeenLevel ? gameSeen : gameMaps.get(L.level) || NO_CELLS;
+  const GAME_MAP = 0x7F001000;
+  let gameMapsTime = 0, gameMapsHash = 0;
+  async function readGameMaps() {
+    if (window.LOL_ENGINE !== "scummvm") return false;      // DOSBox : grille vivante seulement
+    const r = await mem.read([[GAME_MAP, 4 + 29 * 128]]);
+    if (!r || !r[0]) return false;
+    const b = r[0], visited = (b[0] | b[1] << 8 | b[2] << 16 | b[3] << 24) >>> 0;
+    let hash = visited | 0;
+    for (let l = 0; l < 29; l++) {
+      if (!(visited & (1 << l))) { gameMaps.delete(l + 1); continue; }
+      const m = gameMaps.get(l + 1) || new Uint8Array(1024);
+      for (let i = 0; i < 1024; i++) { m[i] = (b[4 + l * 128 + (i >> 3)] >> (i & 7)) & 1; hash = (hash * 31 + m[i]) | 0; }
+      gameMaps.set(l + 1, m);
+    }
+    const changed = hash !== gameMapsHash;
+    gameMapsHash = hash;
+    return changed;
+  }
   function seenFor(L) {
     let s = seenOf.get(L.level);
     if (!s) {
@@ -400,7 +426,7 @@
   function saveSeen(L) {
     try { localStorage.setItem(SEEN_KEY(L.level), Array.from(seenFor(L), (v) => v ? "1" : "0").join("").replace(/0+$/, "")); } catch (e) {}
   }
-  const visible = (L, i) => !fogOn || !L || seenFor(L)[i] === 1;
+  const visible = (L, i) => !fogOn || !L || (fogGame ? gameMapFor(L)[i] === 1 : seenFor(L)[i] === 1);
   function opaque(L, i) { const c = cellClass(L, i); return c === "wall" || c === "special" || c === "unknown" || c === "doorClosed" || c === "fake"; }
   // renvoie true si de nouvelles cases ont été découvertes
   function explore(L, block, dir) {
@@ -427,16 +453,28 @@
   }
   const fogBtn = document.getElementById("mm-fog"), forgetBtn = document.getElementById("mm-forget");
   let fogKey = "";
+  const FOG_TITLE = {
+    off: "Toute la carte (clic : exploration de la page)",
+    web: "Exploration de la page : cases déjà vues par le groupe (clic : carte du jeu)",
+    game: "Carte du jeu : mêmes cases que la carte automatique du jeu, atlas requis (clic : toute la carte)",
+  };
+  function showFogBtn(b) {
+    const mode = !fogOn ? "off" : fogGame ? "game" : "web";
+    b.classList.toggle("on", fogOn); b.classList.toggle("game", fogGame && fogOn);
+    b.textContent = mode === "game" ? "◐ jeu" : "◐"; b.title = FOG_TITLE[mode];
+  }
   function refreshFog() {
-    fogBtn.classList.toggle("on", fogOn);
-    forgetBtn.disabled = !fogOn || !current;
+    showFogBtn(fogBtn);
+    forgetBtn.disabled = !fogOn || fogGame || !current;
     fogKey = "";
     if (current) renderItemList(current);
     draw(lastDraw[0], lastDraw[1]);
   }
   fogBtn.addEventListener("click", (e) => {
-    fogOn = !fogOn;
-    try { localStorage.setItem("minimapFog", fogOn ? "1" : "0"); } catch (err) {}
+    // cycle : toute la carte -> exploration de la page -> carte du jeu -> toute la carte
+    if (!fogOn) { fogOn = true; fogGame = false; } else if (!fogGame) fogGame = true; else { fogOn = false; fogGame = false; }
+    try { localStorage.setItem("minimapFog", !fogOn ? "0" : fogGame ? "game" : "1"); } catch (err) {}
+    if (fogGame) readGameMaps().then(() => refreshFog());
     refreshFog(); e.currentTarget.blur();
   });
   forgetBtn.addEventListener("click", (e) => {
@@ -446,7 +484,7 @@
     if (lastDraw[0] < 1024) explore(current, lastDraw[0], lastDraw[1]);
     refreshFog();
   });
-  fogBtn.classList.toggle("on", fogOn);
+  showFogBtn(fogBtn);
   // clé des lieux et objets visibles : la liste est refaite quand elle change
   const fogListKey = (L) => fogOn ? L.places.filter((p) => visible(L, p.y * 32 + p.x)).length + "/" + L.groups.filter((gr) => visible(L, gr.y * 32 + gr.x)).length : "";
 
@@ -787,7 +825,7 @@
   const bmTex = document.getElementById("bm-tex"), bmFog = document.getElementById("bm-fog"), bmForget = document.getElementById("bm-forget"),
     bmForgetAll = document.getElementById("bm-forget-all");
   function syncBigOpts() {
-    bmTex.classList.toggle("on", texMode); bmFog.classList.toggle("on", fogOn); bmForget.disabled = bmForgetAll.disabled = !fogOn;
+    bmTex.classList.toggle("on", texMode); showFogBtn(bmFog); bmForget.disabled = bmForgetAll.disabled = !fogOn || fogGame;
   }
   bmTex.addEventListener("click", (e) => { e.currentTarget.blur(); setTexMode(!texMode); syncBigOpts(); });
   bmFog.addEventListener("click", (e) => { e.currentTarget.blur(); fogBtn.click(); syncBigOpts(); });
@@ -1130,8 +1168,13 @@
       if (d < bd) { bd = d; near = l; }
     }
     labelEl.textContent = near ? near.text : "";
+    gameSeenLevel = current.level;
     explore(current, block, dir);
-    forgetBtn.disabled = !fogOn;
+    forgetBtn.disabled = !fogOn || fogGame;
+    if (fogGame && fogOn && now - gameMapsTime > 1000) {      // autres niveaux de la carte du jeu (ScummVM)
+      gameMapsTime = now;
+      if (await readGameMaps() && bigOpen && bigOther()) drawBig();
+    }
     if (fogListKey(current) !== fogKey) { fogKey = fogListKey(current); renderItemList(current); }
     // objets à portée (case du groupe et cases voisines)
     for (const li of [...itemsEl.children, ...placesEl.children]) {

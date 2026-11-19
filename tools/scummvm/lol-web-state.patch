@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..10633727 100644
+index 392e4c2d..f4ae7071 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -32,6 +32,7 @@
@@ -21,7 +21,7 @@ index 392e4c2d..10633727 100644
  namespace Kyra {
  
  const char *const LoLEngine::kMouseKeymapName = "lolmouse";
-@@ -929,6 +934,521 @@ void LoLEngine::startupNew() {
+@@ -929,6 +934,546 @@ void LoLEngine::startupNew() {
  	_screen->showMouse();
  }
  
@@ -164,6 +164,31 @@ index 392e4c2d..10633727 100644
 +	begin(0x7F000900);
 +	for (int t = 0; t < 5; t++) u16(_monsterProperties ? _monsterProperties[t].hitPoints : 0);
 +	for (int t = 0; t < 5; t++) u16(_monsterProperties ? _monsterProperties[t].flags : 0);
++	end();
++	// carte automatique du jeu, tous niveaux : niveaux visités (u32, bit n-1 = niveau n ; _hasTempDataFlags,
++	// plus le niveau en cours), puis 29 × 128 octets (bit i&7 de l'octet i>>3 : case i marquée, flags & 7).
++	// Niveau en cours : grille vivante ; autres : données gardées en quittant le niveau (_lvlTempData).
++	begin(0x7F001000);
++	{
++		uint32 visited = _hasTempDataFlags;
++		if (_currentLevel >= 1 && _currentLevel <= 29)
++			visited |= 1u << (_currentLevel - 1);
++		u8(visited & 0xFF); u8((visited >> 8) & 0xFF); u8((visited >> 16) & 0xFF); u8(visited >> 24);
++		for (int l = 0; l < 29; l++) {
++			const bool cur = l + 1 == _currentLevel && _levelBlockProperties;
++			const uint16 *fl = (!cur && (_hasTempDataFlags & (1u << l)) && _lvlTempData[l]) ? _lvlTempData[l]->flags : nullptr;
++			for (int b = 0; b < 128; b++) {
++				uint8 v = 0;
++				for (int k = 0; k < 8; k++) {
++					const int i = b * 8 + k;
++					const uint16 f = cur ? _levelBlockProperties[i].flags : fl ? fl[i] : 0;
++					if (f & 7)
++						v |= 1 << k;
++				}
++				u8(v);
++			}
++		}
++	}
 +	end();
 +	// personnages prédéfinis (table de addCharacter) : nombre u8, puis id i16 + nom 11 octets + raceClassSex
 +	begin(0x7F000800);
@@ -543,7 +568,7 @@ index 392e4c2d..10633727 100644
  void LoLEngine::runLoop() {
  	// Initialize debugger since how it should be fully usable
  	static_cast<Debugger_LoL *>(getDebugger())->initialize();
-@@ -957,6 +1477,7 @@ void LoLEngine::runLoop() {
+@@ -957,6 +1502,7 @@ void LoLEngine::runLoop() {
  		gui_updateInput();
  
  		update();
@@ -551,7 +576,7 @@ index 392e4c2d..10633727 100644
  
  		updatePlayTimer();
  
-@@ -1178,6 +1699,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
+@@ -1178,6 +1724,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
  	return size;
  }
  
@@ -649,7 +674,7 @@ index 392e4c2d..10633727 100644
  bool LoLEngine::addCharacter(int id) {
  	const uint16 *cdf[] = {
  		_charDefsMan, _charDefsMan, _charDefsMan, _charDefsWoman,
-@@ -1477,6 +2089,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
+@@ -1477,6 +2114,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
  
  	int newVal = (mode == 2) ? (pointsMax + points) : (mode ? (pointsCur + points) : points);
  	newVal = CLIP(newVal, 0, pointsMax);
@@ -658,7 +683,7 @@ index 392e4c2d..10633727 100644
  
  	if (type) {
  		c->magicPointsCur = newVal;
-@@ -2074,6 +2688,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
+@@ -2074,6 +2713,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
  
  void LoLEngine::delay(uint32 millis, bool doUpdate, bool) {
  	while (millis && !shouldQuit()) {
@@ -666,7 +691,7 @@ index 392e4c2d..10633727 100644
  		if (doUpdate)
  			update();
  		else
-@@ -2092,6 +2707,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
+@@ -2092,6 +2732,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
  // spells
  
  int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
