@@ -1651,3 +1651,8 @@ sur les sorts, sur la carte automatique) reste **inconnu**.
     - la page du jeu (`lol-game.html`) entoure `fetch` pour les fichiers de `data/` : 15 s maximum par essai,
       contrôle de la taille annoncée (`Content-Length`), jusqu'à 5 essais.
   - **Vérifié** : 96 PAK demandés en parallèle via le portail, 3 fois de suite, tous en 200 ; le jeu démarre sans erreur.
+- **2026-11-19** : grande carte (Tab) : bouton « ↺ tous ».
+  - Il oublie l'exploration de tous les niveaux pour le moteur de la page : clés `minimapSeen:<moteur>:<niveau>`
+    du `localStorage`. L'exploration de l'autre moteur et les autres réglages sont gardés.
+  - Les cases marquées par la carte automatique du jeu sur le niveau en cours (octet 9 & 7) réapparaissent,
+    car elles font partie de la partie elle-même.

@@ -146,6 +146,7 @@
   #bm-dlg .bm-opts button { font: 600 14px/1 system-ui, sans-serif; width: 32px; height: 28px; padding: 0; border: 1px solid #554a36;
     border-radius: 6px; background: #1d1912; color: #cfc3a6; cursor: pointer; }
   #bm-dlg .bm-opts button.on { border-color: #c9a227; color: #c9a227; }
+  #bm-dlg .bm-opts button.wide { width: auto; padding: 0 8px; }
   #bm-dlg .bm-opts button:disabled { opacity: .35; cursor: default; }
   #bm-legend { padding: 0 16px 14px; color: #a39578; font-size: 12px; max-width: 900px; }
   #bm-legend i { display: inline-block; width: 10px; height: 10px; margin: 0 4px 0 10px; vertical-align: -1px; }
@@ -475,7 +476,7 @@
 </dialog>
 <dialog id="bm-dlg" aria-labelledby="bm-title">
   <div class="cat-head"><h2 id="bm-title">Carte</h2><select id="bm-level" aria-label="Niveau affiché" title="Afficher un autre niveau (double-clic sur une case : s'y téléporter)"></select>
-    <span class="bm-opts"><button type="button" id="bm-tex" title="Cases illustrées avec les textures du lieu / couleurs simples">▦</button><button type="button" id="bm-fog" title="Exploration progressive : n'afficher que les cases déjà vues / toute la carte">◐</button><button type="button" id="bm-forget" title="Oublier l'exploration du niveau affiché">↺</button></span><span id="bm-hint"></span><button type="button" id="bm-close" title="Fermer (Tab, Échap)">✕</button></div>
+    <span class="bm-opts"><button type="button" id="bm-tex" title="Cases illustrées avec les textures du lieu / couleurs simples">▦</button><button type="button" id="bm-fog" title="Exploration progressive : n'afficher que les cases déjà vues / toute la carte">◐</button><button type="button" id="bm-forget" title="Oublier l'exploration du niveau affiché">↺</button><button type="button" id="bm-forget-all" class="wide" title="Oublier l'exploration de tous les niveaux (nouvelle partie)">↺ tous</button></span><span id="bm-hint"></span><button type="button" id="bm-close" title="Fermer (Tab, Échap)">✕</button></div>
   <div class="bm-body"><canvas id="bm-canvas"></canvas></div>
   <div id="bm-legend"></div>
 </dialog>
@@ -744,7 +745,7 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261114j"></script>
+<script src="minimap.js?v=20261119a"></script>
 <script src="engine.js?v=20261113a"></script>
 </body>
 </html>

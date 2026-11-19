@@ -784,9 +784,10 @@
   }
   // options d'affichage de la mini-carte, reprises dans la fenêtre (mêmes réglages) : cases
   // illustrées, brouillard ; ↺ oublie l'exploration du niveau affiché ; légende recopiée
-  const bmTex = document.getElementById("bm-tex"), bmFog = document.getElementById("bm-fog"), bmForget = document.getElementById("bm-forget");
+  const bmTex = document.getElementById("bm-tex"), bmFog = document.getElementById("bm-fog"), bmForget = document.getElementById("bm-forget"),
+    bmForgetAll = document.getElementById("bm-forget-all");
   function syncBigOpts() {
-    bmTex.classList.toggle("on", texMode); bmFog.classList.toggle("on", fogOn); bmForget.disabled = !fogOn;
+    bmTex.classList.toggle("on", texMode); bmFog.classList.toggle("on", fogOn); bmForget.disabled = bmForgetAll.disabled = !fogOn;
   }
   bmTex.addEventListener("click", (e) => { e.currentTarget.blur(); setTexMode(!texMode); syncBigOpts(); });
   bmFog.addEventListener("click", (e) => { e.currentTarget.blur(); fogBtn.click(); syncBigOpts(); });
@@ -796,6 +797,17 @@
     if (!L || !confirm(`Oublier l'exploration du niveau ${L.level} (${L.fr}) sur la carte ?`)) return;
     seenFor(L).fill(0); saveSeen(L);
     if (L === current && lastDraw[0] < 1024) explore(current, lastDraw[0], lastDraw[1]);
+    refreshFog();
+  });
+  // ↺ tous : oublie l'exploration de tous les niveaux (moteur de la page), mémorisée ou non
+  bmForgetAll.addEventListener("click", (e) => {
+    e.currentTarget.blur();
+    if (!confirm("Oublier l'exploration de tous les niveaux sur les cartes ?\n\n" +
+      "Les cases marquées par la carte automatique du jeu (niveau en cours) réapparaîtront.")) return;
+    const prefix = SEEN_KEY("");
+    try { for (let i = localStorage.length - 1; i >= 0; i--) { const k = localStorage.key(i); if (k && k.startsWith(prefix)) localStorage.removeItem(k); } } catch (err) {}
+    seenOf.clear();
+    if (current && lastDraw[0] < 1024) explore(current, lastDraw[0], lastDraw[1]);
     refreshFog();
   });
   const bigLevelSel = document.getElementById("bm-level");
