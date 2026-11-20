@@ -5,7 +5,8 @@ web/public/emulators) : scummvm.wasm/.js, données de ScummVM, licences (doc/), 
 Origine exacte : web/scummvm/VERSION.txt. Les fichiers du jeu (data/games) ne sont pas versionnés.
 
 Recompiler (facultatif) : dans third_party/scummvm (clone de github.com/scummvm/scummvm, branche
-locale lol-web = commit noté dans VERSION.txt + tools/scummvm/lol-web-state.patch), moteur Kyra seul
+lol-web = commit noté dans VERSION.txt + tools/scummvm/lol-web-state.patch, publiée sur le fork
+github.com/infocris/scummvm), moteur Kyra seul
 (voir docs/retro-conception.md, § 10 bis) :
   ./dists/emscripten/build.sh setup configure make dist --disable-all-engines --enable-engine=kyra,lol
 puis copier le résultat dans web/scummvm : python3 -I tools/scummvm_web.py import
@@ -434,7 +435,7 @@ def import_build():
         f.write("ScummVM (GPL v3, licences dans doc/), portage WebAssembly, moteur Kyra seul.\n"
                 f"Source : https://github.com/scummvm/scummvm, commit {base} "
                 f"({git('log', '-1', '--format=%cs', base)})\n"
-                f"Modification : tools/scummvm/lol-web-state.patch (branche locale {git('rev-parse', '--abbrev-ref', 'HEAD')}, "
+                f"Modification : tools/scummvm/lol-web-state.patch (branche {git('rev-parse', '--abbrev-ref', 'HEAD')} de github.com/infocris/scummvm, "
                 f"commit {git('rev-parse', '--short', 'HEAD')})\n"
                 "Compilation : dists/emscripten/build.sh setup configure make dist --disable-all-engines "
                 "--enable-engine=kyra,lol (Emscripten 4.0.10)\n"
