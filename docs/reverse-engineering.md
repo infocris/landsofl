@@ -1476,6 +1476,12 @@ party to measure the gap between two sheets.
 - **Up / down arrows**: move forward / backward.
 - **Left / right arrows and keypad 4 / 6**: turn.
 - **Keypad 7 / 9**: sidestep (not rotation, contrary to my first hypothesis).
+- **Other keys, from ScummVM's keymap** (`LoLEngine::initKeymaps`, "Lands of Lore - Keyboard"; read in the source, not tested in the DOS version):
+  - **F1 / F2 / F3**: attack with character 1 / 2 / 3 (same as clicking the character's weapon, `clickedAttackButton`). These keys are not in the minimap's move list and work in both QWERTY and AZERTY.
+  - **/**: select the next known spell (`gui_highlightSelectedSpell`); ignored while weapons are disabled or with a single spell known.
+  - **M**: map (needs the atlas); **R**: rest; **O**: options menu.
+  - **Space / Enter**: stop the current speech (`snd_stopSpeech`).
+  - Movement: Up / Down = forward / backward, Left / Right = slide, Home / Page Up = turn left / right (ScummVM defaults; the original arrow and keypad keys above also work).
 
 ### 12.5 Saves — verified
 
@@ -1672,3 +1678,4 @@ spells, on the in-game automap) remains **unknown**.
     since they are part of the game itself.
 - **2026-11-19**: maps: "◐ jeu" (game) mode, synchronized with the in-game automap (zone `0x7F001000`, § 10a).
 - **2026-11-20**: document translated into English and renamed from `docs/retro-conception.md` to `docs/reverse-engineering.md`. Section suffixes now use letters (§ 10a instead of § 10 bis). Quoted in-game text, French level names and the web page's UI labels stay in French.
+- **2026-11-20**: game keys completed from ScummVM's keymap: F1-F3 attack with characters 1-3, `/` next spell, M/R/O (§ 12.4).
