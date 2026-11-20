@@ -1,5 +1,5 @@
 ScummVM (GPL v3, licences dans doc/), portage WebAssembly, moteur Kyra seul.
 Source : https://github.com/scummvm/scummvm, commit 250505ed66595e794e503476c342a0aa48f23164 (2026-11-09)
-Modification : tools/scummvm/lol-web-state.patch (branche locale lol-web, commit 87c1a53f)
+Modification : tools/scummvm/lol-web-state.patch (branche locale lol-web, commit 6ef61425)
 Compilation : dists/emscripten/build.sh setup configure make dist --disable-all-engines --enable-engine=kyra,lol (Emscripten 4.0.10)
 Importé le 2026-11-19
