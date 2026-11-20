@@ -1477,7 +1477,7 @@ party to measure the gap between two sheets.
 - **Left / right arrows and keypad 4 / 6**: turn.
 - **Keypad 7 / 9**: sidestep (not rotation, contrary to my first hypothesis).
 - **Other keys, from ScummVM's keymap** (`LoLEngine::initKeymaps`, "Lands of Lore - Keyboard"; read in the source, not tested in the DOS version):
-  - **F1 / F2 / F3**: attack with character 1 / 2 / 3 (same as clicking the character's weapon, `clickedAttackButton`). These keys are not in the minimap's move list and work in both QWERTY and AZERTY.
+  - **F1 / F2 / F3**: attack with character 1 / 2 / 3 (same as clicking the character's weapon, `clickedAttackButton`). The ZQSD mapping added by `scummvm.ini` does not touch them.
   - **/**: select the next known spell (`gui_highlightSelectedSpell`); ignored while weapons are disabled or with a single spell known.
   - **M**: map (needs the atlas); **R**: rest; **O**: options menu.
   - **Space / Enter**: stop the current speech (`snd_stopSpeech`).
