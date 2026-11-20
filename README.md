@@ -13,11 +13,11 @@ The page reads the game's memory (or the state published by ScummVM) in real tim
 
 [![Demo video 1](https://img.youtube.com/vi/1258-77oyu4/hqdefault.jpg)](https://www.youtube.com/watch?v=1258-77oyu4)
 [![Demo video 2](https://img.youtube.com/vi/64bViN8zTmk/hqdefault.jpg)](https://www.youtube.com/watch?v=64bViN8zTmk)
-[![Demo video 3](https://img.youtube.com/vi/HGVtNnCF890/hqdefault.jpg)](https://www.youtube.com/watch?v=HGVtNnCF890)
+[![Lands of Lore - Cheating and spoilers](https://img.youtube.com/vi/HGVtNnCF890/hqdefault.jpg)](https://www.youtube.com/watch?v=HGVtNnCF890)
 
 - [Demo video 1](https://www.youtube.com/watch?v=1258-77oyu4)
 - [Demo video 2](https://www.youtube.com/watch?v=64bViN8zTmk)
-- [Demo video 3](https://www.youtube.com/watch?v=HGVtNnCF890)
+- [Lands of Lore - Cheating and spoilers](https://www.youtube.com/watch?v=HGVtNnCF890)
 
 > **Game files are not included.** You need your own copy of the game: the French CD version is the one supported and tested. This project is not affiliated with Westwood Studios or Electronic Arts.
 
