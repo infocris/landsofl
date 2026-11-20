@@ -9,6 +9,14 @@ The game runs unmodified in one of two engines, and you can switch between them 
 
 The page reads the game's memory (or the state published by ScummVM) in real time. From it, the page draws a map and a 3D view, and adds panels the original game never had.
 
+## Demo videos
+
+[![Demo video 1](https://img.youtube.com/vi/1258-77oyu4/hqdefault.jpg)](https://www.youtube.com/watch?v=1258-77oyu4)
+[![Demo video 2](https://img.youtube.com/vi/64bViN8zTmk/hqdefault.jpg)](https://www.youtube.com/watch?v=64bViN8zTmk)
+
+- [Demo video 1](https://www.youtube.com/watch?v=1258-77oyu4)
+- [Demo video 2](https://www.youtube.com/watch?v=64bViN8zTmk)
+
 > **Game files are not included.** You need your own copy of the game: the French CD version is the one supported and tested. This project is not affiliated with Westwood Studios or Electronic Arts.
 
 ## Features
