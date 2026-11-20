@@ -1478,6 +1478,9 @@ party to measure the gap between two sheets.
 - **Keypad 7 / 9**: sidestep (not rotation, contrary to my first hypothesis).
 - **Other keys, from ScummVM's keymap** (`LoLEngine::initKeymaps`, "Lands of Lore - Keyboard"; read in the source, not tested in the DOS version):
   - **F1 / F2 / F3**: attack with character 1 / 2 / 3 (same as clicking the character's weapon, `clickedAttackButton`). The ZQSD mapping added by `scummvm.ini` does not touch them.
+  - **1 / 2 / 3 added by the project** (2026-11-20), outside menus:
+    - ScummVM: `scummvm.ini` maps them to the Attack 1-3 actions (`keymap_lolkeyb_AT1=F1 1`…). The game disables this keymap while a save name is typed (`gui_lol.cpp`), so digits can still be typed there. Verified: a brigand facing the party went from 32 to 22 HP after pressing 1.
+    - DOSBox: the page sends F1-F3 (js-dos codes 290-292) for the top-row keys 1-3, even with ZQSD off, but not while the game is paused (byte 0x39D5A, bit 3 clear: disk menu, character sheet), as for ZQSD. Not tested in game.
   - **/**: select the next known spell (`gui_highlightSelectedSpell`); ignored while weapons are disabled or with a single spell known.
   - **M**: map (needs the atlas); **R**: rest; **O**: options menu.
   - **Space / Enter**: stop the current speech (`snd_stopSpeech`).
@@ -1679,3 +1682,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-19**: maps: "◐ jeu" (game) mode, synchronized with the in-game automap (zone `0x7F001000`, § 10a).
 - **2026-11-20**: document translated into English and renamed from `docs/retro-conception.md` to `docs/reverse-engineering.md`. Section suffixes now use letters (§ 10a instead of § 10 bis). Quoted in-game text, French level names and the web page's UI labels stay in French.
 - **2026-11-20**: game keys completed from ScummVM's keymap: F1-F3 attack with characters 1-3, `/` next spell, M/R/O (§ 12.4).
+- **2026-11-20**: keys 1-3 attack with characters 1-3 (ScummVM keymap, DOSBox page), except in menus (§ 12.4).

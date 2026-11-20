@@ -526,6 +526,9 @@
     KeyQ: 324, // A -> pavé num. 4 (tourner à gauche)
     KeyE: 326, // E -> pavé num. 6 (tourner à droite)
   };
+  // Attaque : 1, 2, 3 (rangée du haut) -> F1, F2, F3 (personnage 1 à 3), même si ZQSD est désactivé,
+  // mais pas en pause (menu disquette : on tape des chiffres dans un nom de sauvegarde).
+  const ATTACK_MAP = { Digit1: 290, Digit2: 291, Digit3: 292 };
   let emu = null; // interface js-dos, prête après "ci-ready"
   let remapOn = true;
   try { remapOn = localStorage.getItem("zqsd") !== "off"; } catch (e) {}
@@ -576,8 +579,8 @@
       e.preventDefault(); e.stopPropagation();
       return;
     }
-    if (!remapOn || paused || !emu || e.ctrlKey || e.metaKey || e.altKey) return;
-    const dos = KEY_MAP[e.code];
+    if (paused || !emu || e.ctrlKey || e.metaKey || e.altKey) return;
+    const dos = ATTACK_MAP[e.code] ?? (remapOn ? KEY_MAP[e.code] : undefined);
     if (dos === undefined) return;
     if (down) { emu.sendKeyEvent(dos, true); held.set(e.code, dos); }
     e.preventDefault(); e.stopPropagation();

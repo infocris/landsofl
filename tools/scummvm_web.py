@@ -88,6 +88,9 @@ def write_pak(path, files):
 # garder les positions ZQSD (comme la version DOSBox, qui se fonde sur event.code).
 # Q / D (AZERTY) tournent, A / E font un pas de côté (choix de l'utilisateur, 2026-11-09).
 ZQSD = {"MVF": "UP w", "MVB": "DOWN s", "TL": "HOME a", "TR": "PAGEUP d", "SLL": "LEFT q", "SLR": "RIGHT e"}
+# Attaque des personnages 1 à 3 : touches 1, 2, 3 (rangée du haut, position physique) en plus de F1-F3.
+# Le jeu désactive ce clavier pendant la saisie d'un nom de sauvegarde : on y tape toujours des chiffres.
+ATTACK = {"AT1": "F1 1", "AT2": "F2 2", "AT3": "F3 3"}
 TARGET = "lol-fr"
 
 
@@ -95,7 +98,7 @@ def write_ini():
     lines = ["[scummvm]", "", f"[{TARGET}]", "gameid=lol", "engineid=kyra",
              "description=Lands of Lore: The Throne of Chaos (CD/DOS/French)",
              "path=/data/games/lol", "language=fr", "platform=pc"]
-    lines += [f"keymap_lolkeyb_{a}={keys}" for a, keys in ZQSD.items()]
+    lines += [f"keymap_lolkeyb_{a}={keys}" for a, keys in {**ZQSD, **ATTACK}.items()]
     with open(os.path.join(SITE, "scummvm.ini"), "w") as f:
         f.write("\n".join(lines) + "\n")
 
