@@ -102,7 +102,7 @@ Saves and settings are stored in the browser (IndexedDB), separately for each en
   - The build used is described in `web/scummvm/VERSION.txt`.
 - **Data**: `tools/` decodes the game files: PAK archives, LCW compression, level grids, wall types, EMC scripts, graphics, items. Those exports feed the maps and the 3D view.
 
-Every file format and memory address found during the work is documented, in French, in [`docs/retro-conception.md`](docs/retro-conception.md).
+Every file format and memory address found during the work is documented in [`docs/reverse-engineering.md`](docs/reverse-engineering.md).
 
 ## Layout
 
@@ -111,7 +111,7 @@ Every file format and memory address found during the work is documented, in Fre
 | `web/public/` | The page (DOSBox version), map, 3D viewer, js-dos |
 | `web/scummvm/` | ScummVM WebAssembly build and the generated ScummVM pages |
 | `tools/` | Extraction and export tools, the ScummVM web server, the engine patch |
-| `docs/` | Reverse-engineering notes (French) |
+| `docs/` | Reverse-engineering notes |
 
 ## Notes
 

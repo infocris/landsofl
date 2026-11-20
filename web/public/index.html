@@ -535,7 +535,7 @@
   function renderBtn() { btn.textContent = "ZQSD : " + (remapOn ? "oui" : "non"); btn.dataset.on = remapOn; }
 
   // Pause du jeu (menu disquette, fiche d'un personnage…) : bit 3 de l'octet 0x39D5A à 0
-  // (docs/retro-conception.md, § 12.2). En pause, le bouton est caché et les touches ne sont
+  // (docs/reverse-engineering.md, § 12.2). En pause, le bouton est caché et les touches ne sont
   // plus converties (on peut taper Z, Q, S, D dans un nom de sauvegarde), jusqu'au retour en jeu.
   const PAUSE_BYTE = 0x39D5A;
   let paused = false, pauseMem = null, pauseBusy = false;

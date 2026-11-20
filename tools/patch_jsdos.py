@@ -5,7 +5,7 @@ Usage : python3 -I tools/patch_jsdos.py web/public/emulators
 Pour chaque variante (wdosbox.js, wdosbox-x.js, -jspi, -dbg) : garde l'original en
 <nom>.orig.js (une seule fois), puis régénère le fichier modifié à partir de l'original.
 La page lit la mémoire via LoLMem.RemoteMemory (web/public/memscan.js) ; voir
-docs/retro-conception.md, § 12.1.
+docs/reverse-engineering.md, § 12.1.
 """
 import os, sys
 

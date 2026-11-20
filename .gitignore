@@ -5,7 +5,7 @@ extracted-cd/
 *.jsdos
 web/archive/
 
-# Données générées par tools/ (voir docs/retro-conception.md, § 11)
+# Données générées par tools/ (voir docs/reverse-engineering.md, § 11)
 maps/
 web/public/viewer/data/
 

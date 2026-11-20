@@ -1,6 +1,6 @@
 """Fiche descriptive d'un type d'objet, à partir de son entrée de 13 octets (table en RAM, § 8.2).
 
-Champs (docs/retro-conception.md, § 8.2) :
+Champs (docs/reverse-engineering.md, § 8.2) :
   0-1  n° de texte du nom (0x4000 + index LANDS.FRE)     2  icône (ITEMICN.SHP)
   3-4  drapeaux (sens non établi)                        5-6  emplacements d'équipement (bits)
   7    action quand on utilise l'objet (point d'entrée de ITEM.INF, 0xFF = aucune)

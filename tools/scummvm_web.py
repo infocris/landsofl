@@ -7,7 +7,7 @@ Origine exacte : web/scummvm/VERSION.txt. Les fichiers du jeu (data/games) ne so
 Recompiler (facultatif) : dans third_party/scummvm (clone de github.com/scummvm/scummvm, branche
 lol-web = commit noté dans VERSION.txt + tools/scummvm/lol-web-state.patch, publiée sur le fork
 github.com/infocris/scummvm), moteur Kyra seul
-(voir docs/retro-conception.md, § 10 bis) :
+(voir docs/reverse-engineering.md, § 10a) :
   ./dists/emscripten/build.sh setup configure make dist --disable-all-engines --enable-engine=kyra,lol
 puis copier le résultat dans web/scummvm : python3 -I tools/scummvm_web.py import
 

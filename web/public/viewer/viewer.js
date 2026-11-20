@@ -8,7 +8,7 @@
   const WALL_H = 0.75;          // texture 128x96 sur une face de 1 case de large
   // Champ de vision : 80° en déplacement libre. En vue intégrée sous le jeu, perspective
   // d'origine : un mur proche (1 case à 0,5 case) occupe 128 px sur 176 -> tan(FOV/2) = 1,375,
-  // soit environ 108°, dans une image au format 176x120 (voir docs § 9.3 bis).
+  // soit environ 108°, dans une image au format 176x120 (voir docs/reverse-engineering.md, § 9.3a).
   let FOV = 80 * Math.PI / 180;
   const MAX_STEPS = 48;
   const RADIUS = 0.22;
@@ -294,7 +294,7 @@
   // --- Rendu ------------------------------------------------------------------
   // Deux perspectives (vue intégrée) : « réelle » (taille ∝ 1/distance) et « jeu »,
   // qui imite le moteur d'origine : la taille ne diminue que d'environ 0,615 par case
-  // (mur de face : 128, 80, 48 px pour 0,5, 1,5, 2,5 cases ; voir docs § 9.3 bis).
+  // (mur de face : 128, 80, 48 px pour 0,5, 1,5, 2,5 cases ; voir docs/reverse-engineering.md, § 9.3a).
   let persp = "reelle";
   try { if (EMBED && localStorage.getItem("lol3d:persp") === "jeu") persp = "jeu"; } catch (e) {}
   let smooth = true;

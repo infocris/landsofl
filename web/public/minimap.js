@@ -1,7 +1,7 @@
 // Mini-carte en direct à côté du jeu : lit la position du groupe dans la RAM du PC émulé.
 // L'émulateur reste dans son worker ; la lecture passe par le canal « lol-mem » ajouté
 // à emulators/wdosbox-x.js (quelques Ko toutes les 200 ms).
-// Adresses physiques trouvées par recherche mémoire (voir docs/retro-conception.md, § 12).
+// Adresses physiques trouvées par recherche mémoire (voir docs/reverse-engineering.md, § 12).
 (() => {
   "use strict";
   const ADDR = {
@@ -13,7 +13,7 @@
   };
   // Caractéristiques (§ 12.2) : fiche de personnage, champs relatifs au nom ; argent du groupe
   const STATS = { money: 0x3E6F0 };   // couronnes d'argent (u16, vérifié : le jeu annonce la valeur écrite)
-  // Inventaire (§ 12.2 bis de la documentation)
+  // Inventaire (§ 12.2 de docs/reverse-engineering.md)
   const INV = {
     bar: 0x3E4F6, barSlots: 48,      // u16 : n° d'objet du jeu (0 = vide), barre commune
     hand: 0x3E558,                   // u16 : objet tenu en main
