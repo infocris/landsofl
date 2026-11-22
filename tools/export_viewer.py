@@ -6,6 +6,8 @@ Pour chaque niveau :
   levelNN.json       grille, types de murs, monstres, annotations, point de départ
   levelNN_walls.png  atlas des faces de mur vues de face (128x96 chacune)
   levelNN_bg.png     fond plafond/sol de la vue d'origine (176x120)
+  levelNN_floor.png  sol vu de dessus, une case (motif répété 3 × 3 pour un sol pavé)
+  levelNN_floor_motif.png  motif du sol pavé (KEEP, TOWER1), reconstitué depuis le fond
   levelNN_spr.png    atlas des sprites de monstres (face, profil, dos)
 """
 import json, os, struct, sys
@@ -244,6 +246,115 @@ def background(ts, pal):
 # -> horizon à y=47 et œil à mi-hauteur (0,367 case au-dessus du sol).
 VIEW_CX, VIEW_HORIZON, VIEW_FOCAL, EYE_H = 88, 47, 64, 0.367
 TEX = 64
+
+
+# Sol du fond d'origine, vu de dessus (docs/reverse-engineering.md § 9.3c, mesuré sur les sols
+# à motif de KEEP et TOWER1). Le sol peint n'obéit pas à la perspective des murs :
+# - en largeur, le motif rétrécit vers un point de fuite à y = hx (39 pour KEEP, 42,5 pour
+#   TOWER1) : le point x de la ligne y est à X = (x − 88) / (0,75 · (y − hx)) « unités » ;
+# - en profondeur, K = ak / (y − hk) unités, avec un horizon propre à chaque sol (hk) ;
+# - une case fait 3,1 unités de large (mur proche : 128 px à la ligne 94, où l'unité fait 41 px).
+FLOOR_CX, FLOOR_HX, FLOOR_SX = 88, 39, 0.75
+CELL_UNITS = 3.1
+FLOOR_DEPTH = (24, 376)          # hk, ak mesurés sur les joints des dalles de TOWER1
+# Sols pavés d'un motif répété : maille (px × pk unités), décalage d'une rangée sur deux (sh,
+# en fraction de px : quinconce) et origine (x0, k0) du motif. Les autres sols sont peints
+# sans répétition : on n'en redresse qu'une case.
+FLOOR_LATTICES = {
+    # octogones clairs et sombres en damier, rangées en quinconce (deux par motif) ;
+    # profondeur ajustée sur les rangées de pixels qui se ressemblent
+    "KEEP": dict(hk=34.5, ak=354.25, px=1.0, pk=1.0, sh=0.0, x0=0.0, k0=0.0),
+    # dalles carrées : joints horizontaux à K entier + 0,37 ; joints verticaux droits vers
+    # y = 42,5, à X = ±0,545
+    "TOWER1": dict(hx=42.5, hk=24.0, ak=376.0, px=1.09, pk=1.0, sh=0.0, x0=0.545, k0=0.37),
+}
+MOTIF = 48                        # pixels par motif
+
+
+def floor_motif(bg, tsname):
+    """Sol vu de dessus, reconstitué depuis le fond d'origine.
+
+    Chaque pixel du sol (découpé en 6 × 2 sous-pixels) est projeté dans le plan du sol puis,
+    pour un sol pavé, replié dans une maille du motif : toutes les répétitions visibles
+    s'accumulent, pondérées par leur résolution à l'écran. La pénombre peinte est compensée
+    par la luminosité moyenne de la bande de profondeur. Renvoie (motif, répété) : le motif
+    seul (MOTIF × MOTIF) et un booléen ; pour un sol non pavé, l'image d'une case."""
+    lat = FLOOR_LATTICES.get(tsname)
+    hk, ak = (lat["hk"], lat["ak"]) if lat else FLOOR_DEPTH
+    px, pk = (lat["px"], lat["pk"]) if lat else (CELL_UNITS, CELL_UNITS)
+    size = MOTIF if lat else 128
+    k_of = lambda y: ak / (y - hk)
+    hx = lat.get("hx", FLOOR_HX) if lat else FLOOR_HX
+    y_min = int(max(hx, hk)) + 2
+    k_near = k_of(bg.h)
+    span = 4.0 if lat else CELL_UNITS                 # profondeur utilisée (unités)
+    lum = [sum(bg.px[(y * bg.w + x) * 4 + c] for x in range(bg.w) for c in range(3)) / bg.w + 1
+           for y in range(bg.h)]
+    rows = [y for y in range(y_min, bg.h) if k_of(y + 0.5) - k_near <= span]
+    smooth = {}
+    for y in rows:                                     # ± une demi-unité de profondeur
+        band = [lum[t] for t in rows if abs(k_of(t + 0.5) - k_of(y + 0.5)) < 0.5]
+        smooth[y] = sum(band) / len(band)
+    ref = sorted(smooth[y] for y in rows[-15:])[len(rows[-15:]) // 2]
+    acc = [[0.0, 0.0, 0.0, 0.0] for _ in range(size * size)]
+    for y in rows:
+        if smooth[y] < 0.12 * ref:
+            continue
+        gain = min(4.0, ref / smooth[y])
+        wgt = FLOOR_SX * (y + 0.5 - hx)                # pixels par unité : résolution
+        for sy in range(6):
+            yy = y + (sy + 0.5) / 6
+            K = k_of(yy)
+            if lat:
+                kk = (K - lat["k0"]) / pk
+                row = kk // 1
+                v = kk - row
+            else:
+                v, row = (K - k_near) / pk, 0
+                if not 0 <= v < 1:
+                    continue
+            iv = min(size - 1, int((1 - v) * size))     # rangée 0 = le plus loin
+            scale = FLOOR_SX * (yy - hx)
+            for x in range(bg.w):
+                o = (y * bg.w + x) * 4
+                col = bg.px[o:o + 3]
+                for sx in (0.25, 0.75):
+                    X = (x + sx - FLOOR_CX) / scale
+                    if lat:
+                        u = ((X - lat["x0"]) / px - lat["sh"] * row) % 1
+                    else:
+                        u = X / px + 0.5
+                        if not 0 <= u < 1:
+                            continue
+                    a = acc[iv * size + min(size - 1, int(u * size))]
+                    a[0] += col[0] * gain * wgt; a[1] += col[1] * gain * wgt
+                    a[2] += col[2] * gain * wgt; a[3] += wgt
+    # trous (coins non vus d'une case peinte) : moyenne des voisins, de proche en proche
+    for _ in range(size):
+        holes = [i for i, a in enumerate(acc) if not a[3]]
+        if not holes:
+            break
+        for i in holes:
+            x, y = i % size, i // size
+            nb = [acc[(y + dy) % size * size + (x + dx) % size] for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))]
+            nb = [a for a in nb if a[3]]
+            if nb:
+                acc[i] = [sum(a[c] / a[3] for a in nb) / len(nb) for c in range(3)] + [1.0]
+    img = Image(size, size)
+    for i, a in enumerate(acc):
+        img.put(i % size, i // size, bytes(min(255, round(a[c] / max(a[3], 1e-9))) for c in range(3)))
+    return img, bool(lat)
+
+
+def floor_cell(motif, repeated):
+    """Texture d'une case : le motif répété (3 × 3 motifs ≈ 3,1 unités) ou la case peinte."""
+    if not repeated:
+        return motif
+    n = round(CELL_UNITS / 1.0)
+    img = Image(motif.w * n, motif.h * n)
+    for k in range(n * n):
+        img.blit(motif, (k % n) * motif.w, (k // n) * motif.h)
+    return img
 
 
 def floor_ceiling(bg):
@@ -573,8 +684,11 @@ def main(game_dir, maps_dir, out_dir):
         atlas.save(os.path.join(out_dir, f"level{n:02d}_walls.png"))
         bg = background(ts, pal)
         bg.save(os.path.join(out_dir, f"level{n:02d}_bg.png"))
-        floor_img, ceil_img = floor_ceiling(bg)
-        floor_img.save(os.path.join(out_dir, f"level{n:02d}_floor.png"))
+        _, ceil_img = floor_ceiling(bg)
+        motif, floor_repeated = floor_motif(bg, tsname)
+        floor_cell(motif, floor_repeated).save(os.path.join(out_dir, f"level{n:02d}_floor.png"))
+        if floor_repeated:
+            motif.save(os.path.join(out_dir, f"level{n:02d}_floor_motif.png"))
         ceil_img.save(os.path.join(out_dir, f"level{n:02d}_ceil.png"))
 
         # sprites des monstres : images 0-15 (face, profil, dos par groupes de 4, puis attaque)
@@ -721,6 +835,8 @@ def main(game_dir, maps_dir, out_dir):
             "items": [{k: it.get(k) for k in ("x", "y", "xOffs", "yOffs", "type", "name", "spawn", "container", "face")}
                       for it in level.get("items", [])],
             "start": {"x": sx_ + 0.5, "y": sy_ + 0.5, "dir": sa_},
+            # sol pavé d'un motif (texture sans raccord) : pas de miroir une case sur deux
+            "floorMirror": not floor_repeated,
         }
         # contenu des coffres (tools/chests.py) : objets donnés par le script à l'ouverture
         out["chestItems"] = chests.chest_contents(files[f"LEVEL{n}.INF"], out, ITEM_NAMES) if f"LEVEL{n}.INF" in files else {}

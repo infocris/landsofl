@@ -507,7 +507,7 @@
     const nn = String(L.level).padStart(2, "0"), img = { ready: false, tiles: null };
     L.img = img;
     const load = (name) => new Promise((ok, ko) => { const im = new Image(); im.onload = () => ok(im); im.onerror = ko;
-      im.src = `viewer/data/level${nn}_${name}.png?v=20261109e`; });
+      im.src = `viewer/data/level${nn}_${name}.png?v=20261122a`; });
     Promise.all([load("floor"), load("walls")]).then(([floor, walls]) => {
       Object.assign(img, { floor, walls, ready: true });
       if (current === L) draw(lastDraw[0], lastDraw[1]);
@@ -541,7 +541,7 @@
     t.drawImage(img.walls, fx + cx, fy + cy, cw, ch, 0, 0, s, s);
   };
   const floorTile = (L, img) => tile(L, img, "floor", (t, s) => {
-    t.drawImage(img.floor, 0, 32, 64, 32, 0, 0, s, s);
+    t.drawImage(img.floor, 0, 0, img.floor.width, img.floor.height, 0, 0, s, s);
     t.fillStyle = "rgba(255,236,190,.22)"; t.fillRect(0, 0, s, s); });
   function cellTile(L, img, i, cls) {
     if (cls === "floor") return floorTile(L, img);

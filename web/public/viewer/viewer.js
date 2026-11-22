@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261114d";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261122a";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) FOV = 2 * Math.atan(1.375);
   let dirty = true;
@@ -398,9 +398,10 @@
 
   // Sol et plafond projetés ligne par ligne, en coordonnées du monde : la texture
   // d'une case (reconstituée depuis le fond d'origine) reste fixée au décor ;
-  // miroir une case sur deux, comme le fond d'origine qui s'inverse à chaque pas.
+  // miroir une case sur deux, comme le fond d'origine qui s'inverse à chaque pas, sauf
+  // pour un sol pavé d'un motif (floorMirror false : texture déjà sans raccord).
   function castFloorCeiling(dirX, dirY, planeX, planeY) {
-    const F = L.floorTex, C = L.ceilTex, tw = F.w, th = F.h;
+    const F = L.floorTex, C = L.ceilTex, mirF = L.floorMirror !== false;
     const lx = dirX - planeX, ly = dirY - planeY;          // rayon de gauche
     const stepX = (2 * planeX) / W, stepY = (2 * planeY) / W;
     const hz = H / 2 + pitch;                              // ligne d'horizon (décalée en vue libre)
@@ -408,7 +409,8 @@
       const dy = y + 0.5 - hz, fRow = y * W;
       if (Math.abs(dy) < 1) { frame32.fill(L.outdoor ? skyAt(y, hz) : 0xff000000, fRow, fRow + W); continue; }
       if (dy < 0 && L.outdoor) { frame32.fill(skyAt(y, hz), fRow, fRow + W); continue; }
-      const T = dy > 0 ? F : C;                            // sous l'horizon : sol, au-dessus : plafond
+      const T = dy > 0 ? F : C, tw = T.w, th = T.h;        // sous l'horizon : sol, au-dessus : plafond
+      const mir = dy > 0 ? mirF : true;
       const rowDist = (WALL_H / 2) * proj / Math.abs(dy);
       const level = shadeFor(rowDist);
       const k = Math.round((1 - level / SHADES * 0.85) * 256);
@@ -417,7 +419,7 @@
       for (let x = 0; x < W; x++, wx += dx, wy += dyw) {
         const cx = Math.floor(wx), cy = Math.floor(wy);
         let tx = ((wx - cx) * tw) | 0, ty = ((wy - cy) * th) | 0;
-        if ((cx + cy) & 1) tx = tw - 1 - tx;
+        if (mir && (cx + cy) & 1) tx = tw - 1 - tx;
         frame32[fRow + x] = shade(T.px[ty * tw + tx], k);
       }
     }
@@ -437,7 +439,7 @@
     const rx = -fy, ry = fx;                                  // vers la droite de l'écran
     const half = H / 2;
     // sol et plafond
-    const F = L.floorTex, C = L.ceilTex, tw = F.w, th = F.h;
+    const F = L.floorTex, C = L.ceilTex, mirF = L.floorMirror !== false;
     for (let y = Math.floor(half) + 1; y < H; y++) {
       const d = (WALL_H / 2) * proj / (y - half), z = zOfDeff(d);
       const k = Math.round((1 - shadeFor(z) / SHADES * 0.85) * 256);
@@ -445,12 +447,16 @@
       for (let x = 0; x < W; x++) {
         const lat = (x + 0.5 - W / 2) * d / proj;
         const wx = player.x + fx * z + rx * lat, wy = player.y + fy * z + ry * lat;
-        const cx = Math.floor(wx), cy = Math.floor(wy);
-        let tx = ((wx - cx) * tw) | 0, ty = ((wy - cy) * th) | 0;
-        if ((cx + cy) & 1) tx = tw - 1 - tx;
-        const i = ty * tw + tx;
-        frame32[fRow + x] = shade(F.px[i], k);
-        if (!L.outdoor) frame32[cRow + x] = shade(C.px[i], k);
+        const cx = Math.floor(wx), cy = Math.floor(wy), odd = (cx + cy) & 1;
+        const fu = wx - cx, fv = wy - cy;
+        let tx = (fu * F.w) | 0;
+        if (mirF && odd) tx = F.w - 1 - tx;
+        frame32[fRow + x] = shade(F.px[((fv * F.h) | 0) * F.w + tx], k);
+        if (!L.outdoor) {
+          let cxx = (fu * C.w) | 0;
+          if (odd) cxx = C.w - 1 - cxx;
+          frame32[cRow + x] = shade(C.px[((fv * C.h) | 0) * C.w + cxx], k);
+        }
       }
       if (L.outdoor) frame32.fill(skyAt(H - 1 - y, half), cRow, cRow + W);
     }

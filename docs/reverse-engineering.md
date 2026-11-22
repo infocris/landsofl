@@ -554,17 +554,11 @@ From this we deduce:
 - **Shading**: the original background is painted with shading that increases with distance
   (black band around the horizon).
 
-The viewer thus reconstructs a floor texture and a ceiling texture seen from
-above (64×64, one cell), by inverse projection of one cell of depth:
-
-- floor: from 0.34 to 1.34 cell;
-- ceiling: from 0.5 to 1.5 cell;
-- shading is compensated row by row;
-- the texture is mirrored every other cell, echoing the original background that the
-  game flips at each step (**deduced**).
-
-The result is an approximation: the original background is a painted image, not the exact
-rendering of a repeating floor, hence visible seams.
+The viewer thus reconstructs a ceiling texture seen from above (64×64, one cell), by
+inverse projection of one cell of depth (0.5 to 1.5 cell), with shading compensated row by
+row. It is mirrored every other cell, echoing the original background that the game flips
+at each step (**deduced**). The floor no longer uses this model: its painted perspective
+differs from the walls' (§ 9.3c).
 
 **Distance scale of the original engine — measured.** It is not a perspective: a
 head-on wall measures 128, about 80 then about 48 px at 0.5, 1.5 and 2.5 cells. These are
@@ -611,6 +605,48 @@ of the view image. The ScummVM functions are `movePartySmoothScroll*` in
 **Settings.** The game option "smooth scrolling" (`smooth_scrolling` in ScummVM) removes
 these transitions: the view changes without intermediate steps. In fast mode
 (`_smoothScrollModeNormal` false), every other step is skipped.
+
+### 9.3c Floor of the background: projection and mosaic pattern — measured (2026-11-22)
+
+The floor of the background (rows below the black band) is a painted image whose
+perspective does **not** match the walls' (§ 9.3a). It was measured on the two floors that
+are paved with a visible repeating pattern: `KEEP` (level 1, octagons) and `TOWER1`
+(levels 18–21, square slabs).
+
+- **Width**: along each row, the pattern period in pixels grows linearly with `y`, towards
+  a vanishing point at y = hx (≈ 39 for KEEP, 42.5 for TOWER1; the vertical joints of
+  TOWER1 are straight lines through it). A floor point at lateral offset `X` (in
+  "units", one unit ≈ one slab) is at `x = 88 + 0.75 · X · (y − hx)`.
+- **Depth**: `K = ak / (y − hk)` units, with its own horizon hk, lower than hx:
+  - TOWER1: the 6 horizontal joints (rows 64, 69, 75, 83, 94, 110) fit
+    `y = 24 + 376 / (k + 4.37)` for integers `k`, within 0.1 px;
+  - KEEP: hk = 34.5, ak = 354.25. Fitted on the X-rectified pixel rows: two rows at the
+    same phase of the pattern correlate, and two rows half a period apart correlate
+    with a half-period horizontal shift (staggered rows). The fit maximises
+    `Σ (c₀ − c½) · cos(π · a · (1/(y₂ − H) − 1/(y₁ − H)))` over the pairs of rows.
+- **Cell**: about 3.1 units wide. The near wall (128 px) stands on row 94, where a unit
+  measures 41 px. A cell therefore holds 3 × 3 patterns.
+- **The pattern** (`levelNN_floor_motif.png`, 48×48) is obtained by folding:
+  1. each floor pixel, split into 6 × 2 sub-pixels, is projected to (X, K);
+  2. it is then reduced modulo the lattice: KEEP 1 × 1 unit; TOWER1 1.09 × 1, with
+     joints at K ≡ 0.37 and X = ±0.545;
+  3. all visible repetitions accumulate, weighted by their on-screen resolution
+     (`0.75 · (y − hx)` px per unit), over about 4 units of depth;
+  4. the painted shading is compensated by the mean brightness of a band ±0.5 unit deep,
+     so that the pattern's own light and dark rows are kept.
+- **What the folding shows**:
+  - KEEP: light and dark octagons alternate in a checkerboard, in staggered rows (two
+    rows per pattern), with a small light diamond between them. The half-period shift is
+    a translation of the shape only: folding with it merges light and dark octagons.
+  - TOWER1: square slabs with dark joints.
+- **Other floors** (grass, cobblestones, lava, rubble): no repetition. Neither the
+  horizontal autocorrelation nor a 2D folding search (cross-validated between the left
+  and right halves of the image) finds a period. They are painted without a pattern. The
+  export only rectifies one cell (3.1 × 3.1 units, from the bottom row) with TOWER1's
+  depth model and hx = 39, then fills the unseen corners from their neighbours.
+- **Use**: `levelNN_floor.png` is one cell, i.e. the pattern repeated 3 × 3 for a paved
+  floor (128×128 for the others). `floorMirror: false` in `levelNN.json` tells the 3D
+  view not to mirror it every other cell, since it already tiles without seams.
 
 ### 9.4 Decorations — `.DAT` — verified for the head-on view
 
@@ -1239,7 +1275,7 @@ second canvas.
 
 **Illustrated minimap rendering** (▦ button, setting remembered). Cells reuse the
 place's graphics exported for the 3D view:
-- **floor**: lower half of `levelNN_floor.png`, i.e. the tiles seen up close;
+- **floor**: `levelNN_floor.png`, one cell seen from above (§ 9.3c);
 - **walls**: the level's most frequent opaque face (`walls[id].tex`), cropped at the center
   and darkened;
 - **closed doors**: their own face, with a colored border.
@@ -1683,3 +1719,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-20**: document translated into English and renamed from `docs/retro-conception.md` to `docs/reverse-engineering.md`. Section suffixes now use letters (§ 10a instead of § 10 bis). Quoted in-game text, French level names and the web page's UI labels stay in French.
 - **2026-11-20**: game keys completed from ScummVM's keymap: F1-F3 attack with characters 1-3, `/` next spell, M/R/O (§ 12.4).
 - **2026-11-20**: keys 1-3 attack with characters 1-3 (ScummVM keymap, DOSBox page), except in menus (§ 12.4).
+- **2026-11-22**: floor of the background measured: its own projection (vanishing point y ≈ 39–42.5 in width, horizon y ≈ 24–34.5 in depth), 3.1 units per cell, and the mosaic pattern of KEEP and TOWER1 extracted by folding every visible repetition (`levelNN_floor_motif.png`). The other floors are not repeating patterns (§ 9.3c).
