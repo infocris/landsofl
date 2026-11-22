@@ -12,7 +12,7 @@ Pour chaque niveau :
   levelNN_floor_wang.png   sol peint : 16 tuiles de Wang (4 × 4), pour un sol sans répétition
   levelNN_spr.png    atlas des sprites de monstres (face, profil, dos)
 """
-import json, os, struct, sys
+import json, math, os, struct, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pak import read_pak, read_strings
@@ -261,7 +261,7 @@ FLOOR_DEPTH = (24, 376)          # hk, ak mesurés sur les joints des dalles de 
 FLOOR_LATTICES = {
     # octogones clairs et sombres en damier, rangées en quinconce (deux par motif) ;
     # profondeur ajustée sur les rangées de pixels qui se ressemblent
-    "KEEP": dict(hk=34.5, ak=354.25, px=1.0, pk=1.0, sh=0.0, x0=0.0, k0=0.0),
+    "KEEP": dict(hk=34.5, ak=354.25, px=1.0, pk=1.0, sh=0.0, x0=0.0, k0=0.0, diag=True),
     # dalles carrées : joints horizontaux à K entier + 0,37 ; joints verticaux droits vers
     # y = 42,5, à X = ±0,545
     "TOWER1": dict(hx=42.5, hk=24.0, ak=376.0, px=1.09, pk=1.0, sh=0.0, x0=0.545, k0=0.37),
@@ -329,7 +329,48 @@ def floor_motif(bg, tsname):
                     a = acc[iv * size + min(size - 1, int(u * size))]
                     a[0] += col[0] * gain * wgt; a[1] += col[1] * gain * wgt
                     a[2] += col[2] * gain * wgt; a[3] += wgt
-    return acc_image(acc, size), bool(lat)
+    img = acc_image(acc, size)
+    if lat and lat.get("diag"):
+        img = sharpen_by_transpose(img)
+    return img, bool(lat)
+
+
+def sharpen_by_transpose(img, sigma=1.5):
+    """Motif symétrique par rapport à la diagonale (octogones de KEEP) : le fond d'origine n'a
+    qu'environ 20 pixels par unité en profondeur contre 60 en largeur, donc le motif replié est
+    net en largeur et flou en profondeur. Sa transposée, recalée par un décalage circulaire, est
+    nette en profondeur : on garde les basses fréquences verticales du motif et on y ajoute les
+    hautes fréquences verticales de la transposée (résultat = flou_v(M) + S − flou_v(S))."""
+    n = img.w
+    M = [[tuple(img.px[(y * n + x) * 4:(y * n + x) * 4 + 3]) for x in range(n)] for y in range(n)]
+    r = int(3 * sigma)
+    ker = [math.exp(-(i * i) / (2 * sigma * sigma)) for i in range(-r, r + 1)]
+    tot = sum(ker); ker = [k / tot for k in ker]
+    def blur_v(A):
+        return [[tuple(sum(ker[i] * A[(y + i - r) % n][x][c] for i in range(2 * r + 1)) for c in range(3))
+                 for x in range(n)] for y in range(n)]
+    Mt = [[M[x][y] for x in range(n)] for y in range(n)]
+    bM, bT = blur_v(M), blur_v(Mt)                     # le flou commute avec le décalage
+    lM = [[sum(p) for p in row] for row in bM]
+    lT = [[sum(p) for p in row] for row in bT]
+    best = None
+    for a in range(n):
+        for b in range(n):
+            e = 0.0
+            for y in range(0, n, 2):
+                rowM, rowT = lM[y], lT[(y - a) % n]
+                for x in range(0, n, 2):
+                    d = rowM[x] - rowT[(x - b) % n]
+                    e += d * d
+            if best is None or e < best[0]:
+                best = (e, a, b)
+    _, a, b = best
+    out = Image(n, n)
+    for y in range(n):
+        for x in range(n):
+            sv, sb = Mt[(y - a) % n][(x - b) % n], bT[(y - a) % n][(x - b) % n]
+            out.put(x, y, bytes(min(255, max(0, round(bM[y][x][c] + sv[c] - sb[c]))) for c in range(3)))
+    return out
 
 
 def acc_image(acc, size):
@@ -363,6 +404,7 @@ CEIL_HX, CEIL_SX = 39, 4.0
 CEIL_DEPTH = (55.15, 145.3)
 CEIL_EDGE_K = 0.97               # bord de case : milieu de la poutre (dessous clair + face)
 CEIL_COFFERED = {"KEEP", "TOWER1", "MANOR", "URBISH", "MINE1"}
+CEIL_TEX = 96                    # texture d'un caisson (les poutres proches font ~150 px par case)
 
 
 def ceiling_cell(bg, tsname):
@@ -383,13 +425,15 @@ def ceiling_cell(bg, tsname):
         band = [lum[t] for t in range(y_max) if abs(k_of(t + 0.5) - k_of(y + 0.5)) < 0.5]
         smooth.append(sum(band) / len(band))
     ref = sorted(smooth[:8])[4]
-    acc = [[0.0, 0.0, 0.0, 0.0] for _ in range(TEX * TEX)]
-    for sy in range(y_max * 8):
-        yy = (sy + 0.5) / 8
-        y0 = min(y_max - 1, max(0, int(yy - 0.5)))
-        y1 = min(y_max - 1, y0 + 1)
-        f = min(1.0, max(0.0, yy - 0.5 - y0))
-        sm = smooth[y0] * (1 - f) + smooth[y1] * f
+    # netteté : chaque sous-rangée prend la rangée de pixels où elle tombe, sans interpolation,
+    # et le poids croît comme le cube de la résolution, pour que les rangées proches (fines)
+    # l'emportent sur les lointaines (grossières, qui étalent les bords)
+    T = CEIL_TEX if fold else TEX
+    acc = [[0.0, 0.0, 0.0, 0.0] for _ in range(T * T)]
+    for sy in range(y_max * 16):
+        yy = (sy + 0.5) / 16
+        y0 = min(y_max - 1, int(yy))
+        sm = smooth[y0]
         if sm < 0.12 * ref:
             continue
         K = k_of(yy)
@@ -399,23 +443,24 @@ def ceiling_cell(bg, tsname):
             v = 1 - (K - k_near)
             if not 0 < v <= 1:
                 continue
-        iv = min(TEX - 1, int(v * TEX)) % TEX           # rangée 0 = le plus loin
+        iv = min(T - 1, int(v * T)) % T                 # rangée 0 = le plus loin
         scale = CEIL_SX * (CEIL_HX - yy)                # pixels par case : résolution
-        g = min(4.0, max(1.0, ref / sm)) * scale
+        w = scale ** 3
+        g = min(4.0, max(1.0, ref / sm)) * w
         for x in range(bg.w):
-            o0, o1 = (y0 * bg.w + x) * 4, (y1 * bg.w + x) * 4
-            col = [(bg.px[o0 + c] * (1 - f) + bg.px[o1 + c] * f) * g for c in range(3)]
+            o = (y0 * bg.w + x) * 4
+            col = (bg.px[o] * g, bg.px[o + 1] * g, bg.px[o + 2] * g)
             for sx in (0.125, 0.375, 0.625, 0.875):
                 u = (x + sx - FLOOR_CX) / scale + 0.5
                 if fold:
                     u %= 1
                 elif not 0 <= u < 1:
                     continue
-                iu = min(TEX - 1, int(u * TEX))
-                for j in ((iu, TEX - 1 - iu) if fold else (iu,)):
-                    a = acc[iv * TEX + j]
-                    a[0] += col[0]; a[1] += col[1]; a[2] += col[2]; a[3] += scale
-    return acc_image(acc, TEX)
+                iu = min(T - 1, int(u * T))
+                for j in ((iu, T - 1 - iu) if fold else (iu,)):
+                    a = acc[iv * T + j]
+                    a[0] += col[0]; a[1] += col[1]; a[2] += col[2]; a[3] += w
+    return acc_image(acc, T)
 
 
 # Tuiles de Wang du sol peint (docs/reverse-engineering.md § 9.3e). Une tuile = une demi-case

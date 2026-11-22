@@ -640,6 +640,19 @@ are paved with a visible repeating pattern: `KEEP` (level 1, octagons) and `TOWE
      (`0.75 · (y − hx)` px per unit), over about 4 units of depth;
   4. the painted shading is compensated by the mean brightness of a band ±0.5 unit deep,
      so that the pattern's own light and dark rows are kept.
+- **Sharpening by transposition (KEEP, 2026-11-22)**: the background has only about 20 pixels
+  per unit in depth near the bottom row, against 60 across, so the folded pattern is sharp
+  across and blurred in depth.
+  - **Symmetry**: KEEP's octagons are symmetric about the diagonal, in a checkerboard that is
+    itself symmetric.
+  - **Alignment**: the transposed pattern, aligned by a circular shift, is sharp in depth. The
+    shift (15, 33) minimises the difference of the two images once both are blurred
+    vertically.
+  - **Combination**: the export keeps the pattern's low vertical frequencies and adds the
+    transpose's high vertical frequencies: `blur_v(M) + S − blur_v(S)`, with a Gaussian of
+    σ = 1.5 px (`sharpen_by_transpose`).
+  - **Result**: the octagons and the small diamonds get sharp edges, and the horizontal
+    streaks are gone.
 - **What the folding shows**:
   - KEEP: light and dark octagons alternate in a checkerboard, in staggered rows (two
     rows per pattern), with a small light diamond between them. The half-period shift is
@@ -773,7 +786,12 @@ structure. CIMMERIA's ceiling is black.
   - **beamed ceilings**: all the visible ceiling is folded into one cell. Each row is
     split into 8 sub-rows with linear interpolation, and each pixel into 4 columns. The
     samples are weighted by the on-screen resolution, `4 · (39 − y)` px per cell, and
-    symmetrised left-right, since the game flips the background at each step. The cell edge
+    symmetrised left-right, since the game flips the background at each step. **Sharpness (2026-11-22)**: each sub-row (16 per pixel row) takes the pixel row it
+    falls in, without interpolation. Each sample is weighted by the cube of the resolution, so
+    the near, fine rows win over the far, coarse ones that smear the edges. The coffer is
+    96×96 (`CEIL_TEX`). The beam and panel edges become sharp. A transposition, as for the
+    floor, was tried: it erased the ceiling's thin horizontal lines and added diagonal
+    artefacts, so it was not kept. The cell edge
     is placed at K ≡ 0.97, the middle of the beam (bright underside and mid band). The
     painted shading is compensated by the mean brightness of the rows within ±0.5 cell of
     depth. The result is a dark coffer framed by beams, which tiles without seams.
@@ -1960,3 +1978,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: Yvel's light half-timbered first floor (decoration 6): its two 6-pane windows, unreadable in the hazy 3-cell view, rebuilt from the ground-floor window of the same style (decoration 4, mirrored half) (§ 9.3g).
 - **2026-11-22**: built-in 3D view displayed with the game's pixel aspect (1.2 times taller than wide, 352×240 shown at 352×288); it was wider and flatter than the game view (§ 9.3a).
 - **2026-11-22**: door leaf height taken from the engine (`drawDoor`: bottom at view row 86 for the next-cell door, face row 78), 10 px higher than before; it now fills its frame up to the lintel, as in the game (§ 9.5).
+- **2026-11-22**: sharper Gladstone textures: the floor pattern takes its depth detail from its transpose (diagonal symmetry of the octagons, § 9.3c); beamed ceilings are folded without row interpolation, with cubic resolution weights, at 96×96 (§ 9.3f).
