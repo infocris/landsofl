@@ -1746,3 +1746,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: hypothesis of a checkerboard of two cells (`12121 / 21212`, mirrored or not) in the painted floors refuted; the background `.VMP` uses each floor tile once (§ 9.3c).
 - **2026-11-22**: painted floors: only the near half cell is rectified (the far rows are dark or, in Yvel, hazy), laid as a checkerboard `1 2 / 2 1` with 2 = 1 mirrored (§ 9.3c).
 - **2026-11-22**: 3D view: health bars only for monsters within 2.5 cells (§ 10a).
+- **2026-11-22**: 3D view of the forest (tileset `FOREST1`: levels 2, 3, 10, 17, 24) treated as an exterior like Yvel: 3-storey trees and sky instead of a ceiling. The original background shows trees well above the view, at least two wall heights, under a dark sky; the former ceiling, projected from those treetops, made a tunnel.

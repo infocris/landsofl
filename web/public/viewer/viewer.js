@@ -84,8 +84,9 @@
     return out;
   }
   // Extérieurs : ciel (couleur des lignes hautes du fond d'origine) au lieu du plafond, et
-  // façades de plusieurs étages (murs hauts de la ville d'Yvel). storeys = hauteur en étages.
-  const OUTDOOR = { YVEL1: { storeys: 3 } };
+  // façades de plusieurs étages (murs hauts de la ville d'Yvel, arbres de la forêt : le fond
+  // d'origine les montre plus hauts que la vue). storeys = hauteur en étages.
+  const OUTDOOR = { YVEL1: { storeys: 3 }, FOREST1: { storeys: 3 } };
   const FOOT = 12;              // lignes du bas de la face (soubassement) non répétées aux étages
   const SHADES = 8;
   const shadeFor = (d) => Math.min(SHADES - 1, Math.floor(Math.max(0, d - 0.6) / 1.4));
