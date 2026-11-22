@@ -18,9 +18,9 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261122k";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261122l";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
-  if (EMBED) FOV = 2 * Math.atan(1.375);
+  if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
   // Vue libre (mode intégré) : clic gauche maintenu + glisser = tourner la tête ; relâcher =
   // retour au point de vue du jeu. pitch = décalage vertical de l'horizon, en pixels du rendu.

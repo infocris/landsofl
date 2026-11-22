@@ -576,6 +576,13 @@ large as in true perspective.
 grid (§ 12.2), hence the actual state of doors. So that these identifiers have a
 texture, the export produces a texture for every wall type of the level.
 
+**Pixel aspect — verified (2026-11-22).** The game's 320×200 screen is shown at 4:3 (ScummVM
+aspect correction, DOSBox), so its pixels are 1.2 times taller than wide. The game view (176×120)
+is thus displayed at 1.22:1, and a near wall (128×96 pixels) at 1.11:1. The 3D view was drawn
+with square pixels (352×240, 1.47:1), so it looked wider and flatter than the game. It is
+now displayed at 352×288 (CSS `html.embed #view`, rendering unchanged). On a side-by-side
+screenshot (level 1, start), the far door is then 46 px high in the game and 47 in the 3D view.
+
 ### 9.3b Movement transitions — verified in ScummVM (2026-11-19)
 
 **Principle.** Nothing is pre-generated: the view is recomposed at each step from the pieces
@@ -1933,3 +1940,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: Yvel's first floor: decorations drawn above the wall (y < 0), visible higher as the wall gets farther (8, 20, 27 px). Views 1–3 rescaled and stacked, the 2-cell view corrected for haze and the grey 3-cell view colored from it; drawn over the first storey in the 3D view (§ 9.3g).
 - **2026-11-22**: Yvel's haze lowered to 1.68 wall heights (top of the first floor's part shown by the game): façades stop there and fade into the haze (§ 9.3g).
 - **2026-11-22**: Yvel's light half-timbered first floor (decoration 6): its two 6-pane windows, unreadable in the hazy 3-cell view, rebuilt from the ground-floor window of the same style (decoration 4, mirrored half) (§ 9.3g).
+- **2026-11-22**: built-in 3D view displayed with the game's pixel aspect (1.2 times taller than wide, 352×240 shown at 352×288); it was wider and flatter than the game view (§ 9.3a).

@@ -10,6 +10,10 @@
     font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
   #view { position: fixed; inset: 0; width: 100vw; height: 100vh; object-fit: contain; background: #000;
     image-rendering: pixelated; image-rendering: crisp-edges; cursor: crosshair; }
+  /* vue intégrée sous le jeu : pixels 1,2 fois plus hauts que larges, comme le jeu (320 × 200
+     affiché en 4:3) ; 352 × 240 rendus, affichés au format 352 × 288 */
+  html.embed #view { inset: auto; left: 50%; top: 50%; transform: translate(-50%, -50%); object-fit: fill;
+    width: min(100vw, calc(100vh * 352 / 288)); height: min(100vh, calc(100vw * 288 / 352)); }
   #scene { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; }
   #scene[hidden] { display: none; }
   #scene img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
@@ -49,6 +53,6 @@
   <b>Maj</b> courir · clic = souris pour regarder (Échap pour libérer) ·
   <b>Espace</b> ouvrir/fermer une porte · <b>N</b> traverser les murs · <b>M</b> carte · <b>H</b> aide
 </div>
-<script src="viewer.js?v=20261122k"></script>
+<script src="viewer.js?v=20261122l"></script>
 </body>
 </html>
