@@ -1027,6 +1027,8 @@ The meaning of the functions, however, can be read directly. Comparison with our
   - **Drawing**: the bar is drawn after the columns, above the sprite. It is green
     above 60 %, yellow above 30 %, red below. It is hidden if the monster's center
     is behind a wall (`zbuf`), if it is dying (mode ≥ 13) or if it is at 0.
+  - **Only near monsters** (2026-11-22): the bar is drawn only within 2.5 cells ahead of
+    the party (`HP_BAR_DIST`), i.e. the adjacent cell and the next one.
   - **Verified** at level 6, facing the rats: full bars, then the closest one turns yellow
     under auto-attack.
 - **In-game automap, all levels** (ScummVM version, 2026-11-19; "◐ jeu" (game) mode of the maps).
@@ -1743,3 +1745,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: floor of the background measured: its own projection (vanishing point y ≈ 39–42.5 in width, horizon y ≈ 24–34.5 in depth), 3.1 units per cell, and the mosaic pattern of KEEP and TOWER1 extracted by folding every visible repetition (`levelNN_floor_motif.png`). The other floors are not repeating patterns (§ 9.3c).
 - **2026-11-22**: hypothesis of a checkerboard of two cells (`12121 / 21212`, mirrored or not) in the painted floors refuted; the background `.VMP` uses each floor tile once (§ 9.3c).
 - **2026-11-22**: painted floors: only the near half cell is rectified (the far rows are dark or, in Yvel, hazy), laid as a checkerboard `1 2 / 2 1` with 2 = 1 mirrored (§ 9.3c).
+- **2026-11-22**: 3D view: health bars only for monsters within 2.5 cells (§ 10a).

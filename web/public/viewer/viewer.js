@@ -370,11 +370,13 @@
     drawHealthBars(sprites);
   }
   // Barre de vie au-dessus de chaque monstre visible (version ScummVM : points de vie actuels du
-  // monstre / maximum de son type, publiés par le moteur). Masquée si le centre du monstre est
-  // derrière un mur (zbuf) ou s'il est mourant (mode >= 13).
+  // monstre / maximum de son type, publiés par le moteur). Seulement pour les monstres proches
+  // (à moins de HP_BAR_DIST cases devant le groupe : la case voisine et la suivante). Masquée
+  // si le centre du monstre est derrière un mur (zbuf) ou s'il est mourant (mode >= 13).
+  const HP_BAR_DIST = 2.5;
   function drawHealthBars(sprites) {
     for (const sp of sprites) {
-      if (!sp.hpMax || sp.hp === undefined || sp.hp <= 0 || sp.mode >= 13) continue;
+      if (!sp.hpMax || sp.hp === undefined || sp.hp <= 0 || sp.mode >= 13 || sp.tz > HP_BAR_DIST) continue;
       const cx = Math.round(sp.left + sp.sw / 2);
       if (cx < 0 || cx >= W || zbuf[cx] <= sp.tz) continue;
       const q = Math.max(0, Math.min(1, sp.hp / sp.hpMax));

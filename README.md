@@ -49,7 +49,7 @@ The page reads the game's memory (or the state published by ScummVM) in real tim
 ### 3D view
 - **Real 3D view** under the game, rebuilt from the level data: walls, floors, ceilings and decorations. Doors and monsters are live.
 - **"Game perspective" mode**: imitates the original engine's distance scale.
-- **Monsters**: drawn as the game draws them (attack and hit frames, translucent ghosts), with a **health bar** above each one.
+- **Monsters**: drawn as the game draws them (attack and hit frames, translucent ghosts), with a **health bar** above the nearby ones.
 
 ### Party, inventory and magic
 - **Character sheets**: stats, skills and experience, in a dialog.
