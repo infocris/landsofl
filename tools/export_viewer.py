@@ -608,6 +608,107 @@ def face_texture(ts, wt, pal):
     return img
 
 
+# Étage au-dessus des murs (docs/reverse-engineering.md § 9.3g). Certaines décorations (ville
+# d'Yvel) sont dessinées au-dessus du mur, à y < 0 : le jeu montre ainsi le bas de l'étage,
+# d'autant plus haut que le mur est loin (vue du haut : 8 px au-dessus du mur proche, 20 au-dessus
+# du mur à 2 cases, 27 au-dessus du mur à 3 cases). Échelles des positions 1 à 3 de face : murs
+# de 128 × 96, 80 × 64 et 48 × 40 pixels.
+UPPER_SIZE = {1: (128, 96), 2: (80, 64), 3: (48, 40)}
+# décors extérieurs où la vue 3D bâtit des étages (la forêt a déjà ses cimes, § 9.3d ; CIMMERIA
+# n'est pas un extérieur)
+UPPER_TILESETS = {"YVEL1"}
+
+
+def upper_layers(ts, pal, dec):
+    """Les vues 1 à 3 d'une décoration ramenées à l'échelle du mur proche, sur un calque de
+    128 × 120 pixels (ligne 96 = haut du mur ; au-dessus, l'étage). None si la décoration ne
+    dépasse pas au-dessus du mur à 3 cases."""
+    s3 = dec["shape"][3]
+    if s3 == 0xFFFF or dec["y"][3] >= 0 or not (s3 < len(ts.decor_shapes) and ts.decor_shapes[s3]):
+        return None
+    layers = {}
+    for p, (pw, ph) in UPPER_SIZE.items():
+        si = dec["shape"][p]
+        if si == 0xFFFF or si >= len(ts.decor_shapes) or not ts.decor_shapes[si]:
+            continue
+        fw, fh, fpx = ts.decor_shapes[si]
+        sx, sy = FACE_W / pw, FACE_H / ph
+        lay = [None] * (FACE_W * 120)
+        places = [(dec["x"][p], False)] + ([(pw - dec["x"][p] - fw, True)] if dec["flags"] & 1 else [])
+        y0 = FACE_H + round(dec["y"][p] * sy)
+        for x0, flip in places:
+            for Y in range(max(0, y0), min(120, y0 + round(fh * sy))):
+                fy = min(fh - 1, int((Y - y0) / sy))
+                for X in range(max(0, round(x0 * sx)), min(FACE_W, round((x0 + fw) * sx))):
+                    fx = min(fw - 1, int((X - x0 * sx) / sx))
+                    c = fpx[fy * fw + (fw - 1 - fx if flip else fx)]
+                    if c is not None:
+                        lay[Y * FACE_W + X] = rgb(pal, c)
+        layers[p] = lay
+    return layers
+
+
+def upper_storeys(ts, pal, used_decors):
+    """Images de l'étage (128 × 96, transparent là où rien n'est connu), une par décoration.
+
+    Les vues lointaines sont peintes dans la brume. Vue à 2 cases : correction linéaire par
+    composante, ajustée (moyenne, écart type) sur les pixels qu'elle partage avec la vue proche,
+    toutes décorations confondues. Vue à 3 cases, presque grise : on garde sa luminosité et on
+    reprend les couleurs de la vue à 2 cases corrigée, par tranche de luminosité, là où elles se
+    recouvrent."""
+    all_layers = {d: upper_layers(ts, pal, ts.decor[d]) for d in used_decors if 0 < d < len(ts.decor)}
+    all_layers = {d: l for d, l in all_layers.items() if l}
+    if not all_layers:
+        return {}
+    # correction de la vue à 2 cases
+    pairs = [(a, b) for l in all_layers.values() if 1 in l and 2 in l
+             for a, b in zip(l[2], l[1]) if a is not None and b is not None]
+    fix = []
+    for c in range(3):
+        if len(pairs) < 16:
+            fix.append((1.0, 0.0)); continue
+        xs = [a[c] for a, _ in pairs]; ys = [b[c] for _, b in pairs]
+        mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+        sx_ = (sum((v - mx) ** 2 for v in xs) / len(xs)) ** 0.5 or 1
+        sy_ = (sum((v - my) ** 2 for v in ys) / len(ys)) ** 0.5
+        fix.append((sy_ / sx_, my - sy_ / sx_ * mx))
+    out = {}
+    for d, l in all_layers.items():
+        if 2 in l:
+            l[2] = [None if p is None else tuple(min(255, max(0, round(p[c] * fix[c][0] + fix[c][1])))
+                                                  for c in range(3)) for p in l[2]]
+        lay3 = l[3]
+        ref = l.get(2) or l.get(1)
+        if ref:                                    # couleurs de la vue à 3 cases
+            lum = lambda p: (p[0] + p[1] + p[2]) / 3
+            bins = {}
+            for a, b in zip(lay3, ref):
+                if a is not None and b is not None:
+                    e = bins.setdefault(int(lum(a) // 12), [0, 0, 0, 0, 0])
+                    e[0] += b[0]; e[1] += b[1]; e[2] += b[2]; e[3] += lum(a); e[4] += 1
+            pts = sorted((e[3] / e[4], [e[c] / e[4] for c in range(3)]) for e in bins.values() if e[4] >= 4)
+            if pts:
+                def colour(v):
+                    if v <= pts[0][0]:
+                        return pts[0][1]
+                    for (l0, c0), (l1, c1) in zip(pts, pts[1:]):
+                        if v <= l1:
+                            t = (v - l0) / (l1 - l0)
+                            return [c0[c] + (c1[c] - c0[c]) * t for c in range(3)]
+                    return pts[-1][1]
+                lay3 = [None if p is None else tuple(round(v) for v in colour(lum(p))) for p in lay3]
+        img = Image(FACE_W, FACE_H)
+        for i in range(FACE_W * FACE_H):
+            p = None
+            for lay in (l.get(1), l.get(2), lay3):    # la vue la plus proche l'emporte
+                if lay and lay[i] is not None:
+                    p = lay[i]; break
+            if p is not None:
+                img.put(i % FACE_W, i // FACE_W, bytes(p))
+        out[d] = img
+    return out
+
+
 def is_opaque(img):
     return all(img.px[(y * img.w + x) * 4 + 3] for y in range(FACE_H - 8) for x in range(img.w))
 
@@ -855,6 +956,26 @@ def main(game_dir, maps_dir, out_dir):
         for k, img in enumerate(textures):
             atlas.blit(img, (k % ATLAS_COLS) * FACE_W, (k // ATLAS_COLS) * FACE_H)
         atlas.save(os.path.join(out_dir, f"level{n:02d}_walls.png"))
+        # étage au-dessus des murs, d'après les vues lointaines des décorations (§ 9.3g)
+        chains = {}
+        for wid in walls:
+            wt = level["wallTypes"].get(str(wid))
+            d, seen = (wt["shape"] if wt else 0), set()
+            while 0 < d < len(ts.decor) and d not in seen:
+                seen.add(d)
+                d = ts.decor[d]["next"]
+            chains[wid] = seen
+        uppers = upper_storeys(ts, pal, set().union(*chains.values())) if tsname in UPPER_TILESETS and chains else {}
+        upper_ids = sorted(uppers)
+        for wid, seen in chains.items():
+            hit = [upper_ids.index(d) for d in upper_ids if d in seen]
+            if hit:
+                walls[wid]["upper"] = hit[0]
+        if upper_ids:
+            ua = Image(FACE_W * ATLAS_COLS, FACE_H * ((len(upper_ids) + ATLAS_COLS - 1) // ATLAS_COLS))
+            for k, d in enumerate(upper_ids):
+                ua.blit(uppers[d], (k % ATLAS_COLS) * FACE_W, (k // ATLAS_COLS) * FACE_H)
+            ua.save(os.path.join(out_dir, f"level{n:02d}_upper.png"))
         bg = background(ts, pal)
         bg.save(os.path.join(out_dir, f"level{n:02d}_bg.png"))
         ceil_img = ceiling_cell(bg, tsname)

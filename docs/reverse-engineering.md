@@ -779,6 +779,57 @@ structure. CIMMERIA's ceiling is black.
   while staying aligned on the cells. Crossbeams therefore always run across the view, as
   in the game, in both the real and the game perspectives.
 
+### 9.3g First floor of Yvel's houses, from the distant views — measured (2026-11-22)
+
+Yvel's background (`YVEL1`) holds nothing but haze above the cobblestones. The far wall
+pieces of the `.VMP` (159, 129; § 9.3d) are reduced, hazier copies of the near piece, with no
+extra height. The upper floor is in the **decorations** (`.DAT`, § 9.4):
+- **Where**: five Yvel decorations (6, 7, 8, 13, 31) are drawn **above** the wall, with
+  `y < 0` at the head-on positions 1–3. The drawn width is the wall's (128, 80, 48).
+- **How much shows**: the game shows more of the upper floor as the wall gets farther:
+  - 8 px above the next-cell wall, which starts at row 8 of the view;
+  - 20 px above the wall 2 cells ahead (row 16);
+  - 27 px above the wall 3 cells ahead (row 24).
+  
+  Each also overlaps the top of the wall by a few pixels (the sill beam or joist ends).
+  At 3 cells, the image starts 3 px above the top of the view: the artist painted only what
+  the view shows.
+- **Contents**:
+  - 6: a tan half-timbered floor with windows;
+  - 7: white half-timbering with red infill and windows with crossed glazing bars;
+  - 8: brick with joist ends and shuttered openings;
+  - 13: an arch with a grille, mirrored half;
+  - 31: the stone of the rampart continued upwards.
+- **Which walls**: they follow 23 wall types (stone, brick or half-timbered ground floors).
+  The plain brick and half-timbered walls (types 1 and 2) have none: in the game, only haze
+  shows above them.
+- **Other tilesets**: decorations above the wall also exist in FOREST1 (8, 9: treetops,
+  which the 3D view already takes from the background) and CIMMERIA. They are not used.
+- **Colors**: the engine draws decorations through a distance overlay (`getLevelOverlay`,
+  `drawDecorations` in `scene_lol.cpp`). The far images are moreover **painted** hazy: the
+  3-cell images are almost grey, so their colors are lost.
+
+**Reconstruction** (`levelNN_upper.png`, one 128×96 image per decoration;
+`walls[id].upper` in `levelNN.json`):
+1. Views 1–3 are brought to the near wall's scale: ×1, ×1.6 and ×2.67 in width; ×1, ×1.5 and
+   ×2.4 in height, after the wall heights 96, 64 and 40.
+2. The nearest view wins wherever it is drawn: rows 88–96 of the floor come from view 1, rows
+   66–96 from view 2, rows 31–96 from view 3.
+3. **2-cell view**: a linear correction per channel (mean, standard deviation). It is fitted
+   on the pixels it shares with the near view, all decorations pooled: gains ≈ 1.5–1.7,
+   offsets ≈ −96 to −122.
+4. **3-cell view**: its brightness is kept, and colors come from the corrected 2-cell view,
+   by brightness band, where the two overlap.
+5. The top third of the floor (rows 0–30) is never shown by the game and stays transparent.
+
+Fitting the haze on the wall pieces instead was tried and failed. Their 3-cell versions are
+nearly grey, which makes the color fit degenerate. A color-by-color mapping learnt on the
+overlaps had too few colors.
+
+**3D view**: in Yvel, over the first repeated storey, the face draws this floor, keeping the
+repeated storey visible in its unknown top third. Walls without such a decoration keep the
+repeated storey.
+
 ### 9.4 Decorations — `.DAT` — verified for the head-on view
 
 ```
@@ -1860,3 +1911,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: wall pieces of the view (`_vmpOffsetsDefault`, rows and sizes) and the forest's treetops taken from the background band above the wall 3 cells ahead (§ 9.3d).
 - **2026-11-22**: floor generation: Wang tiles from the near band of painted floors (16 tiles, minimum-error cuts, edges hashed from their coordinates, deterministic or random seed); paved floors keep their periodic pattern (§ 9.3e).
 - **2026-11-22**: ceiling geometry measured on the background: longitudinal beams converging to y ≈ 39 like the floor, crossbeams one cell apart with `K = 145.3 / (55.15 − y)`, one coffer per cell, eye 0.43 cell above the floor and ceiling 0.25 above the eye. Ceilings rebuilt by folding (beamed tilesets) or near-cell rectification, and turned with the gaze in the 3D view (§ 9.3f).
+- **2026-11-22**: Yvel's first floor: decorations drawn above the wall (y < 0), visible higher as the wall gets farther (8, 20, 27 px). Views 1–3 rescaled and stacked, the 2-cell view corrected for haze and the grey 3-cell view colored from it; drawn over the first storey in the 3D view (§ 9.3g).

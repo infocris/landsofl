@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261122h";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261122i";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) FOV = 2 * Math.atan(1.375);
   let dirty = true;
@@ -171,6 +171,13 @@
     const tx = (ut % cols) * fw + Math.min(fw - 1, Math.floor(u * fw)), ty = Math.floor(ut / cols) * fh;
     const img = L.wallImgs[shadeFor(dist)];
     for (let k = 1; k < S && top - (k - 1) * h > 0; k++) ctx.drawImage(img, tx, ty, 1, sh, x, top - k * h, 1, h + 0.5);
+    // premier étage vu dans le jeu (décorations au-dessus du mur) : par-dessus l'étage répété,
+    // transparent là où le jeu ne le montre jamais (haut de l'étage)
+    const up = L.upperImgs ? L.upperByTex.get(tex) : undefined;
+    if (up !== undefined) {
+      const ux = (up % cols) * fw + Math.min(fw - 1, Math.floor(u * fw)), uy = Math.floor(up / cols) * fh;
+      if (top > 0) ctx.drawImage(L.upperImgs[shadeFor(dist)], ux, uy, 1, fh, x, top - colH, 1, colH + 0.5);
+    }
     if (L.crownImgs) {                              // cime au-dessus du dernier étage
       const ch = colH * CROWN.h / CROWN.wall, y0 = top - (S - 1) * h - ch;
       if (y0 + ch > 0) ctx.drawImage(L.crownImgs[shadeFor(dist)], Math.min(CROWN.w - 1, Math.floor(u * CROWN.w)), 0, 1, CROWN.h, x, y0, 1, ch + 0.5);
@@ -179,7 +186,7 @@
 
   async function loadLevel(n, keepPos) {
     const nn = String(n).padStart(2, "0");
-    const [data, walls, spr, floor, ceil, bg, wang] = await Promise.all([
+    const [data, walls, spr, floor, ceil, bg, wang, upper] = await Promise.all([
       fetch(`data/level${nn}.json?v=${DATA_V}`).then((r) => r.json()),
       loadImage(`data/level${nn}_walls.png?v=${DATA_V}`),
       loadImage(`data/level${nn}_spr.png?v=${DATA_V}`),
@@ -187,6 +194,7 @@
       loadImage(`data/level${nn}_ceil.png?v=${DATA_V}`),
       loadImage(`data/level${nn}_bg.png?v=${DATA_V}`).catch(() => null),
       loadImage(`data/level${nn}_floor_wang.png?v=${DATA_V}`).catch(() => null),
+      loadImage(`data/level${nn}_upper.png?v=${DATA_V}`).catch(() => null),
     ]);
     L = data;
     L.wallImgs = darken(walls, SHADES);
@@ -199,6 +207,10 @@
     for (const [id, w] of Object.entries(L.walls)) L.wallInfo[+id] = w;
     L.outdoor = OUTDOOR[L.tileset] || null;
     if (L.outdoor) setupOutdoor(L, walls, bg);
+    // étage reconstitué des vues lointaines (docs/reverse-engineering.md § 9.3g), par texture
+    L.upperImgs = upper && L.outdoor ? darken(upper, SHADES) : null;
+    L.upperByTex = new Map();
+    for (const w of Object.values(L.walls)) if (w.upper !== undefined && w.tex >= 0) L.upperByTex.set(w.tex, w.upper);
     buildDoorPanels(walls);
     doorShown.clear();
     openDoors = new Set();
