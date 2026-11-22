@@ -55,7 +55,9 @@
 (() => {
   if (!location.hash) history.replaceState(null, "", "#lol-fr");
   const DB = "/home/web_user", KEY = DB + "/scummvm.ini", SEC = "[lol-fr]";
-  const start = () => { const s = document.createElement("script"); s.src = "scummvm.js"; document.body.appendChild(s); };
+  // version du moteur dans les adresses : un navigateur qui a gardé l'ancien moteur en cache le recharge
+  Module.locateFile = (p, dir) => dir + p + (p.endsWith(".wasm") ? "?v=1795385888-13263800" : "");
+  const start = () => { const s = document.createElement("script"); s.src = "scummvm.js?v=1795385888-13263800"; document.body.appendChild(s); };
   const section = (t) => { const i = t.indexOf(SEC); if (i < 0) return ""; const j = t.indexOf("\n[", i + 1); return j < 0 ? t.slice(i) : t.slice(i, j + 1); };
   fetch("scummvm.ini", { cache: "no-store" }).then((r) => r.text()).then((ini) => new Promise((done) => {
     const ours = section(ini);
@@ -155,7 +157,7 @@
     } else if (d.find && zones) ch.postMessage({ id: d.id, found: d.find.map(() => -1) });
     else if (d.cmd && zones) {
       // commandes d'inventaire : exécutées par le moteur dans sa boucle (webRunCommands)
-      const op = { move: 1, delete: 2, create: 3, goto: 4, cheat: 5, money: 6, hurt: 7, spend: 8, cast: 9, levelup: 10, learn: 11, volume: 12, teleport: 13, listsaves: 14, load: 15, save: 16, setchar: 17, unlock: 18, autospell: 19 }[d.cmd.op] || 0;
+      const op = { move: 1, delete: 2, create: 3, goto: 4, cheat: 5, money: 6, hurt: 7, spend: 8, cast: 9, levelup: 10, learn: 11, volume: 12, teleport: 13, listsaves: 14, load: 15, save: 16, setchar: 17, unlock: 18, autospell: 19, clickwall: 20 }[d.cmd.op] || 0;
       // texte éventuel (nom de sauvegarde) : octets UTF-8, lus par le moteur (Module.lolText)
       const text = typeof d.cmd.text === "string" ? new TextEncoder().encode(d.cmd.text) : null;
       (Module.lolCmds = Module.lolCmds || []).push([op, d.cmd.a | 0, d.cmd.b | 0, d.id, text]);

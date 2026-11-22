@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261122n";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261122p";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -434,12 +434,51 @@
       }
     }
     drawHealthBars(sprites);
+    drawSwitch();
   }
   // Barre de vie au-dessus de chaque monstre visible (version ScummVM : points de vie actuels du
   // monstre / maximum de son type, publiés par le moteur). Seulement pour les monstres proches
   // (à moins de HP_BAR_DIST cases devant le groupe : la case voisine et la suivante). Masquée
   // si le centre du monstre est derrière un mur (zbuf) ou s'il est mourant (mode >= 13).
   const HP_BAR_DIST = 2.5;
+  // Interrupteurs (docs/reverse-engineering.md § 9.6) : le jeu n'actionne que le mur juste devant
+  // le groupe (clickedWall), selon son type spécial (1 décor à script, 2/3 levier, 4 script seul,
+  // 5 porte). La zone cliquable de ce mur (walls[id].hot, pixels de la face) est surlignée ; un
+  // clic dessus demande à la page de cliquer le mur dans le jeu (message « lol-clickwall »).
+  let switchHover = false;
+  // seule la page ScummVM peut faire cliquer le jeu (commande du moteur modifié)
+  const canClickWalls = () => { try { return parent.LOL_ENGINE === "scummvm"; } catch (e) { return false; } };
+  function facingSwitch() {
+    if (!EMBED || !L || anim || looking || !canClickWalls()) return null;
+    const d = ((Math.round((gameA + Math.PI / 2) / (Math.PI / 2)) % 4) + 4) % 4;   // 0 N, 1 E, 2 S, 3 O
+    const ax = Math.floor(player.x) + [0, 1, 0, -1][d], ay = Math.floor(player.y) + [-1, 0, 1, 0][d];
+    if (ax < 0 || ay < 0 || ax > 31 || ay > 31) return null;
+    const w = info(face(ax, ay, (d + 2) % 4));
+    if (!w || !w.special || !w.hot) return null;
+    // mur à 0,5 case : même échelle dans les deux perspectives (deff(0,5) = 0,5), centré
+    const fw = L.faceW, fh = L.faceH, cw = 2 * proj, colH = WALL_H / 0.5 * proj;
+    const left = W / 2 - proj, top = H / 2 + pitch - colH / 2;
+    const [x0, y0, x1, y1] = w.hot;
+    return { special: w.special, x: left + x0 / fw * cw, y: top + y0 / fh * colH, w: (x1 - x0) / fw * cw, h: (y1 - y0) / fh * colH };
+  }
+  function drawSwitch() {
+    const sw = facingSwitch();
+    if (!sw) return;
+    ctx.save();
+    ctx.strokeStyle = switchHover ? "rgba(255, 214, 64, 0.95)" : "rgba(255, 214, 64, 0.4)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 2]);
+    ctx.strokeRect(Math.round(sw.x) + 0.5, Math.round(sw.y) + 0.5, Math.round(sw.w) - 1, Math.round(sw.h) - 1);
+    ctx.restore();
+  }
+  function switchAt(e) {
+    const sw = facingSwitch();
+    if (!sw) return null;
+    const r = view.getBoundingClientRect();
+    const px = (e.clientX - r.left) * W / r.width, py = (e.clientY - r.top) * H / r.height;
+    return px >= sw.x && px <= sw.x + sw.w && py >= sw.y && py <= sw.y + sw.h ? sw : null;
+  }
+
   function drawHealthBars(sprites) {
     for (const sp of sprites) {
       if (!sp.hpMax || sp.hp === undefined || sp.hp <= 0 || sp.mode >= 13 || sp.tz > HP_BAR_DIST) continue;
@@ -657,6 +696,7 @@
       }
     }
     drawHealthBars(sprites);
+    drawSwitch();
   }
 
   // Animation des monstres : 16 images par sprite (0-3 face, 4-7 profil, 8-11 dos ; 12-15
@@ -912,13 +952,21 @@
     if (document.pointerLockElement === view) player.a += e.movementX * 0.0035;
   });
   if (EMBED) {
+    let downAt = null;
     view.addEventListener("pointerdown", (e) => {
       if (anim) { player.x = anim.x1; player.y = anim.y1; anim = null; turning = false; }
       if (e.button !== 0 || !L) return;
+      // clic sur l'interrupteur devant le groupe : actionné dans le jeu, sans regarder autour
+      const sw = switchAt(e);
+      if (sw) { downAt = sw; e.preventDefault(); return; }
       looking = true; view.setPointerCapture(e.pointerId); view.style.cursor = "grabbing"; e.preventDefault();
     });
     view.addEventListener("pointermove", (e) => {
-      if (!looking) return;
+      if (!looking) {
+        const over = !!switchAt(e);
+        if (over !== switchHover) { switchHover = over; view.style.cursor = over ? "pointer" : "grab"; dirty = true; }
+        return;
+      }
       const r = view.getBoundingClientRect();
       const s = Math.min(r.width / W, r.height / H);       // pixels écran par pixel du rendu
       lookYaw += e.movementX / s * (FOV / W);
@@ -930,7 +978,14 @@
       if (!looking) return;
       looking = false; lookYaw = 0; pitch = 0; player.a = gameA; view.style.cursor = "grab"; dirty = true;
     };
-    view.addEventListener("pointerup", endLook);
+    view.addEventListener("pointerup", (e) => {
+      if (downAt) {
+        if (switchAt(e)) parent.postMessage({ type: "lol-clickwall", special: downAt.special }, location.origin);
+        downAt = null;
+        return;
+      }
+      endLook();
+    });
     view.addEventListener("pointercancel", endLook);
     view.addEventListener("lostpointercapture", endLook);
   }

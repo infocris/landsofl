@@ -628,10 +628,10 @@ def face_texture(ts, wt, pal):
     """Texture 128x96 d'un type de mur, ou None si rien à dessiner."""
     vmp, shape, flags = wt["vmp"], wt["shape"], wt["flags"]
     nsets = (len(ts.vmp) - 330) // 431
-    if vmp == 0 and shape <= 0:
+    if vmp == 0 and shape <= 0 and not wt.get("doorLeaf"):
         return None
     img = wall_set_face(ts, vmp - 1, pal) if 0 < vmp <= nsets else Image(FACE_W, FACE_H)
-    if shape == -2 and flags & 1 and ts.door_frames:       # porte fermée : battant dans l'ouverture
+    if (shape == -2 or wt.get("doorLeaf")) and flags & 1 and ts.door_frames:       # porte fermée : battant dans l'ouverture
         door = frame_image(ts.door_frames[0], pal)
         # le battant est en retrait au fond de l'encadrement : le moteur pose son bas à la ligne
         # 86 de la vue pour la porte de la case suivante (mur des lignes 8 à 104), soit la ligne
@@ -790,6 +790,48 @@ def upper_storeys(ts, pal, used_decors):
         paste_windows(ts, pal, d, img)
         out[d] = img
     return out
+
+
+# Bouton des portes (docs/reverse-engineering.md § 9.6). Le fichier des murs ne donne aucune
+# décoration aux portes (forme −2) ; le script d'initialisation du niveau (LEVELn.INI) en attache
+# une à tous les types de porte : assignLevelDecorationShape(d) (fonction 0x35), puis
+# resetBlockShapeAssignment(résultat) (0x36), qui l'écrit pour les murs 3 à 7 et 13 à 17.
+DOOR_WALL_IDS = set(range(3, 8)) | set(range(13, 18))
+
+
+def level_door_decoration(files, n):
+    ini = files.get(f"LEVEL{n}.INI")
+    if not ini:
+        return 0
+    found = [args[0] for _, fn, args in emc.calls(emc.chunks(ini)) if fn & 0xFF == 0x35 and args and args[0]]
+    return found[0] if found else 0
+
+
+def switch_rect(ts, wt, pal):
+    """Zone cliquable d'un mur à interrupteur, en pixels de la face 128 × 96 : [x0, y0, x1, y1].
+
+    Comme clickedShape (gui_rpg.cpp) : rectangle de chaque décoration vue de face (position 1),
+    doublé en largeur pour une décoration symétrique (drapeau 1), agrandi de 4 px ; pour une
+    porte, le battant ; pour un script seul (type 4), toute la face."""
+    if wt["special"] == 5 and wt["shape"] <= 0 and ts.door_frames:   # porte sans bouton : le battant
+        w, h, _ = ts.door_frames[0]
+        x0 = (FACE_W - w) // 2
+        return [x0, DOOR_BOTTOM - h, x0 + w, DOOR_BOTTOM]
+    if wt["special"] == 4:
+        return [0, 0, FACE_W, FACE_H]
+    box, d, seen = None, wt["shape"], set()
+    while 0 < d < len(ts.decor) and d not in seen:
+        seen.add(d)
+        dec = ts.decor[d]
+        si = dec["shape"][1]
+        if si != 0xFFFF and si < len(ts.decor_shapes) and ts.decor_shapes[si]:
+            w, h, _ = ts.decor_shapes[si]
+            x, y = dec["x"][1], dec["y"][1]
+            x1 = FACE_W - x if dec["flags"] & 1 else x + w
+            r = [max(0, x - 4), max(0, y - 4), min(FACE_W, x1 + 4), min(FACE_H, y + h + 4)]
+            box = r if box is None else [min(box[0], r[0]), min(box[1], r[1]), max(box[2], r[2]), max(box[3], r[3])]
+        d = dec["next"]
+    return box
 
 
 def is_opaque(img):
@@ -1015,10 +1057,13 @@ def main(game_dir, maps_dir, out_dir):
         used = sorted({w for row in level["blocks"] for cell in row for w in cell}
                       | {int(k) for k in level["wallTypes"]})
         textures, walls = [], {}
+        door_decor = level_door_decoration(files, n)
         for wid in used:
             wt = level["wallTypes"].get(str(wid))
             if wt is None:
                 continue
+            if door_decor and wid in DOOR_WALL_IDS and wt["shape"] <= 0:
+                wt = dict(wt, shape=door_decor, doorLeaf=True)   # bouton de la porte (script du niveau)
             img = face_texture(ts, wt, pal)
             tex = -1
             if img is not None:
@@ -1033,6 +1078,14 @@ def main(game_dir, maps_dir, out_dir):
                 if open_img is not None:
                     entry["openTex"] = len(textures)
                     textures.append(open_img)
+            # interrupteur (type spécial du mur, que le jeu traite au clic : clickedWall) et zone
+            # cliquable dans la face (décorations vues de face, comme clickedShape ; battant
+            # pour une porte, face entière pour un script seul)
+            if wt["special"] in (1, 2, 3, 4, 5):
+                entry["special"] = wt["special"]
+                hot = switch_rect(ts, wt, pal)
+                if hot:
+                    entry["hot"] = hot
             walls[wid] = entry
         rows = max(1, (len(textures) + ATLAS_COLS - 1) // ATLAS_COLS)
         atlas = Image(FACE_W * ATLAS_COLS, FACE_H * rows)

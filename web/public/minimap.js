@@ -952,6 +952,13 @@
   const placeImg = new Map();             // "niveau:n" -> {src, kind} ou Promise
   let snapId = 0;
   const snapWait = new Map();
+  // Interrupteur cliqué dans la vue 3D (mur devant le groupe) : le moteur ScummVM clique ce mur
+  // comme le joueur (commande clickwall, clickedWall du jeu). Sous DOSBox, pas de commande.
+  addEventListener("message", async (e) => {
+    if (e.origin !== location.origin || !e.data || e.data.type !== "lol-clickwall") return;
+    if (window.LOL_ENGINE !== "scummvm") { console.info("Interrupteur : actionnable seulement sous ScummVM"); return; }
+    try { await mem.cmd({ op: "clickwall" }, 5000); } catch (err) { console.warn("clickwall", err); }
+  });
   addEventListener("message", (e) => {
     if (e.origin !== location.origin || !e.data || e.data.type !== "lol-snap") return;
     const ok = snapWait.get(e.data.id); if (ok) { snapWait.delete(e.data.id); ok(e.data.url); }

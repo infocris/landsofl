@@ -930,6 +930,81 @@ so the leaf is recessed and does not sit at the bottom of the opening.
   the inner reveals. It was aligned with the bottom of the opening (row 88), so it stood 10 px
   too low, sinking below the floor line with a gap under the lintel.
 
+### 9.6 Switches and door buttons — verified in ScummVM (2026-11-22)
+
+**What the game clicks.** A click on the view (`LoLEngine::clickedWall`, `gui_lol.cpp`) only
+acts on the face of the cell in front of the party that faces it. The action depends on that
+face's special type (`.WLL`, field `special`, `_specialWallTypes`):
+
+| Type | Function | Effect |
+|---|---|---|
+| 1 | `clickedWallShape` | cell script with flag 0x40 (banners, plaques, buttons…) |
+| 2 / 3 | `clickedLeverOn` / `clickedLeverOff` | wall id ±1 (the lever's other state), then the script with `_clickedSpecialFlag` |
+| 4 | `clickedWallOnlyScript` | script only, no hit test |
+| 5 | `clickedDoorSwitch` | script with 0x40, then the door opens or closes (`processDoorSwitch`) unless the script blocked it |
+| 6 | `clickedNiche` | drops the item in hand into the niche |
+
+Types 1, 2, 3 and 5 require the click to hit one of the face's decorations
+(`clickedShape`, `gui_rpg.cpp`). The test uses the head-on rectangle of each decoration,
+widened by 4 px, and doubled in width for a symmetric decoration (flag 1); the screen
+offsets are (136, 8).
+
+**Door buttons.** The wall file gives the door types no decoration (shape −2). The level's
+initialisation script attaches one:
+- **Calls**: `assignLevelDecorationShape(d)` (script function 0x35), then
+  `resetBlockShapeAssignment(result)` (0x36), which writes it for walls 3–7 and 13–17.
+- **Decorations by level**:
+
+  | Levels | Decoration |
+  |---|---|
+  | 1, 12–16 | 1 |
+  | 4 | 13 |
+  | 18, 20, 21 | 35 |
+  | 26 | 2 |
+  | 27–29 | 38 |
+- **Other levels**: none; there one clicks the door itself.
+- **Gladstone (level 1)**: decoration 1 is the small red plaque with a golden cross, 11×13
+  px at (99, 41) on the face, right of the leaf. Its flag 8 limits it to the centre column of
+  the view.
+- **Export**: the 3D view lacked it. It now draws it on the closed and open door textures
+  (`level_door_decoration`), and the clickable area of such a door is the button, as for
+  `clickedShape`.
+
+**Export** (`levelNN.json`, `walls[id]`): `special` (1–5), and `hot` = clickable rectangle in
+face pixels (`switch_rect`):
+- the decorations' rectangle, as for `clickedShape`;
+- for a door without a button, the leaf;
+- for type 4, the whole face.
+
+**Engine command op 20** (`clickwall`, ScummVM version) clicks the wall in front of the party.
+1. **Mouse position**: the mouse is placed at the centre of its first decoration, so that
+   `clickedShape` passes.
+2. **Hit test**: for types 1 and 5, whose script receives 0x40 written in the code, the hit
+   test is skipped (`_clickedSpecialFlag` set to 0 during the call). Levers (2, 3) and
+   script-only walls (4) keep it, since their script reads it.
+3. **Click**: `clickedWall` is called.
+4. **Reply**: 0 done, 2 nothing to act on in front (or a niche), 3 click without effect,
+   11/12/13 refused (dialogue or scene, controls disabled, magic menu open).
+
+**3D view** (built in, ScummVM only): if the wall in front of the party has a switch, its
+clickable area is outlined with a dashed golden line (brighter on hover, pointer cursor). A
+click there sends `lol-clickwall` to the page, which sends command op 20. The game redraws, and
+the live grid updates the 3D view (open door, lever moved).
+- **Verified**: Gladstone, cell 13,16 facing north. The button next to the door is drawn
+  and outlined. A click on it opens the door in the game, then in the 3D view, where the
+  fountain appears behind it.
+
+**Engine cache** (2026-11-22). The test server sent no cache header, so Chrome kept the
+previous `scummvm.wasm` and `lol-game.html`, and ignored the rebuilt engine: the new command
+answered like an unknown command.
+- **Server**: `tools/scummvm_web.py` now sends `Cache-Control: no-cache` for `.wasm`, `.js`
+  and `.html`.
+- **Pages**: the generated pages load `lol-game.html`, `scummvm.js` and `scummvm.wasm`
+  (`Module.locateFile`) with `?v=` set to the date and size of the build.
+- **Toolchain**: the rebuild must use `dists/emscripten/build.sh make dist …`, whose emsdk is
+  4.0.10. A plain `make` picks Homebrew's `emcc`, a different version, and mixes object files
+  from two toolchains.
+
 ## 10. Not decoded so far
 
 - `.TLC` (5376 bytes per level), `.INF` beyond monster placement, `ITEM.INF`.
@@ -1979,3 +2054,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: built-in 3D view displayed with the game's pixel aspect (1.2 times taller than wide, 352×240 shown at 352×288); it was wider and flatter than the game view (§ 9.3a).
 - **2026-11-22**: door leaf height taken from the engine (`drawDoor`: bottom at view row 86 for the next-cell door, face row 78), 10 px higher than before; it now fills its frame up to the lintel, as in the game (§ 9.5).
 - **2026-11-22**: sharper Gladstone textures: the floor pattern takes its depth detail from its transpose (diagonal symmetry of the octagons, § 9.3c); beamed ceilings are folded without row interpolation, with cubic resolution weights, at 96×96 (§ 9.3f).
+- **2026-11-22**: switches in the 3D view: door buttons attached by the level script (`assignLevelDecorationShape` + `resetBlockShapeAssignment`) now drawn; walls' switch type and clickable area exported; engine command op 20 (`clickwall`) clicks the wall in front like the game (`clickedWall`); the 3D view outlines the switch in front and clicks it; engine files versioned in URLs and served `no-cache` (§ 9.6).

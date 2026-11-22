@@ -161,7 +161,9 @@ LAUNCH_JS = r"""<script src="volume.js"></script>
 (() => {
   if (!location.hash) history.replaceState(null, "", "#__TARGET__");
   const DB = "/home/web_user", KEY = DB + "/scummvm.ini", SEC = "[__TARGET__]";
-  const start = () => { const s = document.createElement("script"); s.src = "scummvm.js"; document.body.appendChild(s); };
+  // version du moteur dans les adresses : un navigateur qui a gardé l'ancien moteur en cache le recharge
+  Module.locateFile = (p, dir) => dir + p + (p.endsWith(".wasm") ? "?v=__BUILD_V__" : "");
+  const start = () => { const s = document.createElement("script"); s.src = "scummvm.js?v=__BUILD_V__"; document.body.appendChild(s); };
   const section = (t) => { const i = t.indexOf(SEC); if (i < 0) return ""; const j = t.indexOf("\n[", i + 1); return j < 0 ? t.slice(i) : t.slice(i, j + 1); };
   fetch("scummvm.ini", { cache: "no-store" }).then((r) => r.text()).then((ini) => new Promise((done) => {
     const ours = section(ini);
@@ -261,7 +263,7 @@ LAUNCH_JS = r"""<script src="volume.js"></script>
     } else if (d.find && zones) ch.postMessage({ id: d.id, found: d.find.map(() => -1) });
     else if (d.cmd && zones) {
       // commandes d'inventaire : exécutées par le moteur dans sa boucle (webRunCommands)
-      const op = { move: 1, delete: 2, create: 3, goto: 4, cheat: 5, money: 6, hurt: 7, spend: 8, cast: 9, levelup: 10, learn: 11, volume: 12, teleport: 13, listsaves: 14, load: 15, save: 16, setchar: 17, unlock: 18, autospell: 19 }[d.cmd.op] || 0;
+      const op = { move: 1, delete: 2, create: 3, goto: 4, cheat: 5, money: 6, hurt: 7, spend: 8, cast: 9, levelup: 10, learn: 11, volume: 12, teleport: 13, listsaves: 14, load: 15, save: 16, setchar: 17, unlock: 18, autospell: 19, clickwall: 20 }[d.cmd.op] || 0;
       // texte éventuel (nom de sauvegarde) : octets UTF-8, lus par le moteur (Module.lolText)
       const text = typeof d.cmd.text === "string" ? new TextEncoder().encode(d.cmd.text) : null;
       (Module.lolCmds = Module.lolCmds || []).push([op, d.cmd.a | 0, d.cmd.b | 0, d.id, text]);
@@ -325,12 +327,18 @@ PAGE_CSS = """<style>
 </head>"""
 
 
+def build_version():
+    """Version du moteur pour les adresses (cache du navigateur) : date et taille de scummvm.wasm."""
+    st = os.stat(os.path.join(SITE, "scummvm.wasm"))
+    return f"{int(st.st_mtime)}-{st.st_size}"
+
+
 def write_launcher():
     html = open(os.path.join(SITE, "scummvm.html"), encoding="utf-8").read()
     tag = "<script async src=scummvm.js></script>"
     if tag not in html:
         sys.exit("scummvm.html : balise de chargement de scummvm.js introuvable.")
-    html = html.replace(tag, LAUNCH_JS.replace("__TARGET__", TARGET))
+    html = html.replace(tag, LAUNCH_JS.replace("__TARGET__", TARGET).replace("__BUILD_V__", build_version()))
     html = html.replace("<title>ScummVM</title>", "<title>Lands of Lore (ScummVM)</title>")
     open(os.path.join(SITE, "lol-game.html"), "w", encoding="utf-8").write(html)
 
@@ -343,7 +351,7 @@ def write_page():
         (r'<script src="js-dos\.js"></script>\n', ""),
         (r"<title>[^<]*</title>", "<title>Lands of Lore (ScummVM)</title>"),
         (r"</head>", PAGE_CSS),
-        (r'<div id="dos"></div>', f'<iframe id="dos" src="lol-game.html#{TARGET}" title="Lands of Lore (ScummVM)" allow="autoplay; fullscreen"></iframe>'),
+        (r'<div id="dos"></div>', f'<iframe id="dos" src="lol-game.html?v={build_version()}#{TARGET}" title="Lands of Lore (ScummVM)" allow="autoplay; fullscreen"></iframe>'),
         # script de la page DOSBox (ZQSD, pause, js-dos, sauvegardes…) : remplacé
         (r"<script>\n\(\(\) => \{\n  // --- Déplacement ZQSD.*?\n</script>", PAGE_JS),
     ]
@@ -364,6 +372,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if os.path.exists(alt):
                 return alt
         return p
+
+    def end_headers(self):
+        # moteur et pages : le navigateur revalide à chaque chargement (304 si inchangé). Sans cet
+        # en-tête, Chrome garde un scummvm.wasm « frais » d'après sa date et ignore un moteur recompilé
+        if self.path.split("?")[0].endswith((".wasm", ".js", ".html", "/")):
+            self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
 
 
 class Server(http.server.ThreadingHTTPServer):
