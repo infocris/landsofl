@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261122f";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261122h";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) FOV = 2 * Math.atan(1.375);
   let dirty = true;
@@ -453,8 +453,25 @@
     return T.px[((idx >> 2) * t + ty) * T.w + (idx & 3) * t + tx];
   }
 
+  // Plafond (docs/reverse-engineering.md § 9.3f) : le jeu redessine le même fond dans les quatre
+  // directions, donc la case de plafond (un caisson vu en regardant vers le nord) est tournée
+  // selon la direction cardinale la plus proche du regard ; elle reste calée sur les cases.
+  // Renvoie (fu, fv) dans la case -> indice du texel.
+  function ceilTexel(a) {
+    const d = ((Math.round(a / (Math.PI / 2)) % 4) + 4) % 4;
+    const fx = [1, 0, -1, 0][d], fy = [0, 1, 0, -1][d], rx = -fy, ry = fx;
+    const swap = rx === 0, flipU = rx < 0 || ry < 0, flipV = fx > 0 || fy > 0;
+    const C = L.ceilTex, cw = C.w, ch = C.h;
+    return (fu, fv, odd) => {
+      let u = swap ? fv : fu, v = swap ? fu : fv;
+      if (flipU !== !!odd) u = 1 - u;                    // miroir une case sur deux
+      if (flipV) v = 1 - v;
+      return Math.min(ch - 1, (v * ch) | 0) * cw + Math.min(cw - 1, (u * cw) | 0);
+    };
+  }
+
   function castFloorCeiling(dirX, dirY, planeX, planeY) {
-    const F = L.floorTex, C = L.ceilTex, mirF = L.floorMirror !== false;
+    const F = L.floorTex, C = L.ceilTex, mirF = L.floorMirror !== false, cTex = ceilTexel(player.a);
     const lx = dirX - planeX, ly = dirY - planeY;          // rayon de gauche
     const stepX = (2 * planeX) / W, stepY = (2 * planeY) / W;
     const hz = H / 2 + pitch;                              // ligne d'horizon (décalée en vue libre)
@@ -471,9 +488,10 @@
       const dx = rowDist * stepX, dyw = rowDist * stepY;
       for (let x = 0; x < W; x++, wx += dx, wy += dyw) {
         const cx = Math.floor(wx), cy = Math.floor(wy);
+        if (dy < 0) { frame32[fRow + x] = shade(C.px[cTex(wx - cx, wy - cy, (cx + cy) & 1)], k); continue; }
         let tx = ((wx - cx) * tw) | 0, ty = ((wy - cy) * th) | 0;
         if (mir && (cx + cy) & 1) tx = tw - 1 - tx;
-        frame32[fRow + x] = shade(dy > 0 && L.wangTex ? wangPx(wx, wy) : T.px[ty * tw + tx], k);
+        frame32[fRow + x] = shade(L.wangTex ? wangPx(wx, wy) : T.px[ty * tw + tx], k);
       }
     }
     ctx.putImageData(frameImg, 0, 0);
@@ -492,7 +510,7 @@
     const rx = -fy, ry = fx;                                  // vers la droite de l'écran
     const half = H / 2;
     // sol et plafond
-    const F = L.floorTex, C = L.ceilTex, mirF = L.floorMirror !== false;
+    const F = L.floorTex, mirF = L.floorMirror !== false, cTex = L.outdoor ? null : ceilTexel(player.a);
     for (let y = Math.floor(half) + 1; y < H; y++) {
       const d = (WALL_H / 2) * proj / (y - half), z = zOfDeff(d);
       const k = Math.round((1 - shadeFor(z) / SHADES * 0.85) * 256);
@@ -505,11 +523,7 @@
         let tx = (fu * F.w) | 0;
         if (mirF && odd) tx = F.w - 1 - tx;
         frame32[fRow + x] = shade(L.wangTex ? wangPx(wx, wy) : F.px[((fv * F.h) | 0) * F.w + tx], k);
-        if (!L.outdoor) {
-          let cxx = (fu * C.w) | 0;
-          if (odd) cxx = C.w - 1 - cxx;
-          frame32[cRow + x] = shade(C.px[((fv * C.h) | 0) * C.w + cxx], k);
-        }
+        if (!L.outdoor) frame32[cRow + x] = shade(L.ceilTex.px[cTex(fu, fv, odd)], k);
       }
       if (L.outdoor) frame32.fill(skyAt(H - 1 - y, half), cRow, cRow + W);
     }

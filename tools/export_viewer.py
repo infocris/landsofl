@@ -243,11 +243,7 @@ def background(ts, pal):
     return img
 
 
-# Perspective de la vue d'origine (176x120), déduite du mur proche de face :
-# 128 px pour une case à 0,5 case de distance -> focale 64 ; mur des lignes 0 à ~94
-# -> horizon à y=47 et œil à mi-hauteur (0,367 case au-dessus du sol).
-VIEW_CX, VIEW_HORIZON, VIEW_FOCAL, EYE_H = 88, 47, 64, 0.367
-TEX = 64
+TEX = 64                          # texture d'une case (plafond)
 
 
 # Sol du fond d'origine, vu de dessus (docs/reverse-engineering.md § 9.3c, mesuré sur les sols
@@ -333,7 +329,13 @@ def floor_motif(bg, tsname):
                     a = acc[iv * size + min(size - 1, int(u * size))]
                     a[0] += col[0] * gain * wgt; a[1] += col[1] * gain * wgt
                     a[2] += col[2] * gain * wgt; a[3] += wgt
-    # trous (coins non vus d'une case peinte) : moyenne des voisins, de proche en proche
+    return acc_image(acc, size), bool(lat)
+
+
+def acc_image(acc, size):
+    """Image d'un accumulateur [r, g, b, poids] par texel ; les trous (texels jamais vus,
+    comme les coins d'une case peinte) prennent la moyenne de leurs voisins, de proche en
+    proche."""
     for _ in range(size):
         holes = [i for i, a in enumerate(acc) if not a[3]]
         if not holes:
@@ -347,7 +349,73 @@ def floor_motif(bg, tsname):
     img = Image(size, size)
     for i, a in enumerate(acc):
         img.put(i % size, i // size, bytes(min(255, round(a[c] / max(a[3], 1e-9))) for c in range(3)))
-    return img, bool(lat)
+    return img
+
+
+# Plafond du fond d'origine, vu de dessous (docs/reverse-engineering.md § 9.3f), mesuré sur les
+# charpentes de KEEP, TOWER1, MANOR et URBISH :
+# - en largeur, les poutres longitudinales fuient vers y = 39, comme le sol : le point x de la
+#   ligne y est à X = (x − 88) / (4 · (39 − y)) cases ;
+# - en profondeur, K = 145,3 / (55,15 − y) cases : les poutres transversales (lignes 0-4,
+#   14-17, 23-25, 29-30) tombent à K entier + 0,66, une par case ;
+# - un caisson par case, poutres sur les bords de la case (longitudinales à X = ±0,5).
+CEIL_HX, CEIL_SX = 39, 4.0
+CEIL_DEPTH = (55.15, 145.3)
+CEIL_EDGE_K = 0.97               # bord de case : milieu de la poutre (dessous clair + face)
+CEIL_COFFERED = {"KEEP", "TOWER1", "MANOR", "URBISH", "MINE1"}
+
+
+def ceiling_cell(bg, tsname):
+    """Plafond d'une case (TEX × TEX, rangée 0 = nord en regardant vers le nord).
+
+    Charpente à caissons : tout le plafond visible est replié dans une case (somme pondérée
+    par la résolution à l'écran, symétrisée gauche-droite puisque le jeu retourne le fond à
+    chaque pas). Autres plafonds (roche, racines…) : la case la plus proche, redressée."""
+    hk, ak = CEIL_DEPTH
+    k_of = lambda y: ak / (hk - y)
+    fold = tsname in CEIL_COFFERED
+    y_max = int(min(CEIL_HX, hk)) - 4
+    k_near = k_of(0)
+    lum = [sum(bg.px[(y * bg.w + x) * 4 + c] for x in range(bg.w) for c in range(3)) / bg.w + 1
+           for y in range(y_max)]
+    smooth = []
+    for y in range(y_max):                             # ± une demi-case de profondeur
+        band = [lum[t] for t in range(y_max) if abs(k_of(t + 0.5) - k_of(y + 0.5)) < 0.5]
+        smooth.append(sum(band) / len(band))
+    ref = sorted(smooth[:8])[4]
+    acc = [[0.0, 0.0, 0.0, 0.0] for _ in range(TEX * TEX)]
+    for sy in range(y_max * 8):
+        yy = (sy + 0.5) / 8
+        y0 = min(y_max - 1, max(0, int(yy - 0.5)))
+        y1 = min(y_max - 1, y0 + 1)
+        f = min(1.0, max(0.0, yy - 0.5 - y0))
+        sm = smooth[y0] * (1 - f) + smooth[y1] * f
+        if sm < 0.12 * ref:
+            continue
+        K = k_of(yy)
+        if fold:
+            v = 1 - (K - CEIL_EDGE_K) % 1
+        else:
+            v = 1 - (K - k_near)
+            if not 0 < v <= 1:
+                continue
+        iv = min(TEX - 1, int(v * TEX)) % TEX           # rangée 0 = le plus loin
+        scale = CEIL_SX * (CEIL_HX - yy)                # pixels par case : résolution
+        g = min(4.0, max(1.0, ref / sm)) * scale
+        for x in range(bg.w):
+            o0, o1 = (y0 * bg.w + x) * 4, (y1 * bg.w + x) * 4
+            col = [(bg.px[o0 + c] * (1 - f) + bg.px[o1 + c] * f) * g for c in range(3)]
+            for sx in (0.125, 0.375, 0.625, 0.875):
+                u = (x + sx - FLOOR_CX) / scale + 0.5
+                if fold:
+                    u %= 1
+                elif not 0 <= u < 1:
+                    continue
+                iu = min(TEX - 1, int(u * TEX))
+                for j in ((iu, TEX - 1 - iu) if fold else (iu,)):
+                    a = acc[iv * TEX + j]
+                    a[0] += col[0]; a[1] += col[1]; a[2] += col[2]; a[3] += scale
+    return acc_image(acc, TEX)
 
 
 # Tuiles de Wang du sol peint (docs/reverse-engineering.md § 9.3e). Une tuile = une demi-case
@@ -492,38 +560,6 @@ def floor_cell(motif, repeated):
     for k in range(n * n):
         img.blit(motif, (k % n) * motif.w, (k // n) * motif.h)
     return img
-
-
-def floor_ceiling(bg):
-    """Textures vues de dessus (64x64, une case) du sol et du plafond.
-
-    Projection inverse d'une case de profondeur dans l'image de fond d'origine
-    (sol : de 0,34 à 1,34 case ; plafond : de 0,5 à 1,5), en regardant vers le nord ;
-    u = est, v = sud dans la case. La pénombre peinte dans l'image d'origine est
-    compensée ligne par ligne (le moteur applique son propre assombrissement)."""
-    out = []
-    for sign, z0 in ((1, 0.34), (-1, 0.5)):          # 1 = sol, -1 = plafond
-        rows = []
-        for v in range(TEX):
-            z = z0 + (1 - (v + 0.5) / TEX)            # bas de la case = plus proche
-            sy = round(VIEW_HORIZON + sign * EYE_H * VIEW_FOCAL / z)
-            sy = min(bg.h - 1, max(0, sy))
-            row = []
-            for u in range(TEX):
-                x = (u + 0.5) / TEX - 0.5
-                sx = min(bg.w - 1, max(0, round(VIEW_CX + x * VIEW_FOCAL / z)))
-                o = (sy * bg.w + sx) * 4
-                row.append(tuple(bg.px[o:o + 3]))
-            rows.append(row)
-        lum = [sum(sum(p) for p in r) / (3 * TEX) + 1 for r in rows]
-        ref = sorted(lum)[-TEX // 4]                  # luminosité des lignes les plus claires
-        img = Image(TEX, TEX)
-        for v, r in enumerate(rows):
-            k = min(4.0, max(1.0, ref / lum[v]))
-            for u, p in enumerate(r):
-                img.put(u, v, bytes(min(255, round(c * k)) for c in p))
-        out.append(img)
-    return out
 
 
 def opening_bbox(img):
@@ -821,7 +857,7 @@ def main(game_dir, maps_dir, out_dir):
         atlas.save(os.path.join(out_dir, f"level{n:02d}_walls.png"))
         bg = background(ts, pal)
         bg.save(os.path.join(out_dir, f"level{n:02d}_bg.png"))
-        _, ceil_img = floor_ceiling(bg)
+        ceil_img = ceiling_cell(bg, tsname)
         motif, floor_repeated = floor_motif(bg, tsname)
         floor_cell(motif, floor_repeated).save(os.path.join(out_dir, f"level{n:02d}_floor.png"))
         if floor_repeated:

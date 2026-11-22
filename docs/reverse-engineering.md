@@ -554,11 +554,10 @@ From this we deduce:
 - **Shading**: the original background is painted with shading that increases with distance
   (black band around the horizon).
 
-The viewer thus reconstructs a ceiling texture seen from above (64×64, one cell), by
-inverse projection of one cell of depth (0.5 to 1.5 cell), with shading compensated row by
-row. It is mirrored every other cell, echoing the original background that the game flips
-at each step (**deduced**). The floor no longer uses this model: its painted perspective
-differs from the walls' (§ 9.3c).
+The floor and the ceiling of the background do **not** follow this model: their painted
+perspective differs from the walls' (§ 9.3c for the floor, § 9.3f for the ceiling). The
+viewer's first ceiling texture, projected with this model (rows 0–31 for one cell), packed
+three to four ceiling beams into one cell.
 
 **Distance scale of the original engine — measured.** It is not a perspective: a
 head-on wall measures 128, about 80 then about 48 px at 0.5, 1.5 and 2.5 cells. These are
@@ -729,6 +728,56 @@ Two generators, depending on the floor (§ 9.3c):
   - **Result**: good on cobblestones (Yvel), rubble (Urbish), lava, grass and moss. On
     the manor floor (MANOR), whose near band is less detailed, blocks remain visible.
   - `levelNN_floor.png` stays the one-cell texture (minimap, fallback).
+
+### 9.3f Ceiling of the background: projection and coffers — measured (2026-11-22)
+
+The ceiling of the background takes rows 0 to about 32 only (black band below, then the
+floor). KEEP, TOWER1, MANOR and URBISH/MINE1 show the same **beamed ceiling**: crossbeams
+across the corridor, longitudinal beams converging towards the centre, and a recessed
+panel between them. CAVE1, SWAMP, CATWALK and RUIN show rock, moss or roots without
+structure. CIMMERIA's ceiling is black.
+
+- **Width**: a search for symmetric pairs of straight lines `x = 88 ± c · (h − y)` that
+  follow the edges best gives h = 36–41.5 on KEEP and TOWER1. The longitudinal beams
+  therefore converge to y ≈ 39, **the floor's vanishing point** (§ 9.3c). A ceiling point at
+  lateral offset `X` (in cells) is at `x = 88 + 4 · X · (39 − y)`. The beam pair sits at
+  `c ≈ 2`, i.e. X = ±0.5: on the cell boundaries. A fainter pair on TOWER1, near rows 30–35,
+  fits X = ±1.5.
+- **Depth**: along the centre of the ceiling, KEEP and TOWER1 share one profile. Bright
+  crossbeams sit at rows 0–4, 14–17, 23–25 and 29–30, with darker bands between them. The
+  centres 15.5, 24 and 29.5 are evenly spaced in `1 / (h − y)` for h = 55.15:
+  `K = 145.3 / (55.15 − y)` cells puts them at K = 3.66, 4.66 and 5.66. The model then
+  predicts the band at rows 0–4 (K = 2.66 → y ≈ 0.6) and a faint line at y ≈ 33, both
+  present. Within each period, the bright underside of the beam is at frac K ∈ [0.65, 0.95],
+  a mid band at [0, 0.3] and the dark recess at [0.3, 0.6].
+- **One coffer per cell**: the crossbeams are one cell apart, and the longitudinal beams at
+  X = ±0.5 pass near the edges of the game's wall pieces (x = 29, 44, 60 at rows 8, 16, 24,
+  against 24, 48, 64; § 9.3d). The ceiling is a grid of beams on the cell boundaries, one
+  coffer per cell.
+- **Heights** (**deduced**, assuming a true perspective for each plane): lateral pixels per
+  cell grow as `(y − h) / H` for a plane at height H from the eye.
+  - The floor gives 0.75 · 3.1 = 2.3 px per row, so the eye is 0.43 cell above the floor.
+  - The ceiling gives 4 px per row, so it is 0.25 cell above the eye.
+  - The room is then 0.68 cell high, against 0.73–0.75 for the walls (128 × 96 px). With
+    the horizon at y ≈ 39 on a wall of rows 0–94, the eye is 0.42 cell above the floor, which
+    matches. The horizon at 47 of § 9.3a (eye at mid-height) is a property of the wall pieces,
+    not of the painted floor and ceiling.
+- **Texture** (`levelNN_ceil.png`, 64×64, row 0 = north when facing north):
+  - **beamed ceilings**: all the visible ceiling is folded into one cell. Each row is
+    split into 8 sub-rows with linear interpolation, and each pixel into 4 columns. The
+    samples are weighted by the on-screen resolution, `4 · (39 − y)` px per cell, and
+    symmetrised left-right, since the game flips the background at each step. The cell edge
+    is placed at K ≡ 0.97, the middle of the beam (bright underside and mid band). The
+    painted shading is compensated by the mean brightness of the rows within ±0.5 cell of
+    depth. The result is a dark coffer framed by beams, which tiles without seams.
+  - **other ceilings**: the nearest cell (K = 2.63 to 3.63, rows 0–15), rectified without
+    folding; it is mirrored every other cell.
+  - A fold symmetrised in all four directions was tried. It blurred the coffer into a
+    cross, so it was not kept.
+- **Use in the 3D view**: the game draws the same background whichever way the party
+  faces, so the ceiling texture is turned to the cardinal direction nearest to the gaze,
+  while staying aligned on the cells. Crossbeams therefore always run across the view, as
+  in the game, in both the real and the game perspectives.
 
 ### 9.4 Decorations — `.DAT` — verified for the head-on view
 
@@ -1810,3 +1859,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: 3D view of the forest (tileset `FOREST1`: levels 2, 3, 10, 17, 24) treated as an exterior like Yvel: 3-storey trees and sky instead of a ceiling. The original background shows trees well above the view, at least two wall heights, under a dark sky; the former ceiling, projected from those treetops, made a tunnel.
 - **2026-11-22**: wall pieces of the view (`_vmpOffsetsDefault`, rows and sizes) and the forest's treetops taken from the background band above the wall 3 cells ahead (§ 9.3d).
 - **2026-11-22**: floor generation: Wang tiles from the near band of painted floors (16 tiles, minimum-error cuts, edges hashed from their coordinates, deterministic or random seed); paved floors keep their periodic pattern (§ 9.3e).
+- **2026-11-22**: ceiling geometry measured on the background: longitudinal beams converging to y ≈ 39 like the floor, crossbeams one cell apart with `K = 145.3 / (55.15 − y)`, one coffer per cell, eye 0.43 cell above the floor and ceiling 0.25 above the eye. Ceilings rebuilt by folding (beamed tilesets) or near-cell rectification, and turned with the gaze in the 3D view (§ 9.3f).
