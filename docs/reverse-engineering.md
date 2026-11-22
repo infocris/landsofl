@@ -892,7 +892,25 @@ side, 8–11 back, 12–15 attack (**verified** on `GUARD.SHP`). The other side
 is obtained by mirroring.
 
 The door leaf (`*DOOR.SHP`, 1 image) fits into the transparent area of the "frame"
-wall set (centered, aligned with the bottom of the opening).
+wall set, centered.
+
+**Height — verified (2026-11-22).** The frame wall set shows the door's reveals in perspective,
+so the leaf is recessed and does not sit at the bottom of the opening.
+- **Engine**: `LoLEngine::drawDoor` (`sprites_lol.cpp`) puts the leaf's top at
+  `DoorY + 124 − Door4 − height`, then its bottom at `DoorY + 124 − Door4`. The tables come from
+  `lol_dos_cd.h` (`kLoLDscDoorY`, `kLoLDscDoor4`).
+- **Bottom row by distance**:
+
+  | Door | DoorY | Door4 | Bottom (view row) | Wall rows |
+  |---|---|---|---|---|
+  | next cell (dim 2) | −30 | 8 | 86 | 8–104 |
+  | 2 cells ahead | −50 | 2 | 72 | 16–80 |
+  | 3 cells ahead | −61 | 5 | 58 | 24–64 |
+- **Check**: on a ScummVM screenshot facing a door 2 cells ahead, the leaf ends at about
+  row 71.
+- **Export**: the leaf's bottom goes to row 78 of the 128×96 face (`DOOR_BOTTOM`), the bottom of
+  the inner reveals. It was aligned with the bottom of the opening (row 88), so it stood 10 px
+  too low, sinking below the floor line with a gap under the lintel.
 
 ## 10. Not decoded so far
 
@@ -1941,3 +1959,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: Yvel's haze lowered to 1.68 wall heights (top of the first floor's part shown by the game): façades stop there and fade into the haze (§ 9.3g).
 - **2026-11-22**: Yvel's light half-timbered first floor (decoration 6): its two 6-pane windows, unreadable in the hazy 3-cell view, rebuilt from the ground-floor window of the same style (decoration 4, mirrored half) (§ 9.3g).
 - **2026-11-22**: built-in 3D view displayed with the game's pixel aspect (1.2 times taller than wide, 352×240 shown at 352×288); it was wider and flatter than the game view (§ 9.3a).
+- **2026-11-22**: door leaf height taken from the engine (`drawDoor`: bottom at view row 86 for the next-cell door, face row 78), 10 px higher than before; it now fills its frame up to the lintel, as in the game (§ 9.5).

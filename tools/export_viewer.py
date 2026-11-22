@@ -574,6 +574,11 @@ def opening_bbox(img):
     return min(xs), min(ys), max(xs), max(ys)
 
 
+# drawDoor (sprites_lol.cpp) : haut = DoorY + 124 − Door4 − hauteur ; case suivante (dim 2) :
+# DoorY = −30, Door4 = 8 -> bas à la ligne 86 de la vue, 78 de la face (qui commence ligne 8)
+DOOR_BOTTOM = 86 - 8
+
+
 def face_texture(ts, wt, pal):
     """Texture 128x96 d'un type de mur, ou None si rien à dessiner."""
     vmp, shape, flags = wt["vmp"], wt["shape"], wt["flags"]
@@ -583,13 +588,12 @@ def face_texture(ts, wt, pal):
     img = wall_set_face(ts, vmp - 1, pal) if 0 < vmp <= nsets else Image(FACE_W, FACE_H)
     if shape == -2 and flags & 1 and ts.door_frames:       # porte fermée : battant dans l'ouverture
         door = frame_image(ts.door_frames[0], pal)
+        # le battant est en retrait au fond de l'encadrement : le moteur pose son bas à la ligne
+        # 86 de la vue pour la porte de la case suivante (mur des lignes 8 à 104), soit la ligne
+        # DOOR_BOTTOM de la face, au bas des embrasures (docs/reverse-engineering.md § 9.5)
         bb = opening_bbox(img)
-        if bb:
-            x0, y0, x1, y1 = bb
-            dx = (x0 + x1 + 1 - door.w) // 2
-            dy = y1 + 1 - door.h
-        else:
-            dx, dy = (FACE_W - door.w) // 2, FACE_H - 8 - door.h
+        dx = (bb[0] + bb[2] + 1 - door.w) // 2 if bb else (FACE_W - door.w) // 2
+        dy = DOOR_BOTTOM - door.h
         img.blit(door, dx, dy)
     seen = set()
     d = shape
