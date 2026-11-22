@@ -644,6 +644,19 @@ are paved with a visible repeating pattern: `KEEP` (level 1, octagons) and `TOWE
   and right halves of the image) finds a period. They are painted without a pattern. The
   export only rectifies one cell (3.1 × 3.1 units, from the bottom row) with TOWER1's
   depth model and hx = 39, then fills the unseen corners from their neighbours.
+- **Checkerboard of two cells — refuted (2026-11-22)**, tested on MANOR, URBISH and RUIN.
+  The hypothesis was a floor made of cells 1 and 2 in a checkerboard (`12121 / 21212`):
+  - **2 = 1 mirrored**: each row would then be mirror-symmetric about every cell boundary
+    (axes evenly spaced, converging to y = hx). Searching cell sizes from 0.6 to 4 units
+    and every phase, the best mean symmetry is 0.30–0.36, close to noise. The positive
+    control, KEEP's octagons, reaches 0.86.
+  - **2 a different cell**: rows one cell apart in depth would match with a one-cell
+    lateral shift. The best row pairs have inconsistent shifts, i.e. no lattice.
+  - No exact copy, mirrored or translated, exists within a row either. The background's
+    `.VMP` uses each floor tile once (rows 8–14: consecutive tile numbers, no mirror bit).
+  
+  The game flips the whole background at each step, which is what the 3D view reproduces
+  by mirroring one cell in two (`floorMirror`).
 - **Use**: `levelNN_floor.png` is one cell, i.e. the pattern repeated 3 × 3 for a paved
   floor (128×128 for the others). `floorMirror: false` in `levelNN.json` tells the 3D
   view not to mirror it every other cell, since it already tiles without seams.
@@ -1720,3 +1733,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-20**: game keys completed from ScummVM's keymap: F1-F3 attack with characters 1-3, `/` next spell, M/R/O (§ 12.4).
 - **2026-11-20**: keys 1-3 attack with characters 1-3 (ScummVM keymap, DOSBox page), except in menus (§ 12.4).
 - **2026-11-22**: floor of the background measured: its own projection (vanishing point y ≈ 39–42.5 in width, horizon y ≈ 24–34.5 in depth), 3.1 units per cell, and the mosaic pattern of KEEP and TOWER1 extracted by folding every visible repetition (`levelNN_floor_motif.png`). The other floors are not repeating patterns (§ 9.3c).
+- **2026-11-22**: hypothesis of a checkerboard of two cells (`12121 / 21212`, mirrored or not) in the painted floors refuted; the background `.VMP` uses each floor tile once (§ 9.3c).
