@@ -669,6 +669,34 @@ are paved with a visible repeating pattern: `KEEP` (level 1, octagons) and `TOWE
   - `floorMirror: false` in `levelNN.json` (paved floors) tells the 3D view not to mirror
     the cell every other cell, since the pattern already tiles without seams.
 
+### 9.3d Wall pieces and the forest's upper part — verified in ScummVM (2026-11-22)
+
+`KyraRpgEngine::drawVcnBlocks` (`scene_rpg.cpp`) builds the view, 22×15 tiles, from the
+background (flipped when `_wllProcessFlag` is set, § 9.3a) and from pieces of each wall's set of
+431 `.VMP` entries. `_vmpOffsetsDefault = {102, 97, 129, 117, 81, 159, 45, 239, 0}`:
+
+| Offset | Tiles (w×h) | First tile row | Piece |
+|---|---|---|---|
+| 129 | 6×5 | 3 (y 24–64) | wall facing the party, 3 cells ahead |
+| 102, 97, 117 | 3×5, 1×5, 2×6 | 3 | sides at 2–3 cells |
+| 159 | 10×8 | 2 (y 16–80) | facing wall, 2 cells ahead |
+| 81 | 2×8 | 2 | side, 2 cells |
+| 239 | 16×12 | 1 (y 8–104) | facing wall, next cell |
+| 45 | 3×12 | 1 | side, next cell |
+| 0 | 3×15 | 0 (y 0–120) | side of the party's own cell, full height |
+
+Walls therefore only cover their own height; above them, the view shows the background.
+In the forest (`FOREST1`), the background's top rows are a band of treetops cut out against
+a sky of a single color (52, 52, 81 in the levels' palette), and in the game (screenshot at
+level 2, facing a corridor) the trunks of the wall 3 cells ahead continue into it without a
+break. The band above that wall (x 64–112, rows 0–23) is thus the upper part of those trees:
+24 px above a 40 px wall.
+
+The 3D view uses it for the forest: one storey of repeated trunk, then this band as the crown
+(24/40 of a wall height, the sky made transparent), against a sky of that single color. Trees
+are thus about 2.6 walls high. The band's size relative to the wall gives at least 1.6 at 3
+cells; the extra trunk storey follows the near trees, which fill the whole view in the game.
+
 ### 9.4 Decorations — `.DAT` — verified for the head-on view
 
 ```
@@ -1747,3 +1775,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: painted floors: only the near half cell is rectified (the far rows are dark or, in Yvel, hazy), laid as a checkerboard `1 2 / 2 1` with 2 = 1 mirrored (§ 9.3c).
 - **2026-11-22**: 3D view: health bars only for monsters within 2.5 cells (§ 10a).
 - **2026-11-22**: 3D view of the forest (tileset `FOREST1`: levels 2, 3, 10, 17, 24) treated as an exterior like Yvel: 3-storey trees and sky instead of a ceiling. The original background shows trees well above the view, at least two wall heights, under a dark sky; the former ceiling, projected from those treetops, made a tunnel.
+- **2026-11-22**: wall pieces of the view (`_vmpOffsetsDefault`, rows and sizes) and the forest's treetops taken from the background band above the wall 3 cells ahead (§ 9.3d).

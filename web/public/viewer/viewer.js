@@ -86,7 +86,8 @@
   // Extérieurs : ciel (couleur des lignes hautes du fond d'origine) au lieu du plafond, et
   // façades de plusieurs étages (murs hauts de la ville d'Yvel, arbres de la forêt : le fond
   // d'origine les montre plus hauts que la vue). storeys = hauteur en étages.
-  const OUTDOOR = { YVEL1: { storeys: 3 }, FOREST1: { storeys: 3 } };
+  // crown : sommet des arbres repris du fond d'origine (voir setupOutdoor).
+  const OUTDOOR = { YVEL1: { storeys: 3 }, FOREST1: { storeys: 2, crown: true } };
   const FOOT = 12;              // lignes du bas de la face (soubassement) non répétées aux étages
   const SHADES = 8;
   const shadeFor = (d) => Math.min(SHADES - 1, Math.floor(Math.max(0, d - 0.6) / 1.4));
@@ -116,6 +117,26 @@
       }
     }
     if (!L.sky.length) L.sky.push(0xff9a9090);
+    // Cimes (forêt) : dans le jeu, le mur de face à 3 cases (6 × 5 tuiles, x 64-112, lignes
+    // 24-64) se prolonge vers le haut dans le fond d'origine, jusqu'au ciel (couleur unie de
+    // la ligne 0). Ce bandeau (lignes 0-23 au-dessus de ce mur), ciel rendu transparent, sert de
+    // sommet aux arbres : il mesure 24/40 de la hauteur d'un mur.
+    L.crownImgs = null;
+    if (L.outdoor.crown && bg) {
+      const b = pixels(bg), cnt = new Map();
+      for (let x = 0; x < b.w; x++) cnt.set(b.px[x], (cnt.get(b.px[x]) || 0) + 1);
+      const sky = [...cnt].sort((a, c) => c[1] - a[1])[0][0];
+      L.sky = [sky];
+      const c = document.createElement("canvas");
+      c.width = CROWN.w; c.height = CROWN.h;
+      const g = c.getContext("2d"), id = g.createImageData(CROWN.w, CROWN.h), out = new Uint32Array(id.data.buffer);
+      for (let y = 0; y < CROWN.h; y++) for (let x = 0; x < CROWN.w; x++) {
+        const v = b.px[y * b.w + CROWN.x + x];
+        out[y * CROWN.w + x] = v === sky ? 0 : v;
+      }
+      g.putImageData(id, 0, 0);
+      L.crownImgs = darken(c, SHADES);
+    }
     const W2 = walls.width, px = pixels(walls).px, fw = L.faceW, fh = L.faceH, cols = L.atlasCols;
     const freq = new Map();
     for (const id of L.faces) { const w = L.wallInfo[id]; if (w && w.opaque && !w.door && w.tex >= 0) freq.set(w.tex, (freq.get(w.tex) || 0) + 1); }
@@ -141,6 +162,7 @@
       return L.upper.get(tex);
     };
   }
+  const CROWN = { x: 64, w: 48, h: 24, wall: 40 };   // bandeau du fond au-dessus du mur à 3 cases
   const skyAt = (y, hz) => L.sky[Math.max(0, Math.min(L.sky.length - 1, Math.floor(BG_HORIZON - (hz - y) / Math.max(1, hz) * BG_HORIZON)))];
   // étages au-dessus d'une colonne de mur (de bas en haut), même assombrissement que la face
   function drawUpper(tex, u, dist, x, top, colH) {
@@ -149,6 +171,10 @@
     const tx = (ut % cols) * fw + Math.min(fw - 1, Math.floor(u * fw)), ty = Math.floor(ut / cols) * fh;
     const img = L.wallImgs[shadeFor(dist)];
     for (let k = 1; k < S && top - (k - 1) * h > 0; k++) ctx.drawImage(img, tx, ty, 1, sh, x, top - k * h, 1, h + 0.5);
+    if (L.crownImgs) {                              // cime au-dessus du dernier étage
+      const ch = colH * CROWN.h / CROWN.wall, y0 = top - (S - 1) * h - ch;
+      if (y0 + ch > 0) ctx.drawImage(L.crownImgs[shadeFor(dist)], Math.min(CROWN.w - 1, Math.floor(u * CROWN.w)), 0, 1, CROWN.h, x, y0, 1, ch + 0.5);
+    }
   }
 
   async function loadLevel(n, keepPos) {
