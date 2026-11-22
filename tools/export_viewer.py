@@ -6,7 +6,8 @@ Pour chaque niveau :
   levelNN.json       grille, types de murs, monstres, annotations, point de départ
   levelNN_walls.png  atlas des faces de mur vues de face (128x96 chacune)
   levelNN_bg.png     fond plafond/sol de la vue d'origine (176x120)
-  levelNN_floor.png  sol vu de dessus, une case (motif répété 3 × 3 pour un sol pavé)
+  levelNN_floor.png  sol vu de dessus, une case (motif répété 3 × 3 pour un sol pavé,
+                     demi-case proche en damier 1 2 / 2 1 pour un sol peint)
   levelNN_floor_motif.png  motif du sol pavé (KEEP, TOWER1), reconstitué depuis le fond
   levelNN_spr.png    atlas des sprites de monstres (face, profil, dos)
 """
@@ -281,13 +282,15 @@ def floor_motif(bg, tsname):
     seul (MOTIF × MOTIF) et un booléen ; pour un sol non pavé, l'image d'une case."""
     lat = FLOOR_LATTICES.get(tsname)
     hk, ak = (lat["hk"], lat["ak"]) if lat else FLOOR_DEPTH
-    px, pk = (lat["px"], lat["pk"]) if lat else (CELL_UNITS, CELL_UNITS)
-    size = MOTIF if lat else 128
+    # sol peint : seulement la moitié proche (une demi-case), nette ; plus loin, la pénombre
+    # ou la brume (Yvel) efface le pavage
+    px, pk = (lat["px"], lat["pk"]) if lat else (CELL_UNITS / 2, CELL_UNITS / 2)
+    size = MOTIF if lat else 64
     k_of = lambda y: ak / (y - hk)
     hx = lat.get("hx", FLOOR_HX) if lat else FLOOR_HX
     y_min = int(max(hx, hk)) + 2
     k_near = k_of(bg.h)
-    span = 4.0 if lat else CELL_UNITS                 # profondeur utilisée (unités)
+    span = 4.0 if lat else pk                          # profondeur utilisée (unités)
     lum = [sum(bg.px[(y * bg.w + x) * 4 + c] for x in range(bg.w) for c in range(3)) / bg.w + 1
            for y in range(bg.h)]
     rows = [y for y in range(y_min, bg.h) if k_of(y + 0.5) - k_near <= span]
@@ -347,9 +350,15 @@ def floor_motif(bg, tsname):
 
 
 def floor_cell(motif, repeated):
-    """Texture d'une case : le motif répété (3 × 3 motifs ≈ 3,1 unités) ou la case peinte."""
+    """Texture d'une case : le motif répété (3 × 3 motifs ≈ 3,1 unités) pour un sol pavé ;
+    pour un sol peint, la demi-case proche en damier 1 2 / 2 1, 2 étant 1 en miroir (le
+    miroir de la case entière, une case sur deux dans la vue 3D, redonne la même case)."""
     if not repeated:
-        return motif
+        img = Image(motif.w * 2, motif.h * 2)
+        flipped = mirrored(motif)
+        for k, part in enumerate((motif, flipped, flipped, motif)):
+            img.blit(part, (k % 2) * motif.w, (k // 2) * motif.h)
+        return img
     n = round(CELL_UNITS / 1.0)
     img = Image(motif.w * n, motif.h * n)
     for k in range(n * n):

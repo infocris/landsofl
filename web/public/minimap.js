@@ -507,7 +507,7 @@
     const nn = String(L.level).padStart(2, "0"), img = { ready: false, tiles: null };
     L.img = img;
     const load = (name) => new Promise((ok, ko) => { const im = new Image(); im.onload = () => ok(im); im.onerror = ko;
-      im.src = `viewer/data/level${nn}_${name}.png?v=20261122a`; });
+      im.src = `viewer/data/level${nn}_${name}.png?v=20261122b`; });
     Promise.all([load("floor"), load("walls")]).then(([floor, walls]) => {
       Object.assign(img, { floor, walls, ready: true });
       if (current === L) draw(lastDraw[0], lastDraw[1]);
