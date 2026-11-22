@@ -821,6 +821,15 @@ extra height. The upper floor is in the **decorations** (`.DAT`, § 9.4):
 4. **3-cell view**: its brightness is kept, and colors come from the corrected 2-cell view,
    by brightness band, where the two overlap.
 5. The top third of the floor (rows 0–30) is never shown by the game and stays transparent.
+6. **Windows rebuilt from a ground-floor window** (`UPPER_WINDOWS`). Decoration 6 (light
+   half-timbering) shows two windows of 2 × 3 panes in the 3-cell view, 13 × 19 px. Their top
+   row of panes is cut off by the top of the view, and their dark panes come out as brown
+   speckles after coloring. They are replaced by the window of the same style from the
+   ground-floor decoration 4 (dark half-timbering), seen up close. That window is a
+   symmetric half window, columns 8–23 and rows 9–48, the right edge being the axis; mirrored,
+   it gives 31 × 40 px and 2 × 3 panes. It is scaled into the two frames measured on the
+   3-cell image: x 3–15 and 32–45, y −4 to 14 above the image top. The windows thus rise into
+   the unknown top third, as the cut panes imply.
 
 Fitting the haze on the wall pieces instead was tried and failed. Their 3-cell versions are
 nearly grey, which makes the color fit degenerate. A color-by-color mapping learnt on the
@@ -1923,3 +1932,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: ceiling geometry measured on the background: longitudinal beams converging to y ≈ 39 like the floor, crossbeams one cell apart with `K = 145.3 / (55.15 − y)`, one coffer per cell, eye 0.43 cell above the floor and ceiling 0.25 above the eye. Ceilings rebuilt by folding (beamed tilesets) or near-cell rectification, and turned with the gaze in the 3D view (§ 9.3f).
 - **2026-11-22**: Yvel's first floor: decorations drawn above the wall (y < 0), visible higher as the wall gets farther (8, 20, 27 px). Views 1–3 rescaled and stacked, the 2-cell view corrected for haze and the grey 3-cell view colored from it; drawn over the first storey in the 3D view (§ 9.3g).
 - **2026-11-22**: Yvel's haze lowered to 1.68 wall heights (top of the first floor's part shown by the game): façades stop there and fade into the haze (§ 9.3g).
+- **2026-11-22**: Yvel's light half-timbered first floor (decoration 6): its two 6-pane windows, unreadable in the hazy 3-cell view, rebuilt from the ground-floor window of the same style (decoration 4, mirrored half) (§ 9.3g).

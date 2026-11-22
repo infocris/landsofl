@@ -617,6 +617,39 @@ UPPER_SIZE = {1: (128, 96), 2: (80, 64), 3: (48, 40)}
 # décors extérieurs où la vue 3D bâtit des étages (la forêt a déjà ses cimes, § 9.3d ; CIMMERIA
 # n'est pas un extérieur)
 UPPER_TILESETS = {"YVEL1"}
+# Fenêtres d'un étage illisibles dans la vue à 3 cases (couleurs perdues dans la brume) :
+# remplacées par la fenêtre du même style d'une décoration du rez-de-chaussée, vue de près
+# (demi-fenêtre symétrique : `half` = colonnes x0..x1 et lignes y0..y1 de l'image, le bord droit
+# étant l'axe). `rects` : cadres des fenêtres dans l'image de la vue à 3 cases (x0, y0, x1, y1,
+# bornes hautes exclues ; y < 0 : au-dessus de l'image, coupé par le haut de la vue).
+UPPER_WINDOWS = {
+    # Yvel, colombage clair : deux fenêtres de 2 × 3 carreaux, comme celle du colombage sombre (4)
+    ("YVEL1", 6): dict(donor=4, half=(8, 9, 24, 49), rects=[(3, -4, 16, 15), (32, -4, 46, 15)]),
+}
+
+
+def paste_windows(ts, pal, d, img):
+    spec = UPPER_WINDOWS.get((ts.name, d))
+    if not spec:
+        return
+    dec, don = ts.decor[d], ts.decor[spec["donor"]]
+    fw, fh, fpx = ts.decor_shapes[don["shape"][1]]
+    hx0, hy0, hx1, hy1 = spec["half"]
+    hw = hx1 - hx0
+    ww, wh = 2 * hw - 1, hy1 - hy0                     # fenêtre entière : moitié + miroir
+    def donor(X, Y):
+        col = hx0 + (X if X < hw else ww - 1 - X)
+        return fpx[(hy0 + Y) * fw + col]
+    pw, ph = UPPER_SIZE[3]
+    sx, sy = FACE_W / pw, FACE_H / ph
+    for x0, y0, x1, y1 in spec["rects"]:
+        X0, X1 = round(x0 * sx), round(x1 * sx)
+        Y0, Y1 = FACE_H + round((dec["y"][3] + y0) * sy), FACE_H + round((dec["y"][3] + y1) * sy)
+        for Y in range(max(0, Y0), min(FACE_H, Y1)):
+            for X in range(max(0, X0), min(FACE_W, X1)):
+                c = donor(min(ww - 1, (X - X0) * ww // (X1 - X0)), min(wh - 1, (Y - Y0) * wh // (Y1 - Y0)))
+                if c is not None:
+                    img.put(X, Y, rgb(pal, c))
 
 
 def upper_layers(ts, pal, dec):
@@ -705,6 +738,7 @@ def upper_storeys(ts, pal, used_decors):
                     p = lay[i]; break
             if p is not None:
                 img.put(i % FACE_W, i // FACE_W, bytes(p))
+        paste_windows(ts, pal, d, img)
         out[d] = img
     return out
 
