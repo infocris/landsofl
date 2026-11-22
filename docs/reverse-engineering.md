@@ -830,6 +830,16 @@ overlaps had too few colors.
 repeated storey visible in its unknown top third. Walls without such a decoration keep the
 repeated storey.
 
+**Fog ceiling**: the game never shows Yvel's façades above that known part, i.e. above
+1 + 65/96 ≈ 1.68 wall heights from the ground. The 3D view lowers the haze to that height,
+`OUTDOOR.YVEL1.fogCeil`:
+- nothing is drawn above it, since the sky there is the haze;
+- a fade in the sky's mean color, opaque at the ceiling and clear 0.3 wall height lower,
+  blends the façades into it.
+
+Being a horizontal plane, it hides the upper parts of near and far buildings alike, with no
+ordering issue.
+
 ### 9.4 Decorations — `.DAT` — verified for the head-on view
 
 ```
@@ -1912,3 +1922,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: floor generation: Wang tiles from the near band of painted floors (16 tiles, minimum-error cuts, edges hashed from their coordinates, deterministic or random seed); paved floors keep their periodic pattern (§ 9.3e).
 - **2026-11-22**: ceiling geometry measured on the background: longitudinal beams converging to y ≈ 39 like the floor, crossbeams one cell apart with `K = 145.3 / (55.15 − y)`, one coffer per cell, eye 0.43 cell above the floor and ceiling 0.25 above the eye. Ceilings rebuilt by folding (beamed tilesets) or near-cell rectification, and turned with the gaze in the 3D view (§ 9.3f).
 - **2026-11-22**: Yvel's first floor: decorations drawn above the wall (y < 0), visible higher as the wall gets farther (8, 20, 27 px). Views 1–3 rescaled and stacked, the 2-cell view corrected for haze and the grey 3-cell view colored from it; drawn over the first storey in the 3D view (§ 9.3g).
+- **2026-11-22**: Yvel's haze lowered to 1.68 wall heights (top of the first floor's part shown by the game): façades stop there and fade into the haze (§ 9.3g).

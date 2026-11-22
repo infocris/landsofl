@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261122i";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261122j";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) FOV = 2 * Math.atan(1.375);
   let dirty = true;
@@ -87,7 +87,11 @@
   // façades de plusieurs étages (murs hauts de la ville d'Yvel, arbres de la forêt : le fond
   // d'origine les montre plus hauts que la vue). storeys = hauteur en étages.
   // crown : sommet des arbres repris du fond d'origine (voir setupOutdoor).
-  const OUTDOOR = { YVEL1: { storeys: 3 }, FOREST1: { storeys: 2, crown: true } };
+  // fogCeil : plafond de brume, en hauteurs de mur depuis le sol (Yvel : le jeu ne montre jamais
+  // les façades au-delà du haut connu du premier étage, docs/reverse-engineering.md § 9.3g) ;
+  // au-dessus, tout se fond dans la brume, sur FOG_FADE hauteur de mur.
+  const OUTDOOR = { YVEL1: { storeys: 3, fogCeil: 1 + 65 / 96 }, FOREST1: { storeys: 2, crown: true } };
+  const FOG_FADE = 0.3;
   const FOOT = 12;              // lignes du bas de la face (soubassement) non répétées aux étages
   const SHADES = 8;
   const shadeFor = (d) => Math.min(SHADES - 1, Math.floor(Math.max(0, d - 0.6) / 1.4));
@@ -137,6 +141,19 @@
       g.putImageData(id, 0, 0);
       L.crownImgs = darken(c, SHADES);
     }
+    // brume : couleur moyenne du ciel, et un dégradé (opaque en haut, transparent en bas)
+    L.fogFade = null;
+    if (L.outdoor.fogCeil) {
+      let r = 0, g = 0, bl = 0;
+      for (const c of L.sky) { r += c & 255; g += (c >> 8) & 255; bl += (c >> 16) & 255; }
+      const n = L.sky.length, c = document.createElement("canvas");
+      c.width = 1; c.height = 32;
+      const gx = c.getContext("2d"), gr = gx.createLinearGradient(0, 0, 0, 32);
+      const rgb = `${Math.round(r / n)},${Math.round(g / n)},${Math.round(bl / n)}`;
+      gr.addColorStop(0, `rgba(${rgb},1)`); gr.addColorStop(1, `rgba(${rgb},0)`);
+      gx.fillStyle = gr; gx.fillRect(0, 0, 1, 32);
+      L.fogFade = c;
+    }
     const W2 = walls.width, px = pixels(walls).px, fw = L.faceW, fh = L.faceH, cols = L.atlasCols;
     const freq = new Map();
     for (const id of L.faces) { const w = L.wallInfo[id]; if (w && w.opaque && !w.door && w.tex >= 0) freq.set(w.tex, (freq.get(w.tex) || 0) + 1); }
@@ -170,14 +187,22 @@
     const ut = L.upperOf(tex), sh = fh - FOOT, h = colH * sh / fh;
     const tx = (ut % cols) * fw + Math.min(fw - 1, Math.floor(u * fw)), ty = Math.floor(ut / cols) * fh;
     const img = L.wallImgs[shadeFor(dist)];
-    for (let k = 1; k < S && top - (k - 1) * h > 0; k++) ctx.drawImage(img, tx, ty, 1, sh, x, top - k * h, 1, h + 0.5);
+    // plafond de brume : rien n'est dessiné au-dessus (le ciel y est la brume)
+    const fogY = L.fogFade ? top - colH * (L.outdoor.fogCeil - 1) : -Infinity;
+    const part = (im, sx, sy, sh2, y, h2) => {          // image coupée à la ligne fogY
+      if (y + h2 <= fogY || y + h2 <= 0) return;
+      if (y < fogY) { const cut = (fogY - y) / h2; sy += cut * sh2; sh2 -= cut * sh2; h2 -= fogY - y; y = fogY; }
+      ctx.drawImage(im, sx, sy, 1, sh2, x, y, 1, h2 + 0.5);
+    };
+    for (let k = 1; k < S && top - (k - 1) * h > Math.max(0, fogY); k++) part(img, tx, ty, sh, top - k * h, h);
     // premier étage vu dans le jeu (décorations au-dessus du mur) : par-dessus l'étage répété,
     // transparent là où le jeu ne le montre jamais (haut de l'étage)
     const up = L.upperImgs ? L.upperByTex.get(tex) : undefined;
     if (up !== undefined) {
       const ux = (up % cols) * fw + Math.min(fw - 1, Math.floor(u * fw)), uy = Math.floor(up / cols) * fh;
-      if (top > 0) ctx.drawImage(L.upperImgs[shadeFor(dist)], ux, uy, 1, fh, x, top - colH, 1, colH + 0.5);
+      if (top > 0) part(L.upperImgs[shadeFor(dist)], ux, uy, fh, top - colH, colH);
     }
+    if (L.fogFade && fogY + colH * FOG_FADE > 0) ctx.drawImage(L.fogFade, 0, 0, 1, 32, x, fogY, 1, colH * FOG_FADE);
     if (L.crownImgs) {                              // cime au-dessus du dernier étage
       const ch = colH * CROWN.h / CROWN.wall, y0 = top - (S - 1) * h - ch;
       if (y0 + ch > 0) ctx.drawImage(L.crownImgs[shadeFor(dist)], Math.min(CROWN.w - 1, Math.floor(u * CROWN.w)), 0, 1, CROWN.h, x, y0, 1, ch + 0.5);
