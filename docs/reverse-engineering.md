@@ -697,6 +697,39 @@ The 3D view uses it for the forest: one storey of repeated trunk, then this band
 are thus about 2.6 walls high. The band's size relative to the wall gives at least 1.6 at 3
 cells; the extra trunk storey follows the near trees, which fill the whole view in the game.
 
+### 9.3e Generating floors from the floor images (2026-11-22)
+
+Two generators, depending on the floor (§ 9.3c):
+
+- **Paved floors** (KEEP, TOWER1): the extracted pattern *is* the generator. The floor is
+  deterministic and periodic, the pattern repeated over a lattice of 3 × 3 per cell.
+- **Painted floors** (the others): **Wang tiles**, which give a non-periodic floor without
+  seams, either deterministic or random.
+  - **Source**: the near band of the floor, rectified from above (`floor_source`, 1.8 units
+    deep from the bottom row, 4.6 units wide, 41.3 px per unit, shading compensated). Pixels
+    outside the original view are left empty.
+  - **Samples**: four 64×64 squares (half a cell) fully inside the source, chosen as far
+    apart as possible. Samples 0/1 serve the horizontal edges (north/south), samples 2/3 the
+    vertical edges (west/east). The second sample of each pair is mirrored, for variety.
+  - **Tiles**: 16, one per combination of edge colors (n, e, s, w ∈ {0, 1}), at index
+    `n + 2e + 4s + 8w` of a 4 × 4 atlas (`levelNN_floor_wang.png`). An edge of color c is
+    centred on sample c: the tile on each side of the edge shows one half of that sample,
+    so the joint is continuous by construction.
+  - **Inside a tile**: the four triangles (one per edge) are joined by a minimum-error cut,
+    as in image quilting. In each quarter, dynamic programming finds a path within 10 px of
+    the diagonal that minimises the squared difference between the two samples, and the
+    joint is blended over ±2 px. A plain blend along the diagonals showed X-shaped seams
+    that cut through the stones.
+  - **Layout** in the 3D view: one tile per half cell (`floorWang.perCell = 2`). The color
+    of each edge is a hash of its coordinates, its orientation, the level and a seed:
+    - deterministic by default (the same floor on every visit, seed 1);
+    - any other seed with `?floorSeed=N`;
+    - random at each load with `?floorSeed=random`.
+    Two tiles sharing an edge get the same color, hence the same joint.
+  - **Result**: good on cobblestones (Yvel), rubble (Urbish), lava, grass and moss. On
+    the manor floor (MANOR), whose near band is less detailed, blocks remain visible.
+  - `levelNN_floor.png` stays the one-cell texture (minimap, fallback).
+
 ### 9.4 Decorations — `.DAT` — verified for the head-on view
 
 ```
@@ -1776,3 +1809,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: 3D view: health bars only for monsters within 2.5 cells (§ 10a).
 - **2026-11-22**: 3D view of the forest (tileset `FOREST1`: levels 2, 3, 10, 17, 24) treated as an exterior like Yvel: 3-storey trees and sky instead of a ceiling. The original background shows trees well above the view, at least two wall heights, under a dark sky; the former ceiling, projected from those treetops, made a tunnel.
 - **2026-11-22**: wall pieces of the view (`_vmpOffsetsDefault`, rows and sizes) and the forest's treetops taken from the background band above the wall 3 cells ahead (§ 9.3d).
+- **2026-11-22**: floor generation: Wang tiles from the near band of painted floors (16 tiles, minimum-error cuts, edges hashed from their coordinates, deterministic or random seed); paved floors keep their periodic pattern (§ 9.3e).

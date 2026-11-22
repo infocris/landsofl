@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261122b";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261122f";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) FOV = 2 * Math.atan(1.375);
   let dirty = true;
@@ -179,18 +179,20 @@
 
   async function loadLevel(n, keepPos) {
     const nn = String(n).padStart(2, "0");
-    const [data, walls, spr, floor, ceil, bg] = await Promise.all([
+    const [data, walls, spr, floor, ceil, bg, wang] = await Promise.all([
       fetch(`data/level${nn}.json?v=${DATA_V}`).then((r) => r.json()),
       loadImage(`data/level${nn}_walls.png?v=${DATA_V}`),
       loadImage(`data/level${nn}_spr.png?v=${DATA_V}`),
       loadImage(`data/level${nn}_floor.png?v=${DATA_V}`),
       loadImage(`data/level${nn}_ceil.png?v=${DATA_V}`),
       loadImage(`data/level${nn}_bg.png?v=${DATA_V}`).catch(() => null),
+      loadImage(`data/level${nn}_floor_wang.png?v=${DATA_V}`).catch(() => null),
     ]);
     L = data;
     L.wallImgs = darken(walls, SHADES);
     L.floorTex = pixels(floor);
     L.ceilTex = pixels(ceil);
+    L.wangTex = data.floorWang && wang ? pixels(wang) : null;
     L.sprImgs = darken(spr, SHADES);
     L.sprSrc = spr; L.compCache = new Map();
     L.wallInfo = [];
@@ -429,6 +431,28 @@
   // d'une case (reconstituée depuis le fond d'origine) reste fixée au décor ;
   // miroir une case sur deux, comme le fond d'origine qui s'inverse à chaque pas, sauf
   // pour un sol pavé d'un motif (floorMirror false : texture déjà sans raccord).
+  // Sol peint en tuiles de Wang (docs/reverse-engineering.md § 9.3e) : une tuile par demi-case ;
+  // la couleur (0/1) de chaque bord est tirée d'un hachage de ses coordonnées et de la graine
+  // FLOOR_SEED : déterministe (même sol à chaque visite), ou aléatoire avec ?floorSeed=random.
+  // Les deux tuiles qui partagent un bord en ont la même couleur, donc le même raccord.
+  const FLOOR_SEED = (() => {
+    const q = new URLSearchParams(location.search).get("floorSeed");
+    if (q === "random") return (Math.random() * 0x7fffffff) | 0;
+    return q ? (+q | 0) : 1;
+  })();
+  function edgeBit(i, j, o) {
+    let h = (Math.imul(i, 0x27d4eb2d) ^ Math.imul(j, 0x165667b1) ^ Math.imul(o + 1, 0x9e3779b1) ^ Math.imul(FLOOR_SEED + L.level, 0x85ebca6b)) >>> 0;
+    h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12;
+    return (h >>> 7) & 1;
+  }
+  function wangPx(wx, wy) {
+    const T = L.wangTex, t = L.floorWang.tile, k = L.floorWang.perCell;
+    const fx = wx * k, fy = wy * k, i = Math.floor(fx), j = Math.floor(fy);
+    const idx = edgeBit(i, j, 0) | edgeBit(i + 1, j, 1) << 1 | edgeBit(i, j + 1, 0) << 2 | edgeBit(i, j, 1) << 3;
+    const tx = ((fx - i) * t) | 0, ty = ((fy - j) * t) | 0;
+    return T.px[((idx >> 2) * t + ty) * T.w + (idx & 3) * t + tx];
+  }
+
   function castFloorCeiling(dirX, dirY, planeX, planeY) {
     const F = L.floorTex, C = L.ceilTex, mirF = L.floorMirror !== false;
     const lx = dirX - planeX, ly = dirY - planeY;          // rayon de gauche
@@ -449,7 +473,7 @@
         const cx = Math.floor(wx), cy = Math.floor(wy);
         let tx = ((wx - cx) * tw) | 0, ty = ((wy - cy) * th) | 0;
         if (mir && (cx + cy) & 1) tx = tw - 1 - tx;
-        frame32[fRow + x] = shade(T.px[ty * tw + tx], k);
+        frame32[fRow + x] = shade(dy > 0 && L.wangTex ? wangPx(wx, wy) : T.px[ty * tw + tx], k);
       }
     }
     ctx.putImageData(frameImg, 0, 0);
@@ -480,7 +504,7 @@
         const fu = wx - cx, fv = wy - cy;
         let tx = (fu * F.w) | 0;
         if (mirF && odd) tx = F.w - 1 - tx;
-        frame32[fRow + x] = shade(F.px[((fv * F.h) | 0) * F.w + tx], k);
+        frame32[fRow + x] = shade(L.wangTex ? wangPx(wx, wy) : F.px[((fv * F.h) | 0) * F.w + tx], k);
         if (!L.outdoor) {
           let cxx = (fu * C.w) | 0;
           if (odd) cxx = C.w - 1 - cxx;

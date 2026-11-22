@@ -9,6 +9,7 @@ Pour chaque niveau :
   levelNN_floor.png  sol vu de dessus, une case (motif répété 3 × 3 pour un sol pavé,
                      demi-case proche en damier 1 2 / 2 1 pour un sol peint)
   levelNN_floor_motif.png  motif du sol pavé (KEEP, TOWER1), reconstitué depuis le fond
+  levelNN_floor_wang.png   sol peint : 16 tuiles de Wang (4 × 4), pour un sol sans répétition
   levelNN_spr.png    atlas des sprites de monstres (face, profil, dos)
 """
 import json, os, struct, sys
@@ -347,6 +348,133 @@ def floor_motif(bg, tsname):
     for i, a in enumerate(acc):
         img.put(i % size, i // size, bytes(min(255, round(a[c] / max(a[3], 1e-9))) for c in range(3)))
     return img, bool(lat)
+
+
+# Tuiles de Wang du sol peint (docs/reverse-engineering.md § 9.3e). Une tuile = une demi-case
+# (WANG_T pixels pour CELL_UNITS / 2 unités). Chaque bord porte une couleur 0/1 ; la tuile
+# d'indice n + 2·e + 4·s + 8·w a ces couleurs au nord, à l'est, au sud et à l'ouest.
+WANG_T = 64
+WANG_DEPTH = 1.8                 # profondeur utilisée depuis le bas de l'image (unités)
+WANG_BAND = 10                   # écart maximal de la découpe à la diagonale (pixels)
+
+
+def floor_source(bg):
+    """Sol peint redressé vu de dessus, sur la bande proche : (pixels RGB ou None, largeur,
+    hauteur). Même projection que floor_motif (FLOOR_DEPTH, hx = 39), pénombre compensée ;
+    rangée 0 = le plus loin. None hors du champ de la vue d'origine."""
+    hk, ak = FLOOR_DEPTH
+    res = WANG_T / (CELL_UNITS / 2)                   # pixels par unité
+    k_near = ak / (bg.h - hk)
+    w, h = int(4.6 * res), int(WANG_DEPTH * res)
+    lum = [sum(bg.px[(y * bg.w + x) * 4 + c] for x in range(bg.w) for c in range(3)) / bg.w + 1
+           for y in range(bg.h)]
+    ys = [y for y in range(int(max(FLOOR_HX, hk)) + 2, bg.h)]
+    k_of = lambda y: ak / (y + 0.5 - hk)
+    smooth = {y: sum(lum[t] for t in ys if abs(k_of(t) - k_of(y)) < 0.5) /
+                 max(1, sum(1 for t in ys if abs(k_of(t) - k_of(y)) < 0.5)) for y in ys}
+    ref = sorted(smooth[y] for y in ys[-15:])[len(ys[-15:]) // 2]
+    out = [None] * (w * h)
+    for j in range(h):
+        K = k_near + WANG_DEPTH - (j + 0.5) / res
+        y = hk + ak / K - 0.5
+        yi = int(round(y))
+        if not ys[0] <= yi < bg.h:
+            continue
+        gain = min(4.0, ref / smooth[yi])
+        for i in range(w):
+            X = (i + 0.5) / res - 2.3
+            x = FLOOR_CX + X * FLOOR_SX * (y + 0.5 - FLOOR_HX) - 0.5
+            if not 0 <= x <= bg.w - 1:
+                continue
+            x0 = int(x); f = x - x0; x1 = min(bg.w - 1, x0 + 1)
+            a, b = (yi * bg.w + x0) * 4, (yi * bg.w + x1) * 4
+            out[j * w + i] = tuple(min(255.0, (bg.px[a + c] * (1 - f) + bg.px[b + c] * f) * gain) for c in range(3))
+    return out, w, h
+
+
+def wang_tiles(bg):
+    """16 tuiles de Wang (atlas 4 × 4 de WANG_T px) tirées de la bande proche du sol peint.
+
+    Quatre échantillons T × T de la source (deux par orientation de bord, choisis les plus
+    éloignés possible, le second de chaque paire en miroir) ; un bord de couleur c est
+    centré sur l'échantillon c : de part et d'autre du bord, les deux tuiles voisines en
+    montrent les deux moitiés, donc le raccord est continu. Dans une tuile, les quatre
+    triangles (vers chaque bord) se fondent le long des diagonales."""
+    src, sw, sh = floor_source(bg)
+    T = WANG_T
+    cands = []
+    for j in range(0, sh - T + 1, 4):
+        for i in range(0, sw - T + 1, 4):
+            if all(src[(j + y) * sw + i + x] is not None for y in (0, T // 2, T - 1) for x in (0, T // 2, T - 1)) \
+               and all(src[(j + y) * sw + i + x] is not None for y in range(0, T, 8) for x in range(0, T, 8)):
+                cands.append((i, j))
+    if not cands:
+        return None
+    picks = [min(cands, key=lambda p: abs(p[0] - (sw - T) / 2))]  # le plus central, puis les plus éloignés
+    while len(picks) < 4:
+        picks.append(max(cands, key=lambda p: min((p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 for q in picks)))
+
+    def sample(k, x, y):
+        i, j = picks[k]
+        x = min(T - 1, max(0, x)); y = min(T - 1, max(0, y))
+        if k % 2:                                     # second échantillon : en miroir
+            x = T - 1 - x
+        v = src[(j + y) * sw + i + x]
+        return v if v is not None else (0.0, 0.0, 0.0)
+
+    half = T // 2
+
+    def cut(fa, fb, rows, diag):
+        """Découpe à erreur minimale entre deux échantillons (image quilting) : pour chaque
+        rangée, colonne c à partir de laquelle on passe de fa à fb, à au plus WANG_BAND pixels
+        de la diagonale et décalée d'au plus 1 d'une rangée à l'autre."""
+        cost, back = {}, {}
+        prev = None
+        for y in rows:
+            cur = {}
+            for c in range(max(0, diag(y) - WANG_BAND), min(T, diag(y) + WANG_BAND + 1)):
+                p, q = fa(c, y), fb(c, y)
+                e = sum((p[k] - q[k]) ** 2 for k in range(3))
+                if prev is None:
+                    cur[c] = e
+                else:
+                    best = min((prev[c2], c2) for c2 in (c - 1, c, c + 1) if c2 in prev) if any(
+                        c2 in prev for c2 in (c - 1, c, c + 1)) else (1e18, c)
+                    cur[c] = e + best[0]; back[(y, c)] = best[1]
+            cost[y] = cur; prev = cur
+        c = min(prev, key=prev.get)
+        path = {}
+        for y in reversed(rows):
+            path[y] = c
+            c = back.get((y, c), c)
+        return path
+
+    atlas = Image(4 * T, 4 * T)
+    for idx in range(16):
+        n, e, s_, w_ = idx & 1, (idx >> 1) & 1, (idx >> 2) & 1, (idx >> 3) & 1
+        ox, oy = (idx % 4) * T, (idx // 4) * T
+        # bords nord et sud sur les échantillons 0/1, bords ouest et est sur 2/3 ; chaque
+        # échantillon est centré sur son bord
+        fn = lambda x, y, k=n: sample(k, x, y + half)
+        fs = lambda x, y, k=s_: sample(k, x, y - half)
+        fw = lambda x, y, k=2 + w_: sample(k, x + half, y)
+        fe = lambda x, y, k=2 + e: sample(k, x - half, y)
+        top, bot = list(range(half)), list(range(half, T))
+        # par quart : (rangées, échantillon à gauche de la coupe, à droite, diagonale)
+        quarters = ((top, fw, fn, lambda y: y), (top, fn, fe, lambda y: T - 1 - y),
+                    (bot, fw, fs, lambda y: T - 1 - y), (bot, fs, fe, lambda y: y))
+        for rows, fa, fb, diag in quarters:
+            path = cut(fa, fb, rows, diag)
+            right = rows is top and fb is fe or rows is bot and fb is fe
+            for y in rows:
+                c = path[y]
+                lo, hi = (half, T) if right else (0, half)
+                for x in range(lo, hi):
+                    # fondu sur 2 pixels de part et d'autre de la coupe
+                    t = min(1.0, max(0.0, (x - c + 2.5) / 5))
+                    p, q = fa(x, y), fb(x, y)
+                    atlas.put(ox + x, oy + y, bytes(min(255, round(p[k] * (1 - t) + q[k] * t)) for k in range(3)))
+    return atlas
 
 
 def floor_cell(motif, repeated):
@@ -698,6 +826,9 @@ def main(game_dir, maps_dir, out_dir):
         floor_cell(motif, floor_repeated).save(os.path.join(out_dir, f"level{n:02d}_floor.png"))
         if floor_repeated:
             motif.save(os.path.join(out_dir, f"level{n:02d}_floor_motif.png"))
+        wang = None if floor_repeated else wang_tiles(bg)
+        if wang is not None:
+            wang.save(os.path.join(out_dir, f"level{n:02d}_floor_wang.png"))
         ceil_img.save(os.path.join(out_dir, f"level{n:02d}_ceil.png"))
 
         # sprites des monstres : images 0-15 (face, profil, dos par groupes de 4, puis attaque)
@@ -846,6 +977,8 @@ def main(game_dir, maps_dir, out_dir):
             "start": {"x": sx_ + 0.5, "y": sy_ + 0.5, "dir": sa_},
             # sol pavé d'un motif (texture sans raccord) : pas de miroir une case sur deux
             "floorMirror": not floor_repeated,
+            # sol peint : tuiles de Wang (levelNN_floor_wang.png), une tuile par demi-case
+            "floorWang": {"tile": WANG_T, "perCell": 2} if wang is not None else None,
         }
         # contenu des coffres (tools/chests.py) : objets donnés par le script à l'ouverture
         out["chestItems"] = chests.chest_contents(files[f"LEVEL{n}.INF"], out, ITEM_NAMES) if f"LEVEL{n}.INF" in files else {}
