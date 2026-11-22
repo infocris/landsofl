@@ -970,6 +970,15 @@ initialisation script attaches one:
   (`level_door_decoration`), and the clickable area of such a door is the button, as for
   `clickedShape`.
 
+**Doors opened by script** (2026-11-22). The second door series, walls 8–12 and 18–22 (map
+symbol 13, same frame set), has no special type (no click) and shape 0 instead of −2. The
+scripts open these doors themselves, for instance when the key is used on a lock. Example:
+Gladstone's library door, at 9,11, east and west faces of type 8, with its lock on the north
+face of 10,12 (wall 73).
+- **Bug**: the export drew the leaf only for shape −2, so these doors looked open in the 3D view
+  even while locked.
+- **Fix**: every door wall (map symbol 13) whose wall type blocks (flag 1) gets its leaf.
+
 **Export** (`levelNN.json`, `walls[id]`): `special` (1–5), and `hot` = clickable rectangle in
 face pixels (`switch_rect`):
 - the decorations' rectangle, as for `clickedShape`;
@@ -2055,3 +2064,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: door leaf height taken from the engine (`drawDoor`: bottom at view row 86 for the next-cell door, face row 78), 10 px higher than before; it now fills its frame up to the lintel, as in the game (§ 9.5).
 - **2026-11-22**: sharper Gladstone textures: the floor pattern takes its depth detail from its transpose (diagonal symmetry of the octagons, § 9.3c); beamed ceilings are folded without row interpolation, with cubic resolution weights, at 96×96 (§ 9.3f).
 - **2026-11-22**: switches in the 3D view: door buttons attached by the level script (`assignLevelDecorationShape` + `resetBlockShapeAssignment`) now drawn; walls' switch type and clickable area exported; engine command op 20 (`clickwall`) clicks the wall in front like the game (`clickedWall`); the 3D view outlines the switch in front and clicks it; engine files versioned in URLs and served `no-cache` (§ 9.6).
+- **2026-11-22**: doors of the script-opened series (walls 8–12, 18–22: shape 0, e.g. Gladstone's locked library door) now drawn closed with their leaf; they looked open in the 3D view (§ 9.6).

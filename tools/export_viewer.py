@@ -1062,8 +1062,13 @@ def main(game_dir, maps_dir, out_dir):
             wt = level["wallTypes"].get(str(wid))
             if wt is None:
                 continue
-            if door_decor and wid in DOOR_WALL_IDS and wt["shape"] <= 0:
-                wt = dict(wt, shape=door_decor, doorLeaf=True)   # bouton de la porte (script du niveau)
+            if wt["automap"] == 13 and wt["shape"] <= 0:
+                # porte (symbole 13 de la carte) : battant dessiné quand elle est fermée, quelle que
+                # soit sa série (3-7 / 13-17 : interrupteur ; 8-12 / 18-22 : ouverte par script,
+                # p. ex. une serrure, forme 0 au lieu de −2)
+                wt = dict(wt, doorLeaf=True)
+                if door_decor and wid in DOOR_WALL_IDS:
+                    wt["shape"] = door_decor                     # bouton de la porte (script du niveau)
             img = face_texture(ts, wt, pal)
             tex = -1
             if img is not None:
