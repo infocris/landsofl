@@ -214,6 +214,7 @@
         const cat = groupIcon(g);
         ic.style.backgroundPosition = `-${(cat.icon % 16) * 16}px -${Math.floor(cat.icon / 16) * 16}px`;
         ic.title = cat.label;
+        if (g.items.every((x) => x.type === g.items[0].type)) ic.dataset.type = g.items[0].type;   // infobulle de l'objet
       }
       const names = new Map();
       for (const it of g.items) {
@@ -1464,6 +1465,78 @@
     if (MANAGE && cell && cell.dataset.loc !== undefined) detailEl.appendChild(actions(type, it, +cell.dataset.loc));
     detailEl.hidden = false;
   }
+  // Infobulle flottante des objets (survol) : nom, nature, effets, emplacement, comparaison avec
+  // l'équipement porté, valeur, texte. Sur tout élément portant data-type (sac, équipement, annuaire,
+  // liste du niveau) ou data-item-type (barre d'actions), et sur les objets au sol de la vue 3D
+  // (message « lol-itemhover »). Dans une fenêtre modale (couche supérieure), l'infobulle y est placée.
+  const itemTip = document.createElement("div");
+  itemTip.id = "item-tip"; itemTip.hidden = true;
+  {
+    const st = document.createElement("style");
+    st.textContent = `
+    #item-tip { position: fixed; z-index: 1005; max-width: 300px; padding: 8px 10px; border: 1px solid #c9a227; border-radius: 6px;
+      background: rgba(14, 11, 7, .96); color: #e8dcc0; font: 12px/1.4 system-ui, sans-serif; box-shadow: 0 6px 20px rgba(0,0,0,.7);
+      pointer-events: none; zoom: var(--ui-z, 1); display: grid; grid-template-columns: 30px 1fr; gap: 2px 8px; margin: 0; }
+    dialog #item-tip { zoom: 1; }
+    #item-tip[hidden] { display: none; }
+    #item-tip .slot { grid-row: span 2; }
+    #item-tip .nm { color: #f0d070; font-weight: 600; font-size: 13px; }
+    #item-tip .kd { color: #a39578; }
+    #item-tip ul { grid-column: 1 / 3; margin: 4px 0 0; padding-left: 16px; }
+    #item-tip .cmp, #item-tip .note2 { grid-column: 1 / 3; margin-top: 4px; }
+    #item-tip .note2 { color: #a39578; font-style: italic; }
+    #item-tip .txt { grid-column: 1 / 3; margin-top: 4px; padding: 4px 6px; background: #e8dcc0; color: #2a2217; border-radius: 3px;
+      font: italic 11px/1.35 Georgia, serif; white-space: pre-wrap; }`;
+    document.head.appendChild(st);
+    document.body.appendChild(itemTip);
+  }
+  function fillItemTip(type, note) {
+    const it = itemInfo && itemInfo[type] ? itemInfo[type] : { name: `objet ${type}`, icon: -1, effects: [] };
+    const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+    const icon = el("div", "slot full"); setIcon(icon, it.icon);
+    const lines = [...(it.effects || [])];
+    if (it.wear) lines.push(`Se porte : ${it.wear}`);
+    if (it.value) lines.push(`Valeur : ${it.value}`);
+    itemTip.replaceChildren(icon, el("div", "nm", it.name), el("div", "kd", it.kind || "Objet"));
+    if (lines.length) { const ul = el("ul"); for (const l of lines) ul.appendChild(el("li", null, l)); itemTip.appendChild(ul); }
+    const cmp = compareEquip(type, it);
+    if (cmp) itemTip.appendChild(cmp);
+    if (it.text) itemTip.appendChild(el("div", "txt", it.text.length > 220 ? it.text.slice(0, 220) + "…" : it.text));
+    if (note) itemTip.appendChild(el("div", "note2", note));
+  }
+  function placeItemTip(x, y) {
+    const z = UZ(), w = itemTip.offsetWidth * z, h = itemTip.offsetHeight * z;
+    let left = x + 16, top = y + 16;
+    if (left + w > innerWidth - 4) left = x - w - 12;
+    if (top + h > innerHeight - 4) top = y - h - 12;
+    itemTip.style.left = Math.max(4, left) / z + "px"; itemTip.style.top = Math.max(4, top) / z + "px";
+  }
+  function showItemTip(type, x, y, host, note) {
+    if (!itemInfo || type < 0) { itemTip.hidden = true; return; }
+    host = host || document.body;
+    if (itemTip.parentNode !== host) host.appendChild(itemTip);
+    if (itemTip.dataset.type !== String(type) || itemTip.dataset.note !== (note || "")) { fillItemTip(type, note); itemTip.dataset.type = type; itemTip.dataset.note = note || ""; }
+    itemTip.hidden = false;
+    placeItemTip(x, y);
+  }
+  let tipTarget = null;
+  document.addEventListener("mouseover", (e) => {
+    const t = e.target.closest && e.target.closest("[data-type], [data-item-type]");
+    if (t === tipTarget) return;
+    if (tipTarget && tipTarget.dataset.tipTitle !== undefined) { tipTarget.title = tipTarget.dataset.tipTitle; delete tipTarget.dataset.tipTitle; }
+    tipTarget = t;
+    if (!t) { itemTip.hidden = true; return; }
+    if (t.title) { t.dataset.tipTitle = t.title; t.title = ""; }        // pas d'infobulle du navigateur en double
+    showItemTip(+(t.dataset.itemType ?? t.dataset.type), e.clientX, e.clientY, t.closest("dialog") || document.body, t.dataset.itemNote);
+  });
+  document.addEventListener("mousemove", (e) => { if (tipTarget && !itemTip.hidden) placeItemTip(e.clientX, e.clientY); });
+  addEventListener("message", (e) => {
+    if (e.origin !== location.origin || !e.data || e.data.type !== "lol-itemhover") return;
+    if (e.data.t < 0 || !frame3d) { if (!tipTarget) itemTip.hidden = true; return; }
+    const r = frame3d.getBoundingClientRect();
+    showItemTip(e.data.t, r.left + e.data.x, r.top + e.data.y, document.body, "Au sol : clic pour le prendre");
+  });
+
   // Comparaison avec l'équipement porté par chaque personnage, pour les emplacements où
   // l'objet peut aller (masque d'emplacements, § 8.2) : force et protection, effets passifs.
   // Armes et boucliers : comparés à la main principale (emplacements 0 et 1) seulement.
@@ -2131,7 +2204,7 @@
       .sort((x, y) => x.it.name.localeCompare(y.it.name, "fr"));
     catList.replaceChildren(...shown.map(({ it, t }) => {
       const li = document.createElement("li"); li.classList.toggle("sel", t === catType);
-      const icon = document.createElement("div"); icon.className = "slot full"; setIcon(icon, it.icon); icon.title = "Fiche de l'objet";
+      const icon = document.createElement("div"); icon.className = "slot full"; setIcon(icon, it.icon); icon.title = "Fiche de l'objet"; icon.dataset.type = t;
       const nm = document.createElement("span"); nm.className = "nm" + (owned.has(t) ? " own" : "");
       nm.textContent = it.name; nm.title = (owned.has(t) ? "Déjà possédé · " : "") + `type ${t} — cliquer pour la fiche`;
       const sm = document.createElement("small"); sm.textContent = [it.kind, ...(it.effects || [])].filter(Boolean).join(" · "); nm.appendChild(sm);
@@ -2659,6 +2732,7 @@
         const c = document.createElement("span"); c.className = "cnt"; c.textContent = n; d.appendChild(c);
         const who = a.for === undefined || a.for === "auto" ? "le plus blessé" : (partyNow().find((p) => p.slot === a.for) || {}).name || "?";
         d.dataset.tip = `${it.name} — ${n} dans le sac · ` + (a.mode === "use" ? `utiliser sur : ${who}` : "prendre en main");
+        d.dataset.itemType = a.t; d.dataset.itemNote = `${n} dans le sac · touche : ` + (a.mode === "use" ? `utiliser sur ${who}` : "prendre en main");
         if (lastInvData && lastInvData.handType === a.t) d.classList.add("flash");
       } else if (a && a.k === "spell") {
         const p = partyNow().find((q) => q.slot === a.c);
@@ -2868,7 +2942,7 @@
       tip.style.top = Math.max(4, r.top - th - 6) / z + "px";
       clearTimeout(showTip.t); if (ms) showTip.t = setTimeout(() => { tip.hidden = true; }, ms);
     }
-    el.addEventListener("mouseover", (e) => { const d = e.target.closest(".ab"); if (d) showTip(d, d.dataset.tip); });
+    el.addEventListener("mouseover", (e) => { const d = e.target.closest(".ab"); if (d && !d.dataset.itemType) showTip(d, d.dataset.tip); else tip.hidden = true; });
     el.addEventListener("mouseleave", () => { tip.hidden = true; });
     // objet tenu en main (curseur du jeu) déposé sur une case : la case reçoit ce type d'objet et
     // l'objet retourne dans le sac (première case libre), où la pile de la case le compte

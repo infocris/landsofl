@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261123u";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261124a";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -618,7 +618,7 @@
   let switchHover = false;
   // Objets au sol dessinés à la dernière image (vue intégrée) : un clic dessus les ramasse dans le
   // sac (commande « pickup » du moteur : case du groupe ou case devant lui, comme dans le jeu)
-  let pickables = [];
+  let pickables = [], hoverType = -1;
   window.lolPickables = () => pickables.map((sp) => ({ type: sp.item.type, x: sp.item.x, y: sp.item.y, left: sp.left, top: sp.top, sw: sp.sw, sh: sp.sh }));   // débogage
   function itemAt(e) {
     const r = view.getBoundingClientRect();
@@ -1201,7 +1201,11 @@
         if (downAt) return;
         const over = !!switchAt(e);
         if (over !== switchHover) { switchHover = over; dirty = true; }
-        view.style.cursor = over || (!handCursor && itemAt(e)) ? "pointer" : baseCursor();
+        const hov = !handCursor ? itemAt(e) : null;
+        view.style.cursor = over || hov ? "pointer" : baseCursor();
+        // infobulle de l'objet au sol survolé (page : « lol-itemhover »)
+        const ht = hov ? hov.item.type : -1;
+        if (ht !== hoverType || ht >= 0) { hoverType = ht; parent.postMessage({ type: "lol-itemhover", t: ht, x: e.clientX, y: e.clientY }, location.origin); }
         return;
       }
       const r = view.getBoundingClientRect();
@@ -1211,6 +1215,7 @@
       player.a = gameA + lookYaw;
       dirty = true;
     });
+    view.addEventListener("pointerleave", () => { if (hoverType >= 0) { hoverType = -1; parent.postMessage({ type: "lol-itemhover", t: -1 }, location.origin); } });
     // clic droit, objet en main : rangé dans le sac (il reste dans l'inventaire)
     view.addEventListener("contextmenu", (e) => {
       e.preventDefault();
