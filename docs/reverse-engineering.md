@@ -583,6 +583,14 @@ js-dos' canvas). A key it still receives is replayed as a synthetic `KeyboardEve
 window, so no press is lost. Checked with ScummVM: after a click in the 3D view, and with focus
 forced into it, A/D turn and W moves the party.
 
+**Turning by dragging (2026-11-23).** Dragging in the built-in view only looks around; on release
+the view used to snap back to the game's direction. Releasing now turns the party towards the side
+it was looking at: beyond 30° of yaw, one quarter turn (Turn right `TR` = Page Up, Turn left `TL`
+= Home, the ScummVM keymap actions, sent as synthetic keys to the game); beyond 135°, two quarter
+turns 350 ms apart. The view keeps its angle and eases into the direction the game sends back; if
+the game does not turn within about a second (menu open), it returns to the game's direction.
+Checked with ScummVM: drag right → East, left → North, small drag → unchanged, wide drag → South.
+
 **Pixel aspect — verified (2026-11-22).** The game's 320×200 screen is shown at 4:3 (ScummVM
 aspect correction, DOSBox), so its pixels are 1.2 times taller than wide. The game view (176×120)
 is thus displayed at 1.22:1, and a near wall (128×96 pixels) at 1.11:1. The 3D view was drawn
@@ -2216,3 +2224,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: game perspective of the 3D view: the floor follows the game's painted-floor model (§ 9.3c) instead of the walls' projection, which stretched the near floor into a fan of huge tiles.
 - **2026-11-23**: forest trees above the walls generated fractally (recursive branching from the wall's trunk feet, leafy tufts, fBm back layer) in a 16-cell strip; the one-cell quilted image repeated every cell (§ 9.3d).
 - **2026-11-23**: levels 2 and 3 share their map, so the page took the Southern Forest for the Northern one (wrong palette in the 3D view); the ScummVM engine now publishes the current level at `0x7F000A00` (§ 12.2).
+- **2026-11-23**: 3D view: releasing a look-around drag turns the party towards that side in the game (§ 9.3a).

@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261123j";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261123k";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -1142,9 +1142,20 @@
       player.a = gameA + lookYaw;
       dirty = true;
     });
-    const endLook = () => {
+    // Relâcher après avoir regardé de côté fait tourner le groupe de ce côté dans le jeu :
+    // un quart de tour au-delà de 30°, un demi-tour au-delà de 135°. La vue garde son angle
+    // et rejoint en douceur la direction que le jeu renvoie.
+    const LOOK_TURN = Math.PI / 6;
+    const endLook = (turn) => {
       if (!looking) return;
-      looking = false; lookYaw = 0; pitch = 0; player.a = gameA; view.style.cursor = "grab"; dirty = true;
+      looking = false; pitch = 0; view.style.cursor = "grab"; dirty = true;
+      const yaw = lookYaw; lookYaw = 0;
+      const n = turn && Math.abs(yaw) > LOOK_TURN ? Math.min(2, Math.max(1, Math.round(Math.abs(yaw) / (Math.PI / 2)))) : 0;
+      if (!n) { player.a = gameA; return; }
+      const code = yaw > 0 ? "PageUp" : "Home";
+      for (let i = 0; i < n; i++) setTimeout(() => pressGameKey(code), i * 350);
+      const a0 = gameA;     // le jeu n'a pas tourné (menu ouvert…) : la vue revient à sa direction
+      setTimeout(() => { if (gameA === a0 && !looking && !anim) { player.a = gameA; dirty = true; } }, n * 350 + 1200);
     };
     view.addEventListener("pointerup", (e) => {
       giveKeysToGame();
@@ -1153,7 +1164,7 @@
         downAt = null;
         return;
       }
-      endLook();
+      endLook(true);
     });
     // Clavier : la vue 3D n'a pas de commandes ; un clic lui donne le clavier, qu'on rend au jeu
     // (ScummVM : son cadre #dos ; DOSBox : la page, dont les écouteurs envoient les touches à
@@ -1168,6 +1179,16 @@
       } catch (err) { return null; }
     };
     function giveKeysToGame() { const t = gameTarget(); if (t) t.focus(); }
+    const KEY_CODES = { Home: 36, PageUp: 33 };
+    function pressGameKey(code) {
+      const t = gameTarget();
+      if (!t) return;
+      t.focus();
+      const View = t.el.ownerDocument ? t.el.ownerDocument.defaultView : parent;
+      const init = { key: code, code, keyCode: KEY_CODES[code], which: KEY_CODES[code], bubbles: true, cancelable: true };
+      t.el.dispatchEvent(new View.KeyboardEvent("keydown", init));
+      setTimeout(() => t.el.dispatchEvent(new View.KeyboardEvent("keyup", init)), 60);
+    }
     for (const type of ["keydown", "keyup"]) addEventListener(type, (e) => {
       const t = gameTarget();
       if (!t) return;
@@ -1178,8 +1199,8 @@
       t.el.dispatchEvent(new View.KeyboardEvent(type, init));
       e.preventDefault();
     });
-    view.addEventListener("pointercancel", endLook);
-    view.addEventListener("lostpointercapture", endLook);
+    view.addEventListener("pointercancel", () => endLook(false));
+    view.addEventListener("lostpointercapture", () => endLook(false));
   }
   levelSel.addEventListener("change", () => { loadLevel(+levelSel.value, false); levelSel.blur(); });
   addEventListener("resize", () => { resize(); dirty = true; });
