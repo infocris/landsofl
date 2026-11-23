@@ -770,7 +770,24 @@ tree above the wall at the wall's own pixel scale:
   the row of faces). Its bottom always joins the wall.
 - **Silhouette**: per column, up to 40 top rows are removed (`EDGE_ROWS`, value noise at 7,
   17 and 41 per cell), which gives a jagged, leafy skyline.
-The background band (`TRUNK`/`CROWN_K`) is only used if no canopy can be built. `viewer.js`: `forestNoise`, `drawUpper` (`?p=` in the URL raises the gaze, for
+The background band (`TRUNK`/`CROWN_K`) is only used if no canopy can be built.
+
+**Fractal trees (2026-11-23).** The quilted image was one cell wide, so the same columns came
+back at every cell: a visible repeating pattern. It is replaced by a procedural strip 16 cells
+wide and 150 rows high, at the wall's pixel scale, wrapping seamlessly (`buildForest`):
+- **Colours**: the palettes come from rows 0–47 of the wall texture: bark (r > g + 15 and
+  r > b + 15), foliage (the rest) and near-blacks, sorted by luminance.
+- **Back layer**: dark foliage whose top follows a periodic fractal noise (fBm, 5 octaves).
+- **Trees**: trunks start at the trunk feet found in rows 0–3 of the texture (bark runs ≥ 3 px),
+  so they continue the wall's trunks. Each branches recursively over 5 levels into 2 or 3
+  children:
+  - angle ±0.25–0.6 rad, length × 0.7–0.85, width × 0.65;
+  - each tree of each cell has its own draw.
+- **Foliage**: irregular leafy tufts at the branch tips and along the thin branches.
+- **Seam**: the bottom 3 rows mirror rows 0–2 of the wall.
+- **Reading the strip**: the column comes from the world position along the wall, shifted by
+  a whole number of cells per row of faces. It is read backwards on E/N faces, whose texture
+  is mirrored, so trunk feet stay aligned with the wall in every orientation. `viewer.js`: `forestNoise`, `drawUpper` (`?p=` in the URL raises the gaze, for
 screenshots).
 
 ### 9.3e Generating floors from the floor images (2026-11-22)
@@ -2178,3 +2195,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: movement keys work while the built-in 3D view has focus: focus handed back to the game after a click, stray keys replayed in the game window (§ 9.3a).
 - **2026-11-23**: forest trees above the walls fully generated at wall resolution (foliage-only top rows, height 60–100 %, noisy leafy silhouette); the stretched background crown band is no longer used (§ 9.3d).
 - **2026-11-23**: game perspective of the 3D view: the floor follows the game's painted-floor model (§ 9.3c) instead of the walls' projection, which stretched the near floor into a fan of huge tiles.
+- **2026-11-23**: forest trees above the walls generated fractally (recursive branching from the wall's trunk feet, leafy tufts, fBm back layer) in a 16-cell strip; the one-cell quilted image repeated every cell (§ 9.3d).

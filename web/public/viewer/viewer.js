@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261123g";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261123h";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -179,71 +179,107 @@
       }
       return L.upper.get(tex);
     };
-    L.canopy = L.outdoor.crown ? buildCanopy(px, W2, plain) : null;
+    L.canopy = L.outdoor.crown ? buildForest(px, W2, plain) : null;
   }
 
-  // Forêt : étage au-dessus du mur synthétisé à partir du haut de la texture du mur (branches et
-  // feuillage, lignes 0 à CANOPY.src), pour ne pas répéter racines et pieds des troncs en hauteur.
-  // De bas en haut, bandes de pleine largeur (CANOPY.strip lignes + CANOPY.ov de recouvrement) :
-  // la première se raccorde au haut du mur, chaque suivante est tirée parmi les 3 qui recouvrent
-  // le mieux la précédente, avec une couture par colonne à la ligne de moindre écart. Les
-  // colonnes gardent leur x : les troncs et branches restent alignés. CANOPY.n variantes par
-  // texture ; image de hauteur CANOPY.h (fond = haut du mur).
-  // Les capRows lignes du haut ne puisent que dans les lignes 0 à cap (feuillage le plus dense) :
-  // l'arbre se termine toujours par du feuillage.
-  const CANOPY = { src: 48, cap: 20, capRows: 45, strip: 10, ov: 4, h: 150, n: 3 };
-  function buildCanopy(px, W2, texs) {
-    const fw = L.faceW, fh = L.faceH, cols = L.atlasCols, { src, cap, capRows, strip, ov, h, n } = CANOPY;
+  // Forêt : arbres au-dessus du mur générés de façon fractale, dans une bande de FOREST.faces
+  // cases de large (raccordée bout à bout), à l'échelle des pixels du mur :
+  // - couleurs : écorces (r > g, r > b) et feuillages (le reste, hors noirs) du haut de la texture ;
+  // - fond : masse de feuillage sombre, sommet en bruit fractal (fbm périodique, 5 octaves) ;
+  // - troncs : partent des pieds de troncs repérés dans les lignes 0-3 de la texture (raccord au
+  //   mur), puis se ramifient récursivement (2 ou 3 branches, angle ±0,25-0,6 rad, longueur
+  //   × 0,7-0,85, largeur × 0,65), chaque arbre de chaque case avec son propre tirage ;
+  // - touffes de feuillage irrégulières au bout des branches et le long des plus fines.
+  // Les 3 lignes du bas reprennent les lignes 0-2 du mur (en miroir) pour le raccord.
+  const FOREST = { faces: 16, h: 150, depth: 5 };
+  function buildForest(px, W2, texs) {
+    const fw = L.faceW, fh = L.faceH, cols = L.atlasCols, NF = FOREST.faces, SW = fw * NF, HT = FOREST.h;
     if (!texs.length) return null;
     const c = document.createElement("canvas");
-    c.width = fw * texs.length * n; c.height = h;
-    const g = c.getContext("2d"), id = g.createImageData(c.width, h), out = new Uint32Array(id.data.buffer);
-    const diff = (p, q) => Math.abs((p & 255) - (q & 255)) + Math.abs(((p >> 8) & 255) - ((q >> 8) & 255)) + Math.abs(((p >> 16) & 255) - ((q >> 16) & 255));
+    c.width = SW; c.height = HT * texs.length;
+    const g = c.getContext("2d"), id = g.createImageData(SW, c.height), out = new Uint32Array(id.data.buffer);
+    const lum = (p) => (p & 255) * 0.3 + ((p >> 8) & 255) * 0.59 + ((p >> 16) & 255) * 0.11;
     texs.forEach((tex, ti) => {
-      const x0 = (tex % cols) * fw, y0 = Math.floor(tex / cols) * fh;
-      const at = (x, y) => px[(y0 + y) * W2 + x0 + x];
-      for (let v = 0; v < n; v++) {
-        const ox = (ti * n + v) * fw;
-        // col[y] : ligne source posée à la hauteur y de l'image, par colonne ; on commence par
-        // les ov lignes du haut du mur, sous le bas de l'image
-        const rows = [];                              // rows[k] = Int16Array(fw) : ligne source par colonne
-        for (let k = 0; k < ov; k++) rows.push(new Int16Array(fw).fill(ov - 1 - k));   // de bas en haut
-        let seed = (tex * 131 + v * 7919 + 17) | 0;
-        while (rows.length < h + ov) {
-          const base = rows.length - ov;              // les ov dernières lignes posées (rows[base..])
-          const cand = [];
-          const lim = base >= h - capRows ? cap : src;
-          for (let y = 0; y + strip + ov <= lim; y++) {
-            // bande y..y+strip+ov-1 (haut en y) ; ses ov lignes du bas recouvrent rows[base..]
-            let e = 0;
-            for (let k = 0; k < ov; k++) {
-              const sy = y + strip + ov - 1 - k, r = rows[base + k];
-              for (let x = 0; x < fw; x += 2) e += diff(at(x, sy), at(x, r[x]));
-            }
-            cand.push([e, y]);
-          }
-          cand.sort((a, b) => a[0] - b[0]);
-          seed = Math.imul(seed ^ (seed >>> 13), 0x5bd1e995) + 0x6b43a9b5 | 0;
-          const y = cand[Math.min(cand.length - 1, ((seed >>> 8) & 0xffff) % 3)][1];
-          // couture : par colonne, on garde l'ancienne ligne sous la ligne de moindre écart
-          for (let x = 0; x < fw; x++) {
-            let best = 0, be = Infinity;
-            for (let k = 0; k < ov; k++) {
-              const e = diff(at(x, y + strip + ov - 1 - k), at(x, rows[base + k][x]));
-              if (e < be) { be = e; best = k; }
-            }
-            for (let k = best; k < ov; k++) rows[base + k][x] = y + strip + ov - 1 - k;
-          }
-          for (let k = 0; k < strip; k++) rows.push(new Int16Array(fw).fill(y + strip - 1 - k));
+      const x0 = (tex % cols) * fw, y0 = Math.floor(tex / cols) * fh, at = (x, y) => px[(y0 + y) * W2 + x0 + x];
+      const isBark = (p) => { const r = p & 255, gg = (p >> 8) & 255, bb = (p >> 16) & 255; return r > gg + 15 && r > bb + 15; };
+      const bark = new Map(), leaf = new Map(), dark = new Map();
+      for (let y = 0; y < 48; y++) for (let x = 0; x < fw; x++) {
+        const p = at(x, y), m = lum(p) < 14 ? dark : isBark(p) ? bark : leaf;
+        m.set(p, (m.get(p) || 0) + 1);
+      }
+      const pal = (m) => [...m].filter((e) => e[1] > 4).map((e) => e[0]).sort((p, q) => lum(p) - lum(q));
+      const B = pal(bark), Lf = pal(leaf), D = pal(dark);
+      if (!B.length || !Lf.length) return;
+      if (!D.length) D.push(0xff000000);
+      let seed = (tex * 2654435761 + 12345) >>> 0;
+      const rnd = () => { seed = (seed + 0x6d2b79f5) >>> 0; let t = seed; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+      const o = ti * HT * SW;
+      const put = (x, y, p) => { y = Math.round(y); if (y < 0 || y >= HT) return; x = ((Math.round(x) % SW) + SW) % SW; out[o + y * SW + x] = p; };
+      const pick = (P, t) => P[Math.max(0, Math.min(P.length - 1, Math.round(t * (P.length - 1))))];
+      // fbm périodique sur la bande
+      const lat = (i, oc) => hash01(((i % (NF * (2 << oc))) + NF * (2 << oc)) % (NF * (2 << oc)), tex * 31 + oc);
+      const fbm = (x) => {
+        let v = 0, amp = 0.5, norm = 0;
+        for (let oc = 0; oc < 5; oc++) {
+          const f = x / SW * NF * (2 << oc), i = Math.floor(f), t = f - i, k = t * t * (3 - 2 * t);
+          v += amp * (lat(i, oc) * (1 - k) + lat(i + 1, oc) * k); norm += amp; amp *= 0.5;
         }
-        for (let yy = 0; yy < h; yy++) {             // ligne d'image h-1-yy = rows[ov + yy]
-          const r = rows[ov + yy], o = (h - 1 - yy) * c.width + ox;
-          for (let x = 0; x < fw; x++) out[o + x] = at(x, r[x]);
+        return v / norm;
+      };
+      // 1. fond : feuillage sombre
+      for (let x = 0; x < SW; x++) {
+        const top = Math.round(HT * (1 - (0.35 + 0.45 * fbm(x))));
+        for (let y = top; y < HT; y++) {
+          const r = rnd(), edge = y - top < 4;
+          if (edge && r < 0.35) continue;
+          put(x, y, r < 0.55 ? pick(D, rnd()) : r < 0.9 || !edge ? pick(Lf, rnd() * 0.3) : pick(Lf, 0.3 + rnd() * 0.4));
         }
       }
+      // 2. touffe de feuillage
+      const tuft = (cx, cy, rad) => {
+        const lob = [rnd(), rnd(), rnd(), rnd()].map((v) => 0.7 + 0.5 * v), ph = rnd() * 6.3;
+        for (let dy = -rad * 1.3; dy <= rad; dy++) for (let dx = -rad * 1.5; dx <= rad * 1.5; dx++) {
+          const ang = Math.atan2(dy, dx), rr = rad * lob[Math.floor(((ang + ph + 12.6) % 6.283) / 1.571) % 4];
+          const d = Math.hypot(dx / 1.2, dy) / rr;
+          if (d > 1 || (d > 0.75 && rnd() < 0.5)) continue;
+          const light = Math.max(0, Math.min(1, 0.75 - (dy / rad) * 0.35 - d * 0.35 + (rnd() - 0.5) * 0.5));
+          put(cx + dx, cy + dy, rnd() < 0.12 ? pick(D, rnd()) : pick(Lf, light));
+        }
+      };
+      // 3. branches récursives
+      const branch = (x, y, a, len, w, depth) => {
+        let px2 = x, py = y;
+        for (let t = 0; t < len; t++) {
+          a += (rnd() - 0.5) * 0.12;
+          px2 += Math.sin(a); py -= Math.cos(a);
+          const hw = w / 2;
+          for (let k = -hw; k <= hw; k++) {
+            const r = (k + hw) / Math.max(1, w), light = Math.max(0, 1 - Math.abs(r - 0.35) * 2.2) * 0.85 + (rnd() - 0.5) * 0.25;
+            put(px2 + k, py, pick(B, light));
+          }
+          if (depth <= 2 && w < 4 && rnd() < 0.05) tuft(px2 + (rnd() - 0.5) * 6, py, 3 + rnd() * 3);
+        }
+        if (depth === 0 || w < 1.5) { tuft(px2, py, 5 + rnd() * 6); return; }
+        const n = rnd() < 0.3 ? 3 : 2;
+        for (let i = 0; i < n; i++) {
+          const da = (0.25 + rnd() * 0.35) * (n === 2 ? (i ? 1 : -1) : i - 1);
+          branch(px2, py, a + da, len * (0.7 + rnd() * 0.15), Math.max(1, w * 0.65), depth - 1);
+        }
+      };
+      // pieds de troncs : suites d'écorce d'au moins 3 px, en majorité sur les lignes 0-3
+      const bases = [];
+      for (let x = 0, run = 0; x <= fw; x++) {
+        const bk = x < fw && [0, 1, 2, 3].filter((y) => isBark(at(x, y))).length >= 3;
+        if (bk) run++;
+        else { if (run >= 3) bases.push([x - run / 2, run]); run = 0; }
+      }
+      for (let f = 0; f < NF; f++) for (const [bx, bw] of bases)
+        branch(f * fw + bx, HT, (rnd() - 0.5) * 0.15, 18 + rnd() * 18, Math.min(14, bw), FOREST.depth - (rnd() < 0.3 ? 1 : 0));
+      // 4. raccord au mur : lignes 0-2 de la texture, en miroir
+      for (let k = 0; k < 3; k++) for (let x = 0; x < SW; x++) out[o + (HT - 1 - k) * SW + x] = at(x % fw, k);
     });
     g.putImageData(id, 0, 0);
-    return { imgs: darken(c, SHADES), index: new Map(texs.map((t, i) => [t, i])) };
+    return { imgs: darken(c, SHADES), index: new Map(texs.map((t, i) => [t, i])), SW, HT };
   }
   // bandeau du fond (toute la largeur) : 48 px pour une face, 24 px de haut pour un mur de 40
   const CROWN = { w: 48, h: 24, wall: 40 };
@@ -253,7 +289,6 @@
   // (CROWN_K) ; la cime est lue en continu dans le bandeau, en aller-retour (pas de raccord),
   // à partir d'un point propre à la rangée. Lisière irrégulière, sans marche entre deux faces.
   const TRUNK = [0.3, 1.5], CROWN_K = [0.8, 1.35];   // sans arbre synthétisé (bandeau du fond)
-  const TREE_K = [0.6, 1], EDGE_ROWS = 40;            // arbre synthétisé : échelle, découpe du sommet
   const hash01 = (i, seed) => {
     let h = Math.imul(i ^ Math.imul(seed, 0x27d4eb2d), 0x9e3779b1);
     h ^= h >>> 15; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13;
@@ -282,15 +317,15 @@
       const tr = TRUNK[0] + (TRUNK[1] - TRUNK[0]) * forestNoise(pos, line, 0);
       const ck = CROWN_K[0] + (CROWN_K[1] - CROWN_K[0]) * forestNoise(pos, line, 101.5);
       const cp = L.canopy, ti = cp && cp.index.get(ut);
-      if (ti !== undefined) {                         // arbre entier synthétisé (buildCanopy), sans bandeau
-        const v = Math.floor(hash01(line, 11) * CANOPY.n) % CANOPY.n;
-        const cx = (ti * CANOPY.n + v) * fw + Math.min(fw - 1, Math.floor(u * fw));
-        // hauteur : 60 à 100 % de l'image (bas toujours raccordé au mur, haut toujours feuillu) ;
-        // silhouette : lignes retirées en haut, bruit à 3 fréquences (touffes de feuillage)
-        const k = TREE_K[0] + (TREE_K[1] - TREE_K[0]) * forestNoise(pos, line, 0);
-        const e = 0.5 * vnoise(pos * 7, line + 1) + 0.3 * vnoise(pos * 17, line + 2) + 0.2 * vnoise(pos * 41, line + 3);
-        const cut = Math.floor(e * EDGE_ROWS), rowsH = CANOPY.h - cut, hh = rowsH / sh * h * k;
-        part(cp.imgs[shadeFor(dist)], cx, cut, rowsH, top - hh, hh);
+      if (ti !== undefined) {                         // arbres fractals (buildForest)
+        // colonne de la bande : position le long du mur (pixels du mur), décalée d'un nombre entier
+        // de cases propre à la rangée ; bande lue à l'envers quand la face l'est (u = 1 − frac)
+        const NF = FOREST.faces, SW = cp.SW, HT = cp.HT;
+        const flip = (line & 7) === FACE_E || (line & 7) === FACE_N;   // line = (case << 3) | face
+        let col = ((Math.floor(pos * fw) + Math.floor(hash01(line, 5) * NF) * fw) % SW + SW) % SW;
+        if (flip) col = SW - 1 - col;
+        const hh = HT / sh * h;
+        part(cp.imgs[shadeFor(dist)], col, ti * HT, HT, top - hh, hh);
         return;
       } else for (let k = 0, rest = tr; rest > 0 && top - k * h > 0; k++, rest--) {
         const f = Math.min(1, rest);
