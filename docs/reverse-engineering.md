@@ -591,6 +591,12 @@ turns 350 ms apart. The view keeps its angle and eases into the direction the ga
 the game does not turn within about a second (menu open), it returns to the game's direction.
 Checked with ScummVM: drag right → East, left → North, small drag → unchanged, wide drag → South.
 
+**Sidestepping while looking (2026-11-23).** While the mouse button is held in the built-in view,
+it takes the keyboard. Q and D (physical A and D, which turn the party) are then sent to the game
+as the left and right arrows (Slide left / Slide right). An arrow still held when the button is
+released gets its key-up. Checked with ScummVM, from 13,14 facing north: D → 14,14, Q → 13,14,
+facing unchanged; after release, D turns again.
+
 **Pixel aspect — verified (2026-11-22).** The game's 320×200 screen is shown at 4:3 (ScummVM
 aspect correction, DOSBox), so its pixels are 1.2 times taller than wide. The game view (176×120)
 is thus displayed at 1.22:1, and a near wall (128×96 pixels) at 1.11:1. The 3D view was drawn
@@ -1021,6 +1027,23 @@ be drawn flipped horizontally, mirrored about the center of the wall, at
 `x' = 128 − x − largeur`. Without this, the castle's coats of arms and banners appear
 cut in half. In the castle, this concerns decorations 6 to 9, 16 and 18.
 
+**Flag bit 1 — engine read, verified (2026-11-23).** The whole image is drawn mirrored
+(`drawDecorations`: `ix = −ix` when the position uses an overlay and `flags & 2`; bit 2 does the
+same only when `_wllProcessFlag` is set, which depends on the party's cell and direction). This is
+how the Gladstone fountain is animated: the level script alternates the four faces of cell 13,13
+between wall types 68 and 69 (sampled every 150 ms in ScummVM), whose decorations 12 and 13 share
+the same shape and differ only by this flag. The export ignored the flag, so both textures were
+identical and the 3D view's fountain stood still; it now mirrors the image (`x' = 128 − x − width`).
+
+**Free-standing decorations (2026-11-23).** A wall type with no wall set (`vmp` 0), only a
+decoration, used on all four faces of a cell, is an object standing in the cell: the Gladstone
+fountain, chests in Roland's manor, holes in the floor or ceiling, stalagmites. The game paints it
+on the face turned towards the party; seen from a diagonal in the 3D view's real perspective, two
+faces showed it twice, and head-on it sat on the near edge of the cell. The export marks these
+types (`walls[id].free`); the real perspective now draws such a cell as one sprite facing the
+camera at the cell's center (one cell wide, wall height), and the game perspective skips its side
+faces. Checked: the fountain from 13,14 facing north and from 12,15 facing north-east.
+
 Position 1 = near wall head-on, with `x/y` relative to the 128×96 wall (**verified**
 visually: banners, coats of arms, portraits, fountain). Positions 2–3 are farther
 away, and positions 4–5 are probably the side views (**deduced**).
@@ -1133,6 +1156,10 @@ the live grid updates the 3D view (open door, lever moved).
 - **Verified**: Gladstone, cell 13,16 facing north. The button next to the door is drawn
   and outlined. A click on it opens the door in the game, then in the 3D view, where the
   fountain appears behind it.
+- **Space** (2026-11-23): the 3D view tells the page whether a switch is in front of the party
+  (`lol-switch-ahead`). Space then sends the same command as the click, from the page or from the
+  game's frame. The key still reaches the game, which only uses it in dialogs. Verified: Gladstone
+  13,16 facing north, Space opens the door.
 
 **Engine cache** (2026-11-22). The test server sent no cache header, so Chrome kept the
 previous `scummvm.wasm` and `lol-game.html`, and ignored the rebuilt engine: the new command
@@ -2225,3 +2252,6 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: forest trees above the walls generated fractally (recursive branching from the wall's trunk feet, leafy tufts, fBm back layer) in a 16-cell strip; the one-cell quilted image repeated every cell (§ 9.3d).
 - **2026-11-23**: levels 2 and 3 share their map, so the page took the Southern Forest for the Northern one (wrong palette in the 3D view); the ScummVM engine now publishes the current level at `0x7F000A00` (§ 12.2).
 - **2026-11-23**: 3D view: releasing a look-around drag turns the party towards that side in the game (§ 9.3a).
+- **2026-11-23**: decoration flag bit 1 mirrors the image; the Gladstone fountain is animated by alternating two mirrored decorations, now animated in the 3D view (§ 9.4).
+- **2026-11-23**: free-standing decorations (all four faces, no wall set) drawn as one centered sprite in the real perspective (§ 9.4).
+- **2026-11-23**: 3D view: Q / D sidestep while the mouse button is held (§ 9.3a); Space operates the switch in front of the party (§ 9.6).

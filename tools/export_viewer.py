@@ -648,7 +648,13 @@ def face_texture(ts, wt, pal):
         si = dec["shape"][1]
         if si != 0xFFFF and si < len(ts.decor_shapes) and ts.decor_shapes[si]:
             shape_img = frame_image(ts.decor_shapes[si], pal)
-            img.blit(shape_img, dec["x"][1], dec["y"][1])
+            if dec["flags"] & 2:
+                # drapeau 2 : image retournée, en miroir par rapport au centre du mur
+                # (drawDecorations, ix = −ix). La fontaine de Gladstone s'anime ainsi : le script
+                # alterne ses murs 68 / 69, même image, la seconde retournée (§ 9.4)
+                img.blit(mirrored(shape_img), FACE_W - dec["x"][1] - shape_img.w, dec["y"][1])
+            else:
+                img.blit(shape_img, dec["x"][1], dec["y"][1])
             if dec["flags"] & 1:
                 # drapeau 1 : motif symétrique, seule une moitié est stockée ; on dessine aussi
                 # l'image retournée, en miroir par rapport au centre du mur
@@ -1077,6 +1083,10 @@ def main(game_dir, maps_dir, out_dir):
             entry = {"tex": tex, "block": bool(wt["flags"] & 1),
                      "opaque": bool(img is not None and is_opaque(img)),
                      "door": wt["special"] == 5 or wt["automap"] == 13}
+            if wt["vmp"] == 0 and wt["shape"] > 0 and not entry["door"] and tex >= 0:
+                # décor seul, sans pan de mur : sur les 4 faces d'une case, c'est un objet posé au
+                # centre (fontaine, statue, stalagmite) que la vue 3D réelle dessine comme un sprite
+                entry["free"] = True
             if entry["door"] and entry["block"]:
                 # variante ouverte : même mur sans battant de porte
                 open_img = face_texture(ts, dict(wt, flags=wt["flags"] & ~1), pal)

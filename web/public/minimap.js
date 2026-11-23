@@ -963,6 +963,21 @@
     if (window.LOL_ENGINE !== "scummvm") { console.info("Interrupteur : actionnable seulement sous ScummVM"); return; }
     try { await mem.cmd({ op: "clickwall" }, 5000); } catch (err) { console.warn("clickwall", err); }
   });
+  // Espace devant un interrupteur (la vue 3D signale s'il y en a un devant le groupe) : même
+  // commande que le clic. La touche part aussi au jeu, qui ne s'en sert qu'en boîte de dialogue.
+  let switchAhead = false;
+  addEventListener("message", (e) => {
+    if (e.origin === location.origin && e.data && e.data.type === "lol-switch-ahead") switchAhead = !!e.data.on;
+  });
+  const onSpace = (e) => {
+    if (e.code !== "Space" || e.repeat || !switchAhead || window.LOL_ENGINE !== "scummvm") return;
+    if (document.querySelector("dialog[open]")) return;
+    mem.cmd({ op: "clickwall" }, 5000).catch((err) => console.warn("clickwall", err));
+  };
+  addEventListener("keydown", onSpace, true);
+  const hookSpace = () => { const f = document.querySelector("iframe#dos"); try { if (f && f.contentWindow) f.contentWindow.addEventListener("keydown", onSpace, true); } catch (e) {} };
+  hookSpace();
+  { const f = document.querySelector("iframe#dos"); if (f) f.addEventListener("load", hookSpace); }
   addEventListener("message", (e) => {
     if (e.origin !== location.origin || !e.data || e.data.type !== "lol-snap") return;
     const ok = snapWait.get(e.data.id); if (ok) { snapWait.delete(e.data.id); ok(e.data.url); }

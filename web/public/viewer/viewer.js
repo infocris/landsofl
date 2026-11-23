@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261123k";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261123l";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -406,6 +406,25 @@
   const inside = (cx, cy) => cx >= 0 && cy >= 0 && cx < 32 && cy < 32;
   const face = (cx, cy, f) => L.faces[(cy * 32 + cx) * 4 + f];
   const info = (id) => L.wallInfo[id];
+  // Objet posé au centre d'une case (fontaine, statue…) : même décor seul sur ses 4 faces (walls[id].free).
+  // Le jeu le peint sur la face tournée vers le groupe ; la perspective réelle le dessine au centre
+  // de la case, toujours de face, pour ne pas le voir deux fois en diagonale ni trop près.
+  function freeAt(cx, cy) {
+    if (!inside(cx, cy)) return null;
+    const i = (cy * 32 + cx) * 4, id = L.faces[i];
+    if (L.faces[i + 1] !== id || L.faces[i + 2] !== id || L.faces[i + 3] !== id) return null;
+    const w = info(id);
+    return w && w.free ? w : null;
+  }
+  let freeCache = { faces: null, list: [] };
+  function freeObjects() {
+    if (freeCache.faces !== L.faces) {
+      const list = [];
+      for (let cy = 0; cy < 32; cy++) for (let cx = 0; cx < 32; cx++) if (freeAt(cx, cy)) list.push([cx, cy]);
+      freeCache = { faces: L.faces, list };
+    }
+    return freeCache.list;
+  }
 
   function cellBlocked(cx, cy) {
     if (!inside(cx, cy)) return true;
@@ -543,6 +562,7 @@
         if (sdx < sdy) { sdx += ddx; cx += sx; side = 0; } else { sdy += ddy; cy += sy; side = 1; }
         if (!inside(cx, cy)) break;
         const f = side === 0 ? (sx > 0 ? FACE_W : FACE_E) : (sy > 0 ? FACE_N : FACE_S);
+        if (freeAt(cx, cy)) continue;                       // dessiné comme un sprite (projectSprites)
         const t = texFor(cx, cy, f);
         if (!t) continue;
         const dist = side === 0 ? sdx - ddx : sdy - ddy;
@@ -605,13 +625,21 @@
     const w = info(face(ax, ay, (d + 2) % 4));
     if (!w || !w.special || !w.hot) return null;
     // mur à 0,5 case : même échelle dans les deux perspectives (deff(0,5) = 0,5), centré
-    const fw = L.faceW, fh = L.faceH, cw = 2 * proj, colH = WALL_H / 0.5 * proj;
-    const left = W / 2 - proj, top = H / 2 + pitch - colH / 2;
+    const z = persp !== "jeu" && freeAt(ax, ay) ? 1 : 0.5;     // objet au centre de la case (perspective réelle)
+    const fw = L.faceW, fh = L.faceH, cw = proj / z, colH = WALL_H / z * proj;
+    const left = W / 2 - cw / 2, top = H / 2 + pitch - colH / 2;
     const [x0, y0, x1, y1] = w.hot;
     return { special: w.special, x: left + x0 / fw * cw, y: top + y0 / fh * colH, w: (x1 - x0) / fw * cw, h: (y1 - y0) / fh * colH };
   }
+  // La page du jeu actionne l'interrupteur devant le groupe avec Espace : elle apprend d'ici s'il y en a un.
+  let switchAheadSent = false;
   function drawSwitch() {
     const sw = facingSwitch();
+    const ahead = !!sw || (looking && switchAheadSent);       // regarder autour ne le fait pas oublier
+    if (EMBED && ahead !== switchAheadSent) {
+      switchAheadSent = ahead;
+      try { parent.postMessage({ type: "lol-switch-ahead", on: ahead }, location.origin); } catch (e) {}
+    }
     if (!sw) return;
     ctx.save();
     ctx.strokeStyle = switchHover ? "rgba(255, 214, 64, 0.95)" : "rgba(255, 214, 64, 0.4)";
@@ -824,6 +852,7 @@
           if (c.axis === 0) { const nx = ncx > cx ? cx + 1 : cx - 1; f = nx > cx ? FACE_W : FACE_E; cx = nx; uu = hy - Math.floor(hy); pos = hy; line = (cx << 3) | f; }
           else { const ny = ncy > cy ? cy + 1 : cy - 1; f = ny > cy ? FACE_N : FACE_S; cy = ny; uu = hx - Math.floor(hx); pos = hx; line = (cy << 3) | f; }
           if (!inside(cx, cy)) { done = true; break; }
+          if ((fx === 0 ? c.axis === 0 : c.axis === 1) && freeAt(cx, cy)) continue;   // objet : vu de face seulement
           const t = texFor(cx, cy, f);
           if (!t) continue;
           if (f === FACE_E || f === FACE_N) uu = 1 - uu;
@@ -974,6 +1003,17 @@
       const left = W / 2 * (1 + tx / tz) - sw / 2, top = H / 2 + pitch + (WALL_H / 2) / tz * proj - sh + it.dy * scale;
       out.push({ tz: tz + it.dz, rx, ry, rw, rh, sw, sh, left, top, mirror: false, imgs: FLOOR.imgs, ghost: it.alpha,
         x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
+    }
+    const cols = L.atlasCols, fw = L.faceW, fh = L.faceH, unit = W / 2 / Math.hypot(planeX, planeY);
+    for (const [cx, cy] of freeObjects()) {             // objets au centre d'une case : face entière, de face
+      const dx = cx + 0.5 - player.x, dy = cy + 0.5 - player.y;
+      const tx = inv * (dirY * dx - dirX * dy), tz = inv * (-planeY * dx + planeX * dy);
+      if (tz < 0.2) continue;
+      const tex = info(face(cx, cy, 0)).tex;
+      const sw = unit / tz, sh = WALL_H / tz * proj;
+      const left = W / 2 * (1 + tx / tz) - sw / 2, top = H / 2 + pitch - sh / 2;
+      out.push({ tz, rx: (tex % cols) * fw, ry: Math.floor(tex / cols) * fh, rw: fw, rh: fh, sw, sh, left, top, mirror: false,
+        imgs: L.wallImgs, x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
     }
     const source = EMBED ? liveMonsters.filter((m) => m.level === L.level) : L.monsters;
     for (const m of source) {
@@ -1128,6 +1168,7 @@
       const sw = switchAt(e);
       if (sw) { downAt = sw; e.preventDefault(); return; }
       looking = true; view.setPointerCapture(e.pointerId); view.style.cursor = "grabbing"; e.preventDefault();
+      window.focus();       // le clavier vient ici pendant qu'on regarde : Q / D deviennent des pas de côté
     });
     view.addEventListener("pointermove", (e) => {
       if (!looking) {
@@ -1149,6 +1190,7 @@
     const endLook = (turn) => {
       if (!looking) return;
       looking = false; pitch = 0; view.style.cursor = "grab"; dirty = true;
+      releaseStrafe();
       const yaw = lookYaw; lookYaw = 0;
       const n = turn && Math.abs(yaw) > LOOK_TURN ? Math.min(2, Math.max(1, Math.round(Math.abs(yaw) / (Math.PI / 2)))) : 0;
       if (!n) { player.a = gameA; return; }
@@ -1189,10 +1231,28 @@
       t.el.dispatchEvent(new View.KeyboardEvent("keydown", init));
       setTimeout(() => t.el.dispatchEvent(new View.KeyboardEvent("keyup", init)), 60);
     }
-    for (const type of ["keydown", "keyup"]) addEventListener(type, (e) => {
+    // Bouton de la souris tenu (on regarde autour) : Q / D (touches physiques A / D, qui tournent
+    // le groupe) font un pas de côté, envoyés au jeu comme les flèches gauche / droite.
+    const STRAFE = { KeyA: ["ArrowLeft", 37], KeyD: ["ArrowRight", 39] };
+    const strafeHeld = new Set();
+    function sendArrow(type, code) {
       const t = gameTarget();
       if (!t) return;
-      t.focus();
+      const [key, keyCode] = STRAFE[code];
+      const View = t.el.ownerDocument ? t.el.ownerDocument.defaultView : parent;
+      t.el.dispatchEvent(new View.KeyboardEvent(type, { key, code: key, keyCode, which: keyCode, bubbles: true, cancelable: true }));
+    }
+    function releaseStrafe() { for (const c of strafeHeld) sendArrow("keyup", c); strafeHeld.clear(); }
+    for (const type of ["keydown", "keyup"]) addEventListener(type, (e) => {
+      if (STRAFE[e.code] && (type === "keydown" ? looking : strafeHeld.has(e.code))) {
+        if (type === "keydown") strafeHeld.add(e.code); else strafeHeld.delete(e.code);
+        sendArrow(type, e.code);
+        e.preventDefault();
+        return;
+      }
+      const t = gameTarget();
+      if (!t) return;
+      if (!looking) t.focus();
       const init = { key: e.key, code: e.code, keyCode: e.keyCode, which: e.which, location: e.location, repeat: e.repeat,
         shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey, bubbles: true, cancelable: true };
       const View = t.el.ownerDocument ? t.el.ownerDocument.defaultView : parent;
