@@ -1826,6 +1826,25 @@ adventure. To be checked at that point, on byte 9 of each cell.
 
 **Current level**: I found no variable. The minimap compares the live grid with the 29
 original grids and keeps the level that has more than 900 identical cells out of 1024.
+- **Ambiguity (2026-11-23)**: levels 2 (Northern Forest) and 3 (Southern Forest) share the
+  same map, 4092 of 4096 faces identical. They differ by their monsters and by the alternate
+  palette named in `LEVELn.INI` (`ALTPAL2.PAL` / `ALTPAL1.PAL`). The grid cannot tell them
+  apart: in the Southern Forest the page showed level 2, and the 3D view drew the Northern
+  Forest's colours.
+- **The two palettes**: they differ from the `.VCN` palette only in colours 91–94, the
+  foliage. `ALTPAL1` is autumn yellow (174, 142, 65 … 69, 52, 20), `ALTPAL2` turquoise
+  (65, 146, 113 … 24, 69, 65), `ALTPAL3` grey-green. The export already applies them per level.
+- **Fix under ScummVM**: the engine publishes `_currentLevel` (u8 at `0x7F000A00`) and the
+  page uses it. Under DOSBox the grid comparison remains, with the same ambiguity.
+- **3D view on a level change**: two bugs kept the view on the wrong spot after a jump between
+  levels.
+  - A position received while the level was loading was dropped. The page sends a position
+    only when it changes, so it never came back. The last one is now applied after loading.
+  - A position equal to the previous level's was ignored, although `loadLevel` had just put
+    the player on the level's start cell.
+  
+  Checked: jump to level 3 at 12,17 facing north; the panel shows "Forêt du Sud", and the 3D
+  view shows the same autumn-coloured tree wall as the game.
 
 ### 12.3 Search method (to find these addresses again)
 
@@ -2196,3 +2215,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: forest trees above the walls fully generated at wall resolution (foliage-only top rows, height 60–100 %, noisy leafy silhouette); the stretched background crown band is no longer used (§ 9.3d).
 - **2026-11-23**: game perspective of the 3D view: the floor follows the game's painted-floor model (§ 9.3c) instead of the walls' projection, which stretched the near floor into a fan of huge tiles.
 - **2026-11-23**: forest trees above the walls generated fractally (recursive branching from the wall's trunk feet, leafy tufts, fBm back layer) in a 16-cell strip; the one-cell quilted image repeated every cell (§ 9.3d).
+- **2026-11-23**: levels 2 and 3 share their map, so the page took the Southern Forest for the Northern one (wrong palette in the 3D view); the ScummVM engine now publishes the current level at `0x7F000A00` (§ 12.2).

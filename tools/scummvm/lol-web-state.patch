@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..98cf9dd5 100644
+index 392e4c2d..f850acdc 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -32,6 +32,7 @@
@@ -21,7 +21,7 @@ index 392e4c2d..98cf9dd5 100644
  namespace Kyra {
  
  const char *const LoLEngine::kMouseKeymapName = "lolmouse";
-@@ -929,6 +934,588 @@ void LoLEngine::startupNew() {
+@@ -929,6 +934,591 @@ void LoLEngine::startupNew() {
  	_screen->showMouse();
  }
  
@@ -110,6 +110,9 @@ index 392e4c2d..98cf9dd5 100644
 +
 +	begin(0x3E4E0); u16(_currentBlock); end();
 +	begin(0x3E4EF); u16(_currentDirection); end();
++	// niveau en cours (u8) : les niveaux 2 et 3 (forêts du Nord et du Sud) ont la même carte à
++	// 4 faces près, la page ne peut pas les distinguer par la grille
++	begin(0x7F000A00); u8(_currentLevel); end();
 +	begin(0x5D6B5); u8(_specialSceneFlag ? 1 : 5); end();
 +	begin(0x3E6F0); u16(_credits); end();
 +	begin(0x3E558); u16(_itemInHand); end();
@@ -610,7 +613,7 @@ index 392e4c2d..98cf9dd5 100644
  void LoLEngine::runLoop() {
  	// Initialize debugger since how it should be fully usable
  	static_cast<Debugger_LoL *>(getDebugger())->initialize();
-@@ -957,6 +1544,7 @@ void LoLEngine::runLoop() {
+@@ -957,6 +1547,7 @@ void LoLEngine::runLoop() {
  		gui_updateInput();
  
  		update();
@@ -618,7 +621,7 @@ index 392e4c2d..98cf9dd5 100644
  
  		updatePlayTimer();
  
-@@ -1178,6 +1766,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
+@@ -1178,6 +1769,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
  	return size;
  }
  
@@ -716,7 +719,7 @@ index 392e4c2d..98cf9dd5 100644
  bool LoLEngine::addCharacter(int id) {
  	const uint16 *cdf[] = {
  		_charDefsMan, _charDefsMan, _charDefsMan, _charDefsWoman,
-@@ -1477,6 +2156,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
+@@ -1477,6 +2159,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
  
  	int newVal = (mode == 2) ? (pointsMax + points) : (mode ? (pointsCur + points) : points);
  	newVal = CLIP(newVal, 0, pointsMax);
@@ -725,7 +728,7 @@ index 392e4c2d..98cf9dd5 100644
  
  	if (type) {
  		c->magicPointsCur = newVal;
-@@ -2074,6 +2755,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
+@@ -2074,6 +2758,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
  
  void LoLEngine::delay(uint32 millis, bool doUpdate, bool) {
  	while (millis && !shouldQuit()) {
@@ -733,7 +736,7 @@ index 392e4c2d..98cf9dd5 100644
  		if (doUpdate)
  			update();
  		else
-@@ -2092,6 +2774,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
+@@ -2092,6 +2777,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
  // spells
  
  int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {

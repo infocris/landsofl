@@ -1131,7 +1131,8 @@
 
   async function update() {
     const r = await mem.read([[ADDR.block, 2], [ADDR.dir, 2], [ADDR.grid, 1024 * ADDR.stride],
-      [MON.x0 - 2, MON.size * MON.count], [ADDR.sceneFlag, 1], [ITEMS.base, ITEMS.size * INV.maxItems]]);
+      [MON.x0 - 2, MON.size * MON.count], [ADDR.sceneFlag, 1], [ITEMS.base, ITEMS.size * INV.maxItems],
+      ...(ENGINE_SPRITES ? [[CUR_LEVEL, 1]] : [])]);
     if (!r) { titleEl.textContent = "Mini-carte"; infoEl.textContent = "en attente du jeu…"; return; }
     const block = r[0][0] | r[0][1] << 8, dir = r[1][0] | r[1][1] << 8;
     const hash = readGrid(r[2]);
@@ -1151,7 +1152,12 @@
     const inScene = r[4][0] === 1;
     const liveItems = readLiveItems(r[2], r[5]);
     const now = performance.now();
-    if (hash !== lastHash && now - lastIdentify > 500) {
+    // ScummVM publie le niveau en cours ; sous DOSBox, on le reconnaît à sa grille (identify)
+    const engineLevel = ENGINE_SPRITES && r[6] ? levels.find((q) => q.level === r[6][0]) : undefined;
+    if (engineLevel && engineLevel !== current) {
+      renderItemList(engineLevel); engineLevel.spriteOf = null;
+      current = engineLevel; lastHash = hash; lastIdentify = now;
+    } else if (!engineLevel && hash !== lastHash && now - lastIdentify > 500) {
       const found = identify();
       if (found !== current) { renderItemList(found); if (found) found.spriteOf = null; }
       current = found; lastHash = hash; lastIdentify = now;
@@ -1210,6 +1216,7 @@
   // sprites chargé dans son emplacement (zone 0x7F000000, 13 octets par type ; tools/scummvm_web.py).
   // Choix exact, relu à chaque mise à jour (un script peut recharger un emplacement en cours de niveau).
   const ENGINE_SPRITES = window.LOL_ENGINE === "scummvm", SPRITE_NAMES = 0x7F000000;
+  const CUR_LEVEL = 0x7F000A00;   // u8 publié par le moteur : niveau en cours
   async function resolveEngineSprites(L) {
     if (resolving) return;
     resolving = true;

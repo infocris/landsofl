@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261123h";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261123j";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -1289,20 +1289,26 @@
   });
 
   // Mode intégré : position du groupe envoyée par la page du jeu (case entière + direction).
-  let loadingLevel = null;
+  // Une position reçue pendant le chargement d'un niveau n'est pas perdue : la dernière est
+  // appliquée à la fin du chargement (la page ne renvoie une position que si elle change).
+  let loadingLevel = null, pendingPos = null;
   addEventListener("message", async (e) => {
     if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-pos") return;
-    const { level, x, y, dir } = e.data;
+    let { level, x, y, dir } = e.data;
     let freshLevel = false;
+    if (loadingLevel !== null) { pendingPos = e.data; return; }
     if (!L || L.level !== level) {
       freshLevel = true;
-      if (loadingLevel === level) return;
-      loadingLevel = level;
+      loadingLevel = level; pendingPos = null;
       try { await loadLevel(level, false); applyLiveGrid(); } finally { loadingLevel = null; }
+      if (pendingPos) {
+        ({ level, x, y, dir } = pendingPos); pendingPos = null;
+        if (L.level !== level) { window.postMessage({ type: "lol-pos", level, x, y, dir }, location.origin); return; }
+      }
     }
     const tx = x + 0.5, ty = y + 0.5, ta = DIR_ANGLE[dir & 3];
     const same = Math.abs(tx - (anim ? anim.x1 : player.x)) < 1e-6 && Math.abs(ty - (anim ? anim.y1 : player.y)) < 1e-6 && ta === gameA;
-    if (same) return;
+    if (same && !freshLevel) return;          // niveau rechargé : loadLevel a remis sa case de départ
     let da = ta - (player.a - lookYaw);                 // plus court chemin angulaire
     da = Math.atan2(Math.sin(da), Math.cos(da));
     const step = Math.hypot(tx - player.x, ty - player.y);
