@@ -1278,8 +1278,11 @@ The meaning of the functions, however, can be read directly. Comparison with our
 - **Configurable keys** (2026-11-23, `web/public/keys.js`). A « Touches… » window on the page
   binds one key per action: move, turn, sidestep, attack 1–3, plus the page shortcuts (big map, inventory,
   switch, panel, 3D view; F8 ZQSD toggle under DOSBox). Keys are physical positions (`event.code`)
-  shown with the user's layout (Chrome's `navigator.keyboard.getLayoutMap`, AZERTY fallback). A
-  key already in use is swapped with the action that had it. Settings live in `localStorage`
+  shown with the user's layout (Chrome's `navigator.keyboard.getLayoutMap`, AZERTY fallback). An
+  action can be left without a key (✕ button, stored as `""`). A key already in use is taken from
+  the action that had it, which is left without a key (it was swapped until 2026-11-23: the user
+  wanted E for the switch and no key for sidestep right). Space also skips the game's dialogues,
+  hence the need to move the switch elsewhere. Settings live in `localStorage`
   (`lol-keys`), one set per version since DOSBox and ScummVM are served on two ports.
   - **ScummVM**: `scummvm.ini` now binds only the fixed keys (arrows, Home, Page Up, F1–F3), and
     the launcher's merge replaces the old letter bindings. The page listens in the game frame
@@ -2289,3 +2292,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: 3D view: Q / D sidestep while the mouse button is held (§ 9.3a); Space operates the switch in front of the party (§ 9.6).
 - **2026-11-23**: configurable keyboard keys (« Touches… » window), translated by the page into the game's fixed keys (§ 10a).
 - **2026-11-23**: saves dialog usable before the game starts: list read from IndexedDB, loading through `save_slot` at launch (§ 10a).
+- **2026-11-23**: keys window: actions can be left without a key; a key taken from another action leaves it unbound (§ 10a). Verified: switch on E, sidestep right unbound, Space no longer opens the door, E does.

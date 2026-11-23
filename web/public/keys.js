@@ -49,11 +49,10 @@
     try { localStorage.setItem(STORE, JSON.stringify(custom)); } catch (e) {}
     for (const f of listeners) try { f(); } catch (e) {}
   }
-  // une touche déjà prise passe à l'action qui l'avait (échange)
+  // une touche déjà prise est retirée à l'action qui l'avait, qui reste sans touche ("")
   function assign(id, code) {
-    const prev = codeOf(id);
     const other = code && ACTIONS.find((a) => a.id !== id && codeOf(a.id) === code);
-    if (other) custom[other.id] = prev;
+    if (other) custom[other.id] = "";
     custom[id] = code;
     for (const a of ACTIONS) if (custom[a.id] === a.def) delete custom[a.id];
     save();
@@ -144,7 +143,11 @@
   #keys-dlg .kx { font-size: 18px; background: none; border: 0; color: #a39578; cursor: pointer; padding: 0 4px; }
   #keys-dlg .kb { overflow: auto; padding: 6px 16px 10px; }
   #keys-dlg h3 { margin: 12px 0 4px; font-size: 13px; color: #a39578; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-  #keys-dlg .kr { display: grid; grid-template-columns: 1fr 100px 120px; align-items: center; gap: 8px; padding: 3px 0; }
+  #keys-dlg .kr { display: grid; grid-template-columns: 1fr 100px 26px 112px; align-items: center; gap: 6px; padding: 3px 0; }
+  #keys-dlg .kr button.kc { padding: 2px 0; background: none; border-color: transparent; color: #8a7f68; }
+  #keys-dlg .kr button.kc:hover { color: #fff; border-color: #555; }
+  #keys-dlg .kr button.kc:disabled { visibility: hidden; }
+  #keys-dlg .kr button.none { color: #8a7f68; }
   #keys-dlg .kr button { font: 13px system-ui, sans-serif; padding: 4px 8px; border: 1px solid #555; border-radius: 5px;
     background: #1b1610; color: #fff; cursor: pointer; min-height: 26px; }
   #keys-dlg .kr button:hover { border-color: #c9a227; }
@@ -162,8 +165,8 @@
     const dlg = document.createElement("dialog");
     dlg.id = "keys-dlg"; dlg.setAttribute("aria-label", "Touches du clavier");
     dlg.innerHTML = `<div class="kh"><h2>Touches du clavier</h2><button type="button" class="kx" title="Fermer (Échap)">✕</button></div>
-      <div class="kn">Cliquer une touche puis appuyer sur la nouvelle. Suppr : aucune touche ; Échap : annuler.
-      Une touche déjà prise est échangée avec l'action qui l'avait.</div>
+      <div class="kn">Cliquer une touche puis appuyer sur la nouvelle (Échap : annuler). ✕ : aucune touche.
+      Une touche déjà prise est retirée à l'action qui l'avait, qui reste sans touche.</div>
       <div class="kb"></div>
       <div class="kt"><span></span><button type="button" class="kreset">Touches par défaut</button></div>`;
     document.body.append(open, dlg);
@@ -177,17 +180,22 @@
           const row = document.createElement("div"); row.className = "kr";
           const l = document.createElement("span"); l.textContent = a.label;
           const b = document.createElement("button"); b.type = "button"; b.dataset.id = a.id;
-          b.textContent = waiting === a.id ? "appuyer…" : keyName(codeOf(a.id));
+          b.textContent = waiting === a.id ? "appuyer…" : codeOf(a.id) ? keyName(codeOf(a.id)) : "aucune";
           b.classList.toggle("wait", waiting === a.id); b.classList.toggle("changed", a.id in custom);
+          b.classList.toggle("none", !codeOf(a.id));
+          const x = document.createElement("button"); x.type = "button"; x.className = "kc"; x.dataset.clear = a.id;
+          x.textContent = "✕"; x.title = "Aucune touche pour cette action"; x.disabled = !codeOf(a.id);
           if (a.id in custom) b.title = "Par défaut : " + keyName(a.def);
           const f = document.createElement("span"); f.className = "kf";
           f.textContent = note && FIXED_LABEL[a.id] ? `${note} ${FIXED_LABEL[a.id]}` : "";
-          row.append(l, b, f); body.appendChild(row);
+          row.append(l, b, x, f); body.appendChild(row);
         }
       }
       status.textContent = SCUMM ? "Appliqué tout de suite, sauf dans le menu du jeu." : "Appliqué tout de suite.";
     }
     body.addEventListener("click", (e) => {
+      const x = e.target.closest("button[data-clear]");
+      if (x) { waiting = null; assign(x.dataset.clear, ""); render(); return; }
       const b = e.target.closest("button[data-id]");
       if (!b) return;
       waiting = waiting === b.dataset.id ? null : b.dataset.id; render();
