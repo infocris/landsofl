@@ -1662,8 +1662,11 @@ The meaning of the functions, however, can be read directly. Comparison with our
   hit-test, not behind a wall per the z-buffer) sends `lol-pickup`. **Command 24** (`pickup`, a =
   cell, b = item type) is allowed only on the party's cell or the cell ahead, without a wall
   between, as in `clickedScenePickupItem`. It finds the item in the cell's `drawObjects` chain,
-  removes it (`removeLevelItem`, cell script 0x100) and adds it to the bag
-  (`addItemToInventory`). If the bag is full, the item goes in hand.
+  removes it (`removeLevelItem`, cell script 0x100). Since 2026-11-23 (second request) it goes in
+  hand when the hand is free, as in the game, otherwise into the bag (`addItemToInventory`).
+  A right click in the 3D view with an item in hand puts it in the first free bag slot (move
+  100 → slot), so it stays in the inventory. Verified: aloe dropped, clicked → in hand (cursor);
+  right click → back in the bag, normal cursor.
 - **Verified** (Gladstone 13,17 facing north):
   - key 1 puts an aloe in hand, and the 3D view shows it as cursor;
   - a floor click drops it at 13.25,17.25, and a click on it puts it back in the bag;
@@ -2371,3 +2374,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: floating party portraits (FACEnn.SHP, frame chosen like gui_drawCharFaceShape) (§ 10a).
 - **2026-11-23**: action bar (keys 1–9, items used by engine command 21, attacks) and stacks view of the bag (§ 10a).
 - **2026-11-23**: spells and attacks dragged into the action bar; bar items taken in hand (throw / drop / use like the original, engine commands 22–23); floor items picked up by clicking them in the 3D view (command 24) (§ 10a).
+- **2026-11-23**: picking up from the 3D view puts the item in hand; right click puts the held item in the bag (§ 10a).

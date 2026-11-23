@@ -1561,7 +1561,15 @@
     lastHandSent = icon;
     frame3d.contentWindow.postMessage({ type: "lol-hand", icon }, location.origin);
   }
-  // clic sur un objet au sol dans la vue 3D : ramassé dans le sac (commande « pickup », op 24)
+  // clic droit dans la vue 3D avec un objet en main : rangé dans la première case libre du sac
+  addEventListener("message", async (e) => {
+    if (e.origin !== location.origin || !e.data || e.data.type !== "lol-handstore" || window.LOL_ENGINE !== "scummvm") return;
+    const free = lastInvData ? lastInvData.barTypes.indexOf(-1) : -1;
+    if (free < 0) { console.info("Ranger : le sac est plein."); return; }
+    await mem.cmd({ op: "move", a: LOC_HAND, b: free }, 4000);
+    lastInv = ""; setTimeout(() => updateInventory().catch(() => {}), 150);
+  });
+  // clic sur un objet au sol dans la vue 3D : pris en main (sac si la main est occupée ; « pickup », op 24)
   const PICK_ERR = { 1: "Trop loin : seulement sur la case du groupe ou celle de devant.", 2: "Un mur est devant.", 3: "L'objet n'est plus là.", 11: "Pas pendant un dialogue." };
   addEventListener("message", async (e) => {
     if (e.origin !== location.origin || !e.data || e.data.type !== "lol-pickup" || window.LOL_ENGINE !== "scummvm") return;

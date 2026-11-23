@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261123p";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261123q";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -1210,6 +1210,12 @@
       player.a = gameA + lookYaw;
       dirty = true;
     });
+    // clic droit, objet en main : rangé dans le sac (il reste dans l'inventaire)
+    view.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      if (handCursor) parent.postMessage({ type: "lol-handstore" }, location.origin);
+      giveKeysToGame();
+    });
     // Objet en main (message « lol-hand » de la page) : il sert de curseur dans la vue. Clic sur le
     // sol de la case du groupe : posé à gauche / à droite (mode 1 / 2) ; sur le sol de la case de
     // devant : mode 3 / 4 ; plus haut : lancé devant le groupe (mode 0), sur un monstre s'il y en a un
@@ -1356,7 +1362,7 @@
         handCursor = `url(${c.toDataURL()}) 20 20, auto`;
       }
       if (!looking) view.style.cursor = baseCursor();
-      view.title = handCursor ? "Objet en main : clic sur le sol pour le poser, plus haut pour le lancer ; glisser pour regarder autour"
+      view.title = handCursor ? "Objet en main : clic sur le sol pour le poser, plus haut pour le lancer, clic droit pour le ranger dans le sac ; glisser pour regarder autour"
         : "Maintenir le clic gauche et glisser pour regarder autour";
     };
     if (handIcons.complete && handIcons.naturalWidth) apply(); else handIcons.onload = apply;
