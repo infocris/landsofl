@@ -1641,6 +1641,12 @@ The meaning of the functions, however, can be read directly. Comparison with our
     slots can be dragged onto each other to swap them, and dropping one outside the bar clears it.
     Verified: Étincelle level 1 → slot 3, attack → slot 4, 3 ↔ 5, slot 4 dropped outside → empty;
     key 5 casts Étincelle (magic 6 → 1).
+- **Unavailable actions greyed out** (2026-11-23). `clickedAttackButton` refuses an attack while
+  the character's flags & 0x314C (0x4: weapon recovering after a hit; 0x8: unconscious…). The bar
+  reads the party records every 200 ms. An attack slot is greyed while those flags are set or
+  life is 0. A spell slot is greyed in the same cases, and also when the caster lacks the magic,
+  or the life, the level costs (costs from the published spell table). Verified: after Michael's
+  attack, flags 0x5 for about 2.7 s, slot greyed, then flags 0x1 and the slot active again.
 - **Item in hand, as in the original** (2026-11-23).
   - **The game's mouse actions** with an item in hand:
     - a click high in the view throws it ahead (`clickedSceneThrowItem` → `launchObject`, which
@@ -2375,3 +2381,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: action bar (keys 1–9, items used by engine command 21, attacks) and stacks view of the bag (§ 10a).
 - **2026-11-23**: spells and attacks dragged into the action bar; bar items taken in hand (throw / drop / use like the original, engine commands 22–23); floor items picked up by clicking them in the 3D view (command 24) (§ 10a).
 - **2026-11-23**: picking up from the 3D view puts the item in hand; right click puts the held item in the bag (§ 10a).
+- **2026-11-23**: action bar greys out attacks while the character cannot strike (flags & 0x314C) and spells the caster cannot afford (§ 10a).

@@ -1711,7 +1711,7 @@
   const spTargetL = document.getElementById("sp-target-l"), spMsg = document.getElementById("sp-msg");
   const CP850 = "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜø£Ø×ƒáíóúñÑªº¿®¬½¼¡«»";
   const cp850 = (bytes) => Array.from(bytes, (b) => b < 128 ? String.fromCharCode(b) : CP850[b - 128] || "?").join("");
-  let spellKey = "", spellParty = [];
+  let spellKey = "", spellParty = [], knownSpells = [];
   const SPELL_ERR = { 1: "Impossible maintenant : personnage occupé ou inconscient, menu de magie ouvert, ou sort inconnu.",
     4: "Pas assez de magie (ou de vie) pour ce niveau.", 5: "Le sort ne peut pas partir d'ici (mur juste devant ?)." };
   function fillSelect(sel, party, keep) {
@@ -1751,6 +1751,7 @@
     }
     spellParty = party;
     spTargetL.hidden = !spells.some((s) => s.type === HEAL);
+    knownSpells = spells;
     renderSpells(spells);
     renderAutoCfg(spells, party);
     renderLearn(missing);
@@ -2519,7 +2520,7 @@
     .ab.full { border-color: #6d5a3a; background-image: url("viewer/data/item_icons.png"); background-size: 640px auto; background-repeat: no-repeat; }
     .ab:hover { border-color: #c9a227; }
     .ab.drop { outline: 2px dashed #28dce6; outline-offset: -1px; }
-    .ab.empty-stack { filter: grayscale(1) brightness(.5); }
+    .ab.empty-stack, .ab.busy { filter: grayscale(1) brightness(.45); }
     .ab.flash { box-shadow: 0 0 0 2px #c9a227 inset; }
     .ab.fail { box-shadow: 0 0 0 2px #e0442a inset; }
     .ab .k { position: absolute; left: 2px; top: 1px; color: #c9a227; font-weight: 700; text-shadow: 0 0 2px #000; }
@@ -2631,8 +2632,41 @@
       const keep = el.querySelectorAll(".ab").length;
       el.replaceChildren(grip, ...bar.map((_, i) => { const d = slotEl(i, false); wire(d, i); return d; }));
       if (invAbar) invAbar.replaceChildren(...bar.map((_, i) => { const d = slotEl(i, true); wire(d, i); return d; }));
+      if (typeof applyReady === "function") applyReady();
       if (!keep) place();
     }
+    // Disponibilité (toutes les 200 ms) : attaque grisée tant que le personnage ne peut pas frapper
+    // (drapeaux & 0x314C, comme clickedAttackButton : arme qui se recharge, inconscient…) ; sort
+    // grisé si le lanceur ne peut pas le lancer (même drapeaux, magie ou vie insuffisante pour ce niveau).
+    let ready = new Map();                              // personnage -> { flags, hp, mp }
+    function applyReady() {
+      for (const d of document.querySelectorAll("#action-bar .ab, #inv-abar .ab")) {
+        const a = bar[+d.dataset.i], c = a && (a.k === "atk" || a.k === "spell") ? ready.get(a.c) : null;
+        let busy = false;
+        if (a && (a.k === "atk" || a.k === "spell")) busy = !c || !!(c.flags & 0x314C) || c.hp <= 0;
+        if (!busy && a && a.k === "spell" && c) {
+          const sp = knownSpells.find((q) => q.type === a.s);
+          busy = !sp || sp.mp[a.l] > c.mp || sp.hp[a.l] >= c.hp;
+        }
+        d.classList.toggle("busy", busy);
+      }
+    }
+    let polling = false;
+    setInterval(async () => {
+      if (polling || el.hidden || previewing || !bar.some((a) => a && a.k !== "item")) return;
+      polling = true;
+      try {
+        const r = await mem.read([PARTY_RANGE()]);
+        if (!r) return;
+        const m = new Map();
+        for (const c of partyChars(r[0])) {
+          const u16 = (k) => c.at(k) | c.at(k + 1) << 8, s16 = (k) => (u16(k) << 16) >> 16;
+          const o = c.slot * INV.charSize;
+          m.set(c.slot, { flags: r[0][o] | r[0][o + 1] << 8, hp: s16(55), mp: s16(59) });
+        }
+        ready = m; applyReady();
+      } finally { polling = false; }
+    }, 200);
     window.lolActionBarRefresh = refresh;
     window.lolActionBar = { get: () => bar.slice(), set: (i, a) => { bar[i] = a; saveBar(); } };   // débogage
     function typeAtLoc(loc) {
