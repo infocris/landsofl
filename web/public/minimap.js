@@ -1310,7 +1310,21 @@
   let lastItemsSent = "";
   function sendItemsTo3d(L, items) {
     if (!items || !frame3d || !frame3d.contentWindow) return;
-    const list = items.filter((i) => !i.container).map((i) => ({ x: i.x + (i.xOffs || 0) / 256, y: i.y + (i.yOffs || 0) / 256, type: i.type, h: i.h || 0, id: i.id }));
+    // objets d'une niche : dans la case du mur, contre la face tournée vers le groupe (décalage 0x00 ou
+    // 0xFF), hauteur 8 (clickedNiche) ; montrés un peu en avant de la face pour ne pas être cachés par le mur
+    const nudge = (o) => (o >= 0xF0 ? o + 24 : o <= 0x10 ? o - 24 : o);
+    // coffre ou niche à volets (manoir de Roland) : objets montrés quand la face contre laquelle ils
+    // sont posés est ouverte (état 1 ouvert, 2 ouvert vide, 3 cassé ; 0 fermé)
+    const faceOf = (i) => { const xo = i.xOffs || 0, yo = i.yOffs || 0; return yo <= 0x10 ? 0 : xo >= 0xF0 ? 1 : yo >= 0xF0 ? 2 : xo <= 0x10 ? 3 : -1; };
+    const openChest = (i) => { const f = faceOf(i), st = f >= 0 ? chestState(L, i.y * 32 + i.x, f) : -1; return st >= 0 && st % 4 !== 0; };
+    // niche : seulement si la face est (devenue) une niche, type spécial 6 ; fermée, c'est un mur plein
+    // (manoir de Roland : la face 4,8 nord passe du type 1 au type 64 quand un script l'ouvre)
+    const openNiche = (i) => { const f = faceOf(i), t = f >= 0 ? L.wallTypes[live[(i.y * 32 + i.x) * 4 + f]] : null; return !!t && t[1] === 6; };
+    const list = items.filter((i) => !i.container || (i.container === "wall" && i.h > 1 && openNiche(i)) || (i.container === "chest" && openChest(i))).map((i) => {
+      const niche = !!i.container;
+      const xo = niche ? nudge(i.xOffs || 0) : i.xOffs || 0, yo = niche ? nudge(i.yOffs || 0) : i.yOffs || 0;
+      return { x: i.x + xo / 256, y: i.y + yo / 256, type: i.type, h: i.h || 0, id: i.id };
+    });
     const key = L.level + JSON.stringify(list);
     if (key === lastItemsSent) return;
     lastItemsSent = key;
