@@ -231,7 +231,8 @@
 
   // Objets réellement présents (§ 12.2) : octets 4-5 d'une case de la grille vivante = premier
   // objet posé (n° d'entrée, 0x8000 = monstre), chaîné par le champ « suivant » (+0) de l'entrée.
-  // Entrée de 16 octets : +0 suivant, +5 case, +7 x, +9 y (case*256 + décalage), +12 type.
+  // Entrée de 16 octets : +0 suivant, +4 hauteur de vol (objet lancé : 12, puis 0 à l'arrivée),
+  // +5 case, +7 x, +9 y (case*256 + décalage), +12 type.
   const ITEMS = { base: INV.items - 12, size: 16 };
   function readLiveItems(grid, table) {
     if (!itemInfo) return null;
@@ -245,7 +246,7 @@
           const wall = cellClass(current, c) === "wall" || cellClass(current, c) === "special";
           const chest = [0, 1, 2, 3].some((f) => chestState(current, c, f) >= 0);
           out.push({ x: c % 32, y: c >> 5, type, name: itemInfo[type].name,
-            xOffs: table[o + 7], yOffs: table[o + 9], container: chest ? "chest" : wall ? "wall" : undefined });
+            xOffs: table[o + 7], yOffs: table[o + 9], h: table[o + 4], id, container: chest ? "chest" : wall ? "wall" : undefined });
         }
         id = w(o);
       }
@@ -1309,7 +1310,7 @@
   let lastItemsSent = "";
   function sendItemsTo3d(L, items) {
     if (!items || !frame3d || !frame3d.contentWindow) return;
-    const list = items.filter((i) => !i.container).map((i) => ({ x: i.x + (i.xOffs || 0) / 256, y: i.y + (i.yOffs || 0) / 256, type: i.type }));
+    const list = items.filter((i) => !i.container).map((i) => ({ x: i.x + (i.xOffs || 0) / 256, y: i.y + (i.yOffs || 0) / 256, type: i.type, h: i.h || 0, id: i.id }));
     const key = L.level + JSON.stringify(list);
     if (key === lastItemsSent) return;
     lastItemsSent = key;

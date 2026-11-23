@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261123r";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261123t";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -939,6 +939,7 @@
   function animating() {
     const now = performance.now();
     for (const t of monTrack.values()) if (now < t.until) return true;
+    for (const a of itemMoves.values()) if (a.t0 && now - a.t0 < ITEM_MOVE_MS) return true;
     return false;
   }
   function spriteFrame(ids, pose, m) {
@@ -1378,11 +1379,32 @@
 
   // Mode intégré : objets posés au sol (images du jeu : item_floor.png, tools/export_viewer.py)
   let liveItems = [];
+  window.lolLiveItems = () => liveItems;   // débogage
   addEventListener("message", (e) => {
     if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-items") return;
-    liveItems = e.data.list.map((i) => ({ ...i, level: e.data.level }));
+    // un objet dont la position change (lancé, puis retombé) glisse de l'ancienne à la nouvelle en
+    // ITEM_MOVE_MS, hauteur comprise : la page ne relit la mémoire que toutes les 200 ms
+    const now = performance.now(), seen = new Set();
+    liveItems = e.data.list.map((i) => {
+      const it = { ...i, level: e.data.level };
+      if (it.id) {
+        seen.add(it.id);
+        const a = itemMoves.get(it.id);
+        if (a && (a.x1 !== it.x || a.y1 !== it.y || a.h1 !== it.h) && a.level === it.level) {
+          const p = itemPos(a, now);
+          itemMoves.set(it.id, { x0: p.x, y0: p.y, h0: p.h, x1: it.x, y1: it.y, h1: it.h, t0: now, level: it.level });
+        } else if (!a || a.level !== it.level) itemMoves.set(it.id, { x0: it.x, y0: it.y, h0: it.h, x1: it.x, y1: it.y, h1: it.h, t0: 0, level: it.level });
+      }
+      return it;
+    });
+    for (const id of [...itemMoves.keys()]) if (!seen.has(id)) itemMoves.delete(id);
     dirty = true;
   });
+  const ITEM_MOVE_MS = 200, itemMoves = new Map();
+  function itemPos(a, now) {
+    const k = a.t0 ? Math.min(1, (now - a.t0) / ITEM_MOVE_MS) : 1;
+    return { x: a.x0 + (a.x1 - a.x0) * k, y: a.y0 + (a.y1 - a.y0) * k, h: a.h0 + (a.h1 - a.h0) * k, moving: k < 1 };
+  }
   const FLOOR = { rects: null, types: null, imgs: null, blood: null };
   // giclée d'un coup reçu, dessinée au centre du monstre décalé de hitOffsX/Y (drawMonster) ;
   // plus le coup est fort, moins elle est réduite (m.blood = 1 à 4)
@@ -1431,7 +1453,10 @@
     for (const it of liveItems) {
       if (it.level !== L.level) continue;
       const k = FLOOR.types[it.type], rect = k >= 0 ? FLOOR.rects[k] : null;
-      if (rect) out.push({ x: it.x, y: it.y, rect, dy: ITEM_DY, dz: 0, item: it });
+      // objet en vol (lancé) : relevé de (hauteur − 1) × 6 pixels, comme drawBlockObjects ; pas ramassable
+      const a = it.id ? itemMoves.get(it.id) : null, p = a ? itemPos(a, performance.now()) : { x: it.x, y: it.y, h: it.h || 0 };
+      const fly = p.h > 1 ? (p.h - 1) * 6 : 0;
+      if (rect) out.push({ x: p.x, y: p.y, rect, dy: ITEM_DY - fly, dz: 0, item: fly || p.moving ? null : it });
     }
     return out;
   }
