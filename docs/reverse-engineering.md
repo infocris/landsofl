@@ -956,6 +956,20 @@ structure. CIMMERIA's ceiling is black.
   coming from the far end of the view: north face 1.0, east/west 0.72, south 0.42. The
   shading is left-right symmetric, so it survives the mirror applied every other cell, and
   the texture turns with the gaze like the folded one. TOWER1 and URBISH keep the fold.
+- **Gladstone beams (KEEP, level 1, 2026-11-24)**: the isometric coffer is replaced by a
+  redraw of the original ceiling. The painted ceiling (rows 0–33) shows beige beams on the
+  cell edges. The near crossbeam (rows 0–3) has a flat light underside with a thin inner
+  frame and chamfered ends. A **beaded moulding** (a row of dots, rows 24–25 on the far
+  beams) runs along the edges, and a thin dark line follows the longitudinal beams. A very
+  dark recess sits between the beams. One ramp of 9 tones, (16,12,8) to (195,158,125).
+  `keep_ceiling_cell` redraws one cell in pixel art with these tones only:
+  - beam underside, 0.11 cell on each side of the edge;
+  - from the arris: beads one pixel in three, a light fillet, then a thin frame 5 px in;
+  - side face, 0.06 cell, mitred at 45°, lit by orientation and darker towards the recess;
+  - a 1 px shadow line;
+  - the dark recess with a faint grain.
+  The isometric coffer (`iso_ceiling_cell`) stays in the code, but no tileset uses it any
+  more (`CEIL_ISO` is empty).
 - **Manor beams (MANOR, level 4, 2026-11-23)**: Roland's manor first used the isometric coffer,
   with the recess capped at 0.45 of the mid tone (`CEIL_ISO_DARK`, still in the code). It is now
   redrawn from its own background. The painted ceiling (rows 0–33) shows **squared beams**
@@ -2529,6 +2543,7 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: Roland's manor ceiling (MANOR) redrawn from the original background in pixel art: squared beams with a light underside and angled side faces, recessed olive plank panels (§ 9.3f).
 - **2026-11-23**: Roland's manor floor (MANOR) redrawn in pixel art: irregular flagstones from a periodic Voronoi diagram, 12-colour ramp of the painted floor, texture over 2 × 2 cells (`floorSpan`) (§ 9.3c).
 - **2026-11-24**: cave floor and ceiling (CAVE1, levels 5–9 and 25) redrawn in pixel art on a periodic Voronoi diagram: domed rock blocks with moss in the joints, ceiling bumps under moss and roots; moss/rock split by saturation, so level 25's palette works too; `ceilSpan` in the 3D view (§ 9.3c).
+- **2026-11-24**: Gladstone's ceiling (KEEP) redrawn from the original background in pixel art: framed beige beams with a beaded moulding, angled faces, shadow line, dark recess; the isometric coffer is no longer used (§ 9.3f).
 - **2026-11-23**: mine ceiling (MINE1, levels 13–16) redrawn from the original background in pixel art: round logs on the cell edges, lagging boards, rock where boards are missing (§ 9.3f).
 - **2026-11-22**: switches in the 3D view: door buttons attached by the level script (`assignLevelDecorationShape` + `resetBlockShapeAssignment`) now drawn; walls' switch type and clickable area exported; engine command op 20 (`clickwall`) clicks the wall in front like the game (`clickedWall`); the 3D view outlines the switch in front and clicks it; engine files versioned in URLs and served `no-cache` (§ 9.6).
 - **2026-11-22**: doors of the script-opened series (walls 8–12, 18–22: shape 0, e.g. Gladstone's locked library door) now drawn closed with their leaf; they looked open in the 3D view (§ 9.6).

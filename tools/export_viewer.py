@@ -480,7 +480,7 @@ def ceiling_cell(bg, tsname):
 # son orientation, la lumière venant du fond de la vue : la face côté nord (tournée vers le
 # joueur) est claire, la face sud sombre, les faces est/ouest intermédiaires. L'éclairage est
 # symétrique gauche-droite, donc compatible avec le miroir une case sur deux de la vue 3D.
-CEIL_ISO = {"KEEP"}
+CEIL_ISO = set()                 # plus utilisé : chaque plafond est redessiné d'après son fond
 CEIL_ISO_STEPS = (               # (largeur en fraction de case, nature) depuis le bord
     (0.09, "beam"),              # dessous de la poutre (demi-poutre de chaque côté du bord)
     (0.13, "bevel"),             # premier gradin : face oblique de la poutre
@@ -728,6 +728,71 @@ def manor_ceiling_cell(bg, size=CEIL_TEX):
                     if j in (4, 5) and h(22, k, x // 4) < 0.03:
                         t = 0.3                       # nœud
                     c = pick(olive, t)
+            img.put(x, y, bytes(c))
+    return img
+
+
+# Plafond de Gladstone d'après le fond d'origine (docs/reverse-engineering.md § 9.3f) : poutres
+# beiges sur les bords des cases, dessous plat et clair orné d'un cadre fin, moulure perlée le
+# long de l'arête, faces vues en biais (onglets à 45°, éclairées selon leur orientation), ligne
+# d'ombre, puis le retrait très sombre. Pixel art : la rampe de 9 teintes du plafond peint.
+CEIL_KEEP = {"KEEP"}
+KEEP_BEAM = 0.11                 # demi-largeur du dessous de poutre (fraction de case)
+KEEP_FACE = 0.06                 # largeur de la face vue en biais
+
+
+def ceiling_ramp(bg, rows=34):
+    """Rampe du plafond peint (lignes 0 à rows), du plus sombre au plus clair, noir exclu."""
+    from collections import Counter
+    cnt = Counter(tuple(bg.px[(y * bg.w + x) * 4:(y * bg.w + x) * 4 + 3])
+                  for y in range(rows) for x in range(bg.w))
+    return sorted((c for c, n in cnt.items() if n > 10 and sum(c) > 0), key=sum)
+
+
+def keep_ceiling_cell(bg, size=CEIL_TEX):
+    """Plafond à poutres moulurées de Gladstone (size × size, rangée 0 = nord)."""
+    ramp = ceiling_ramp(bg)
+    if len(ramp) < 7:
+        return None
+    top = len(ramp) - 1
+    def h(*a):
+        x = 0x9B05688C
+        for v in a:
+            x = ((x ^ (v & 0xFFFFFFFF)) * 0x85EBCA6B) & 0xFFFFFFFF
+            x ^= x >> 13
+        return x / 2 ** 32
+    b0 = KEEP_BEAM * size
+    b1 = b0 + KEEP_FACE * size
+    face_idx = {0: top - 2, 1: top - 3, 3: top - 3, 2: top - 4}   # N, E, S, O
+    img = Image(size, size)
+    for y in range(size):
+        for x in range(size):
+            d = (y + 0.5, size - x - 0.5, size - y - 0.5, x + 0.5)   # N, E, S, O
+            m = min(d)
+            side = d.index(m)
+            along = x if side in (0, 2) else y
+            if m < b0:
+                e = b0 - m                           # distance à l'arête de la poutre
+                if e < 1.5:
+                    # moulure perlée : un point clair tous les 3 px, creux sombre entre
+                    idx = top - 2 if along % 3 else top - 4
+                elif e < 2.5:
+                    idx = top                         # liseré clair au-dessus des perles
+                elif 4.5 <= e < 5.5:
+                    idx = top - 3                     # cadre fin, en retrait de l'arête
+                else:
+                    idx = top - (h(1, side & 1, along // 6, int(m) // 3) < 0.25)   # dessous, léger grain
+                c = ramp[idx]
+            elif m < b1:
+                # face vue en biais, assombrie vers le fond
+                f = (m - b0) / (b1 - b0)
+                idx = face_idx[side] - (f > 0.6)
+                c = ramp[idx]
+            elif m < b1 + 1:
+                c = ramp[0]                           # ligne d'ombre au pied de la face
+            else:
+                # retrait sombre, à peine veiné
+                c = ramp[1 + (h(2, x // 4, y) < 0.3)]
             img.put(x, y, bytes(c))
     return img
 
@@ -1685,6 +1750,8 @@ def main(game_dir, maps_dir, out_dir):
         ceil_img = ceiling_cell(bg, tsname)
         if tsname in CEIL_ISO:
             ceil_img = iso_ceiling_cell(ceil_img)
+        elif tsname in CEIL_KEEP:
+            ceil_img = keep_ceiling_cell(bg) or ceil_img
         elif tsname in CEIL_MINE:
             ceil_img = mine_ceiling_cell(bg) or ceil_img
         elif tsname in CEIL_MANOR:
