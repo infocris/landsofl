@@ -1344,6 +1344,18 @@ def main(game_dir, maps_dir, out_dir):
         for shift in (0, 63, 15, 74):
             blood.append(len(imgs))
             imgs.append(frame_image((w6, h6, [c + shift if c is not None and 2 <= c <= 7 else c for c in px6]), pal))
+        # flaque de sang (drapeau 0x80 de la case, LoLEngine::drawBlockEffects) : image 3 de ICE.SHP
+        # (GENERAL.PAK), toute en couleur 255 : le jeu y remplace le sol par _grayOverlay, soit
+        # (sol × 32/64 + rouge 16) en 6 bits = moitié du sol + moitié de (128, 0, 0). La vue 3D la
+        # dessine en (128, 0, 0) à 50 % d'opacité.
+        ice = lolgfx.shp_frames(read_pak(os.path.join(game_dir, "GENERAL.PAK"))["ICE.SHP"])
+        w3, h3, px3 = ice[3]
+        stain = Image(w3, h3)
+        for i, c in enumerate(px3):
+            if c is not None:
+                stain.put(i % w3, i // w3, (128, 0, 0))
+        blood_pool = len(imgs)
+        imgs.append(stain)
         sx, rects = 0, []
         for img in imgs:
             rects.append([sx, 0, img.w, img.h]); sx += img.w + 1
@@ -1352,7 +1364,7 @@ def main(game_dir, maps_dir, out_dir):
             floor_sheet.blit(img, r[0], 0)
         floor_sheet.save(os.path.join(out_dir, "item_floor.png"))
         with open(os.path.join(out_dir, "item_floor.json"), "w", encoding="utf-8") as fh:
-            json.dump({"rects": rects, "types": types, "blood": blood}, fh)
+            json.dump({"rects": rects, "types": types, "blood": blood, "bloodPool": blood_pool}, fh)
         print(f"objets au sol : {len(imgs)} images pour {len(types)} types")
 
         # emplacements d'équipement vides (LoLEngine::gui_drawCharInventoryItem, version CD) : image

@@ -910,6 +910,32 @@ floor item; the per-item jitter is ignored (the item number is not sent).
 - **Check**: ointment dropped at 13.25, 17.25 facing north (level 1): same place and size in
   both views, feet at the bottom edge.
 
+### 9.3i Blood pools on the floor — engine read (2026-11-23)
+
+**Engine.** When a monster dies (`killMonster`, `sprites_lol.cpp`), the game sets `flags |= 0x80`
+on its block. It does so only if the block's north face has no wall (`_wllVmpMap` and
+`_wllShapeMap` both 0), the block has no slime (0x40), and the monster type lacks property
+0x1000 (monsters that do not bleed). The block
+flags' high nibble holds floor effects (`drawBlockEffects`): 0x10 ice wall, 0x20 teleporter
+glow, 0x40 blue slime spot, 0x80 blood spot. Each is the frame (flag bit − 4) of `ICE.SHP`
+(`GENERAL.PAK`: 128×96, 77×63, 91×17, 56×8). Slime and blood are drawn before the block's
+objects, ice and teleporter after. The shape is placed like an object, at the block centre
+(0x80, 0x80), with no `fineY` shift, using the same depth tables (§ 9.3h).
+
+**Colours.** The blood frame is entirely colour 255 and drawn with `_grayOverlay` as
+background-fading table (draw flag 0x80, plot type 33): each covered floor pixel becomes the
+palette colour nearest to (floor × 32/64 + (16, 0, 0)) in 6-bit, i.e. half the floor plus half of
+(128, 0, 0) in 8-bit (`generateGrayOverlay(pal, ovl, 32, 16, 0, 0, 128)` in `loadLevel`).
+
+**Live data.** The flags are byte 9 of each 10-byte cell of the published grid (`0x3E713`, low
+byte of `flags`), in ScummVM as under DOSBox. The game page sends the cells with 0x80
+(`lol-blood` message). The 3D view draws `item_floor.png`'s `bloodPool` image (the 56×8 mask
+in (128, 0, 0)) at 50 % opacity, at the cell centre, just behind the cell's items.
+- **Check**: pools injected at 13,16 and 13,17 (level 1, facing north): drawn translucent at
+  one cell and under the party; the one at 13,15, behind the closed door, is hidden.
+- **Not done**: slime spots (0x40, drawn with the level's transparency tables) and the
+  ice and teleporter effects.
+
 ### 9.4 Decorations — `.DAT` — verified for the head-on view
 
 ```
@@ -2103,3 +2129,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: doors of the script-opened series (walls 8–12, 18–22: shape 0, e.g. Gladstone's locked library door) now drawn closed with their leaf; they looked open in the 3D view (§ 9.6).
 - **2026-11-23**: objects in the party's own cell (dropped in front of it) drawn as the engine does, full size at the bottom of the view (`_monsterScaleY`/`_monsterScaleX` tables); the 3D view projected them below the image (§ 9.3h).
 - **2026-11-23**: forest treetops in the 3D view generated pseudo-randomly per row of faces (trunk and crown heights from a smoothed noise, crown read across the whole background band); the skyline was flat and repeated every cell (§ 9.3d).
+- **2026-11-23**: blood pools (cell flag 0x80, `ICE.SHP` frame 3, floor halved plus red through `_grayOverlay`) read from the live grid and drawn in the 3D view (§ 9.3i).

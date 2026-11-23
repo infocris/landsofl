@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261123b";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261123c";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -452,7 +452,7 @@
         const dist = Math.max(0.05, it.d);
         if (it.sp) {
           const sp = it.sp;
-          if (sp.ghost) ctx.globalAlpha = 0.55;          // apparition sur événement
+          if (sp.ghost) ctx.globalAlpha = sp.ghost === true ? 0.55 : sp.ghost;   // apparition sur événement, flaque
           ctx.drawImage((sp.imgs || L.sprImgs)[shadeFor(dist)], sp.rx + Math.floor(it.u * sp.rw), sp.ry, 1, sp.rh,
             x, sp.top, 1, sp.sh);
           ctx.globalAlpha = 1;
@@ -647,10 +647,10 @@
       const z = dx * fx + dy * fy, lat = dx * rx + dy * ry;
       if (z < 0) continue;
       const [srx, sry, rw, rh] = it.rect, d = deff(z);
-      const near = z < 0.5 ? nearItem(z, lat, rw, rh, 0) : null;
+      const near = z < 0.5 ? nearItem(z, lat, rw, rh, 0, it.dy) : null;
       const scale = (WALL_H / 96) * proj / d, sw = near ? near.sw : rw * scale, sh = near ? near.sh : rh * scale;
-      const left = near ? near.left : W / 2 + lat * proj / d - sw / 2, top = near ? near.top : half + (WALL_H / 2) * proj / d - sh + ITEM_DY * scale;
-      sprites.push({ tz: z, rx: srx, ry: sry, rw, rh, sw, sh, left, top, mirror: false, imgs: FLOOR.imgs,
+      const left = near ? near.left : W / 2 + lat * proj / d - sw / 2, top = near ? near.top : half + (WALL_H / 2) * proj / d - sh + it.dy * scale;
+      sprites.push({ tz: z + it.dz, rx: srx, ry: sry, rw, rh, sw, sh, left, top, mirror: false, imgs: FLOOR.imgs, alpha: it.alpha,
         x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
     }
     for (const m of (EMBED ? liveMonsters.filter((q) => q.level === L.level) : [])) {
@@ -720,7 +720,9 @@
         const dist = Math.max(0.05, it.d);
         if (it.sp) {
           const sp = it.sp;
+          if (sp.alpha) ctx.globalAlpha = sp.alpha;
           ctx.drawImage((sp.imgs || L.sprImgs)[shadeFor(dist)], sp.rx + Math.floor(it.u * sp.rw), sp.ry, 1, sp.rh, x, sp.top, 1, sp.sh);
+          ctx.globalAlpha = 1;
         } else {
           const colH = WALL_H * proj / deff(dist), top = half - colH / 2;
           const tx = (it.tex % cols) * fw + Math.min(fw - 1, Math.floor(it.u * fw));
@@ -839,14 +841,14 @@
       if (tz < 0) continue;
       const [rx, ry, rw, rh] = it.rect;
       if (tz < 0.5) {                                   // case du groupe : règle du jeu (nearItem)
-        const t = Math.hypot(planeX, planeY), n = nearItem(tz, (dx * planeX + dy * planeY) / t, rw, rh, pitch);
-        out.push({ tz, rx, ry, rw, rh, ...n, mirror: false, imgs: FLOOR.imgs,
+        const t = Math.hypot(planeX, planeY), n = nearItem(tz, (dx * planeX + dy * planeY) / t, rw, rh, pitch, it.dy);
+        out.push({ tz: tz + it.dz, rx, ry, rw, rh, ...n, mirror: false, imgs: FLOOR.imgs, ghost: it.alpha,
           x0: Math.max(0, Math.floor(n.left)), x1: Math.min(W - 1, Math.ceil(n.left + n.sw)) });
         continue;
       }
       const scale = (WALL_H / 96) / tz * proj, sw = rw * scale, sh = rh * scale;
-      const left = W / 2 * (1 + tx / tz) - sw / 2, top = H / 2 + pitch + (WALL_H / 2) / tz * proj - sh + ITEM_DY * scale;
-      out.push({ tz, rx, ry, rw, rh, sw, sh, left, top, mirror: false, imgs: FLOOR.imgs,
+      const left = W / 2 * (1 + tx / tz) - sw / 2, top = H / 2 + pitch + (WALL_H / 2) / tz * proj - sh + it.dy * scale;
+      out.push({ tz: tz + it.dz, rx, ry, rw, rh, sw, sh, left, top, mirror: false, imgs: FLOOR.imgs, ghost: it.alpha,
         x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
     }
     const source = EMBED ? liveMonsters.filter((m) => m.level === L.level) : L.monsters;
@@ -1075,7 +1077,7 @@
       imgs: FLOOR.imgs, x0: Math.max(0, Math.floor(l)), x1: Math.min(W - 1, Math.ceil(l + bw)) };
   }
   Promise.all([fetch(`data/item_floor.json?v=${DATA_V}`).then((r) => r.json()), loadImage(`data/item_floor.png?v=${DATA_V}`)])
-    .then(([d, img]) => { FLOOR.rects = d.rects; FLOOR.types = d.types; FLOOR.blood = d.blood || null; FLOOR.imgs = darken(img, SHADES); dirty = true; }, () => {});
+    .then(([d, img]) => { FLOOR.rects = d.rects; FLOOR.types = d.types; FLOOR.blood = d.blood || null; FLOOR.bloodPool = d.bloodPool ?? -1; FLOOR.imgs = darken(img, SHADES); dirty = true; }, () => {});
   window.lolFloorItems = () => liveItems;   // débogage
   // Objet à moins d'une demi-case devant le groupe (sa propre case) : le jeu ne le projette
   // pas, il le dessine en taille réelle, pieds sur la ligne _monsterScaleY[z·8] (124, 120,
@@ -1085,19 +1087,31 @@
   // ITEM_DY : drawBlockObjects descend chaque objet de 5 px (à l'échelle), plus un petit écart
   // propre à son numéro (_sceneItemOffs) qu'on ignore.
   const NEAR_ROW = [124, 120, 116, 112], NEAR_LAT = [152, 152, 144, 136], ITEM_DY = 5;
-  function nearItem(z, lat, rw, rh, dy) {
+  function nearItem(z, lat, rw, rh, dy, itemDy = ITEM_DY) {
     const l = Math.max(0, Math.min(3, Math.floor(z * 8))), s = H / 120;
     const sw = rw * W / 176, sh = rh * s;
-    return { sw, sh, left: W / 2 + lat * NEAR_LAT[l] * W / 176 - sw / 2, top: H / 2 + dy + (NEAR_ROW[l] - 60 + ITEM_DY) * s - sh };
+    return { sw, sh, left: W / 2 + lat * NEAR_LAT[l] * W / 176 - sw / 2, top: H / 2 + dy + (NEAR_ROW[l] - 60 + itemDy) * s - sh };
   }
-  // objets visibles du niveau affiché -> [{ x, y, rect }]
+  // Flaques de sang (drapeau 0x80 de la case, LoLEngine::drawBlockEffects) : au centre de la
+  // case, sans décalage de 5 px, dessinées avant les objets de la case (dz), à 50 % : le jeu
+  // remplace le sol par sa moitié + du rouge (_grayOverlay, docs/reverse-engineering.md § 9.3i).
+  let liveBlood = { level: -1, cells: [] };
+  addEventListener("message", (e) => {
+    if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-blood") return;
+    liveBlood = { level: e.data.level, cells: e.data.cells };
+    dirty = true;
+  });
+  // objets visibles du niveau affiché -> [{ x, y, rect, dy, dz, alpha }]
   function floorItems() {
     if (!EMBED || !FLOOR.imgs || !L) return [];
     const out = [];
+    const pool = FLOOR.bloodPool >= 0 ? FLOOR.rects[FLOOR.bloodPool] : null;
+    if (pool && liveBlood.level === L.level)
+      for (const c of liveBlood.cells) out.push({ x: (c & 31) + 0.5, y: (c >> 5) + 0.5, rect: pool, dy: 0, dz: 0.001, alpha: 0.5 });
     for (const it of liveItems) {
       if (it.level !== L.level) continue;
       const k = FLOOR.types[it.type], rect = k >= 0 ? FLOOR.rects[k] : null;
-      if (rect) out.push({ x: it.x, y: it.y, rect });
+      if (rect) out.push({ x: it.x, y: it.y, rect, dy: ITEM_DY, dz: 0 });
     }
     return out;
   }

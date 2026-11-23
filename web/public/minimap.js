@@ -253,12 +253,16 @@
     return out;
   }
 
+  // Drapeaux de case (octet 9) : 0x80 = flaque de sang (LoLEngine::drawBlockEffects)
+  let liveBlood = [];
   function readGrid(bytes) {
     let hash = 0;
+    liveBlood = [];
     for (let i = 0; i < 1024; i++) {
       const a = i * ADDR.stride;
       for (let k = 0; k < 4; k++) { const v = bytes[a + k]; live[i * 4 + k] = v; hash = (hash * 31 + v) | 0; }
       gameSeen[i] = bytes[a + 9] & 7 ? 1 : 0;
+      if (bytes[a + 9] & 0x80) liveBlood.push(i);
     }
     return hash;
   }
@@ -1193,6 +1197,7 @@
     // noir « Lieu »). Version ScummVM : la page recopie l'image du jeu elle-même (tools/scummvm_web.py).
     sendSceneTo3d(inScene && !ENGINE_SPRITES ? current.scenes[block] || null : null, near ? near.text : "");
     sendGridTo3d(current.level, hash);
+    sendBloodTo3d(current.level);
     sendMonstersTo3d(current);
     sendItemsTo3d(current, liveItems);
     sendTo3d(current.level, x, y, dir);
@@ -1304,6 +1309,13 @@
     if (key === lastGridSent || !frame3d || !frame3d.contentWindow) return;
     lastGridSent = key;
     frame3d.contentWindow.postMessage({ type: "lol-grid", level, faces: live.slice() }, location.origin);
+  }
+  let lastBloodSent = "";
+  function sendBloodTo3d(level) {
+    const key = `${level}:${liveBlood.join(",")}`;
+    if (key === lastBloodSent || !frame3d || !frame3d.contentWindow) return;
+    lastBloodSent = key;
+    frame3d.contentWindow.postMessage({ type: "lol-blood", level, cells: liveBlood.slice() }, location.origin);
   }
 
   // Vue 3D sous le jeu : on ne lui envoie la position que lorsqu'elle change.
