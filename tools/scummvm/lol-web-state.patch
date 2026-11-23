@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..e8723df0 100644
+index 392e4c2d..368fa57d 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -32,6 +32,7 @@
@@ -21,7 +21,7 @@ index 392e4c2d..e8723df0 100644
  namespace Kyra {
  
  const char *const LoLEngine::kMouseKeymapName = "lolmouse";
-@@ -929,6 +934,756 @@ void LoLEngine::startupNew() {
+@@ -929,6 +934,772 @@ void LoLEngine::startupNew() {
  	_screen->showMouse();
  }
  
@@ -186,8 +186,9 @@ index 392e4c2d..e8723df0 100644
 +		u8(t < 0 ? 0xFF : t); u8(0);
 +		for (int l = 0; l < 4; l++) u16(t < 0 ? 0 : _spellProperties[t].mpRequired[l]);
 +		for (int l = 0; l < 4; l++) u16(t < 0 ? 0 : _spellProperties[t].hpRequired[l]);
-+		const char *n = t < 0 ? "" : getLangString(_spellProperties[t].spellNameCode);
-+		for (int k = 0; k < 30; k++) u8(n && k < (int)strlen(n) ? (uint8)n[k] : 0);
++		const Common::String ns = t < 0 ? Common::String() : webLangString(_spellProperties[t].spellNameCode);
++		const char *n = ns.c_str();
++		for (int k = 0; k < 30; k++) u8(k < (int)strlen(n) ? (uint8)n[k] : 0);
 +	}
 +	end();
 +	// points de vie maximum des 5 types de monstres du niveau (u16 ; type = champ +32 du monstre),
@@ -245,8 +246,9 @@ index 392e4c2d..e8723df0 100644
 +	for (int t = 0; t < 7; t++) {
 +		for (int l = 0; l < 4; l++) u16(_spellProperties ? _spellProperties[t].mpRequired[l] : 0);
 +		for (int l = 0; l < 4; l++) u16(_spellProperties ? _spellProperties[t].hpRequired[l] : 0);
-+		const char *n = _spellProperties ? getLangString(_spellProperties[t].spellNameCode) : "";
-+		for (int k = 0; k < 30; k++) u8(n && k < (int)strlen(n) ? (uint8)n[k] : 0);
++		const Common::String ns = _spellProperties ? webLangString(_spellProperties[t].spellNameCode) : Common::String();
++		const char *n = ns.c_str();
++		for (int k = 0; k < 30; k++) u8(k < (int)strlen(n) ? (uint8)n[k] : 0);
 +	}
 +	end();
 +	begin(0x7F000000);
@@ -337,6 +339,20 @@ index 392e4c2d..e8723df0 100644
 +		EM_ASM({ if (Module.lolCmdDone) Module.lolCmdDone($0, $1); }, id, res);
 +	}
 +#endif
++}
++
++// getLangString écrit dans l'un de 5 tampons tournants, que le jeu garde par pointeur (libellés des
++// boutons de dialogue Oui / Non…) : la publication lit le texte puis remet tampon et rotation en état
++// (sans cela, survoler « Non » pendant une vente affichait des noms de sorts sur les boutons)
++Common::String LoLEngine::webLangString(uint16 id) {
++	const int idx = _lastUsedStringBuffer;
++	char saved[sizeof(_stringBuffer[0])];
++	memcpy(saved, _stringBuffer[idx], sizeof(saved));
++	const char *str = getLangString(id);
++	const Common::String out(str ? str : "");
++	memcpy(_stringBuffer[idx], saved, sizeof(saved));
++	_lastUsedStringBuffer = idx;
++	return out;
 +}
 +
 +bool LoLEngine::webSlotUsable(int c, int k) const {
@@ -778,7 +794,7 @@ index 392e4c2d..e8723df0 100644
  void LoLEngine::runLoop() {
  	// Initialize debugger since how it should be fully usable
  	static_cast<Debugger_LoL *>(getDebugger())->initialize();
-@@ -957,6 +1712,7 @@ void LoLEngine::runLoop() {
+@@ -957,6 +1728,7 @@ void LoLEngine::runLoop() {
  		gui_updateInput();
  
  		update();
@@ -786,7 +802,7 @@ index 392e4c2d..e8723df0 100644
  
  		updatePlayTimer();
  
-@@ -1031,6 +1787,7 @@ void LoLEngine::readSettings() {
+@@ -1031,6 +1803,7 @@ void LoLEngine::readSettings() {
  }
  
  void LoLEngine::update() {
@@ -794,7 +810,7 @@ index 392e4c2d..e8723df0 100644
  	updateSequenceBackgroundAnimations();
  
  	if (_updateCharNum != -1 && _system->getMillis() > _updatePortraitNext)
-@@ -1178,6 +1935,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
+@@ -1178,6 +1951,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
  	return size;
  }
  
@@ -892,7 +908,7 @@ index 392e4c2d..e8723df0 100644
  bool LoLEngine::addCharacter(int id) {
  	const uint16 *cdf[] = {
  		_charDefsMan, _charDefsMan, _charDefsMan, _charDefsWoman,
-@@ -1477,6 +2325,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
+@@ -1477,6 +2341,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
  
  	int newVal = (mode == 2) ? (pointsMax + points) : (mode ? (pointsCur + points) : points);
  	newVal = CLIP(newVal, 0, pointsMax);
@@ -901,7 +917,7 @@ index 392e4c2d..e8723df0 100644
  
  	if (type) {
  		c->magicPointsCur = newVal;
-@@ -1969,6 +2819,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
+@@ -1969,6 +2835,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
  		}
  	}
  
@@ -909,16 +925,16 @@ index 392e4c2d..e8723df0 100644
  	if (!skipAnim && charId < 3) {
  		_updateCharNum = charId;
  		_portraitSpeechAnimMode = mode;
-@@ -1981,6 +2832,8 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
+@@ -1981,6 +2848,8 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
  	else if (paramList)
  		snd_playCharacterSpeech(paramList[2], ch, 0);
  
 +	if (!textEnabled())	// version web : voix seule, la réplique est publiée quand même
-+		webDialogue(_txt->webFormat(str, script, paramList, mode == 2 ? 3 : paramIndex));
++		webDialogue(_txt->webFormat(str, script, paramList, mode == 2 ? 3 : paramIndex).c_str());
  	if (textEnabled()) {
  		if (mode == 0) {
  			_txt->printDialogueText2(3, str, script, paramList, paramIndex);
-@@ -2074,6 +2927,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
+@@ -2074,6 +2943,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
  
  void LoLEngine::delay(uint32 millis, bool doUpdate, bool) {
  	while (millis && !shouldQuit()) {
@@ -926,7 +942,7 @@ index 392e4c2d..e8723df0 100644
  		if (doUpdate)
  			update();
  		else
-@@ -2092,6 +2946,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
+@@ -2092,6 +2962,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
  // spells
  
  int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
@@ -939,10 +955,10 @@ index 392e4c2d..e8723df0 100644
  	_activeSpell.spell = spellType;
  	_activeSpell.p = &_spellProperties[spellType];
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index 2cfadf37..cd5a0200 100644
+index 2cfadf37..ee5964c1 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
-@@ -315,6 +315,12 @@ private:
+@@ -315,6 +315,13 @@ private:
  
  	// main loop
  	void runLoop();
@@ -951,11 +967,12 @@ index 2cfadf37..cd5a0200 100644
 +	int webInventoryCommand(int op, int a, int b);
 +	Item webItemAt(int loc);
 +	bool webSlotUsable(int c, int k) const;
++	Common::String webLangString(uint16 id);
 +	void webSetItemAt(int loc, Item item);
  	void update() override;
  
  	// mouse
-@@ -1072,6 +1078,27 @@ private:
+@@ -1072,6 +1079,27 @@ private:
  
  	LoLItem *_itemsInPlay;
  	ItemProperty *_itemProperties;
@@ -1029,7 +1046,7 @@ index 926e60dc..31bb0dec 100644
  	_updateFlags &= 0xFFFB;
  	setMouseCursorToItemInHand();
 diff --git a/engines/kyra/script/script_lol.cpp b/engines/kyra/script/script_lol.cpp
-index 30c59a77..e3f495d3 100644
+index 30c59a77..c382434a 100644
 --- a/engines/kyra/script/script_lol.cpp
 +++ b/engines/kyra/script/script_lol.cpp
 @@ -235,6 +235,7 @@ int LoLEngine::olol_allocItemPropertiesBuffer(EMCState *script) {
@@ -1040,7 +1057,7 @@ index 30c59a77..e3f495d3 100644
  	return 1;
  }
  
-@@ -1593,9 +1594,12 @@ int LoLEngine::olol_playDialogueTalkText(EMCState *script) {
+@@ -1593,9 +1594,14 @@ int LoLEngine::olol_playDialogueTalkText(EMCState *script) {
  	debugC(3, kDebugLevelScriptFuncs, "LoLEngine::olol_playDialogueTalkText(%p) (%d)", (const void *)script, stackPos(0));
  	int track = stackPos(0);
  
@@ -1049,7 +1066,9 @@ index 30c59a77..e3f495d3 100644
  		const char *s = getLangString(track);
  		_txt->printDialogueText2(4, s, script, 0, 1);
 +	} else {
-+		webDialogue(_txt->webFormat(getLangString(track), script, 0, 1));	// voix seule : réplique publiée quand même
++		// voix seule : réplique publiée quand même. getLangString fait tourner 5 tampons de textes, dont
++		// les libellés des boutons de dialogue (Oui / Non) gardés par pointeur : rotation remise en état
++		webDialogue(_txt->webFormat(webLangString(track).c_str(), script, 0, 1).c_str());
  	}
  
  	return 1;
@@ -1066,15 +1085,22 @@ index 22882f41..c19ab31a 100644
  	displayText(_dialogueBuffer);
  
 diff --git a/engines/kyra/text/text_lol.h b/engines/kyra/text/text_lol.h
-index 575ec92c..cc9b255f 100644
+index 575ec92c..c4f3c8ec 100644
 --- a/engines/kyra/text/text_lol.h
 +++ b/engines/kyra/text/text_lol.h
-@@ -41,6 +41,8 @@ public:
+@@ -41,6 +41,15 @@ public:
  	~TextDisplayer_LoL() override;
  
  	void setupField(bool mode);
 +	// version web : texte mis en forme (paramètres du script) sans l'afficher, pour le publier
-+	const char *webFormat(const char *str, EMCState *script, const uint16 *paramList, int16 paramIndex) { preprocessString(str, script, paramList, paramIndex); return _dialogueBuffer; }
++	// (_dialogueBuffer sert aussi au jeu, p. ex. pour redessiner un texte : il est rendu tel quel)
++	Common::String webFormat(const char *str, EMCState *script, const uint16 *paramList, int16 paramIndex) {
++		const Common::String saved(_dialogueBuffer);
++		preprocessString(str, script, paramList, paramIndex);
++		const Common::String out(_dialogueBuffer);
++		Common::strlcpy(_dialogueBuffer, saved.c_str(), 2560);
++		return out;
++	}
  	void expandField();
  
  	void printDialogueText2(int dim, const char *str, EMCState *script, const uint16 *paramList, int16 paramIndex);

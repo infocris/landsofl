@@ -3025,7 +3025,14 @@
           const held = lastInvData ? lastInvData.handType : -1;
           if (held >= 0 && held !== t) { const free = lastInvData.barTypes.indexOf(-1); if (free >= 0) await mem.cmd({ op: "move", a: LOC_HAND, b: free }, 4000); }
           if (held !== t) await mem.cmd({ op: "move", a: e.loc, b: LOC_HAND }, 4000);
-          setTimeout(() => gameClick(200, 60), 250);   // le marchand, au centre de la fenêtre de scène
+          // le marchand, au centre de la fenêtre de scène ; clic refait (3 fois au plus) tant qu'aucune
+          // réplique n'arrive (le clic simulé n'est pas toujours pris par la scène)
+          const seq0 = window.lolSay ? window.lolSay().seq : -1;
+          for (let k = 0; k < 3; k++) {
+            await new Promise((ok) => setTimeout(ok, k ? 1200 : 250));
+            if (k && window.lolSay && window.lolSay().seq !== seq0) break;
+            await gameClick(200, 60);
+          }
           lastInv = ""; setTimeout(() => updateInventory().catch(() => {}), 800);
         });
         li.append(ic, nm, v, b);

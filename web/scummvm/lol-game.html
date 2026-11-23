@@ -56,8 +56,8 @@
   if (!location.hash) history.replaceState(null, "", "#lol-fr");
   const DB = "/home/web_user", KEY = DB + "/scummvm.ini", SEC = "[lol-fr]";
   // version du moteur dans les adresses : un navigateur qui a gardé l'ancien moteur en cache le recharge
-  Module.locateFile = (p, dir) => dir + p + (p.endsWith(".wasm") ? "?v=1795469996-13269305" : "");
-  const start = () => { const s = document.createElement("script"); s.src = "scummvm.js?v=1795469996-13269305"; document.body.appendChild(s); };
+  Module.locateFile = (p, dir) => dir + p + (p.endsWith(".wasm") ? "?v=1795472534-13270165" : "");
+  const start = () => { const s = document.createElement("script"); s.src = "scummvm.js?v=1795472534-13270165"; document.body.appendChild(s); };
   const section = (t) => { const i = t.indexOf(SEC); if (i < 0) return ""; const j = t.indexOf("\n[", i + 1); return j < 0 ? t.slice(i) : t.slice(i, j + 1); };
   // sauvegarde à charger dès le lancement (fenêtre « Sauvegardes… » avant le début de la partie,
   // minimap.js) : clé save_slot de la section, lue par KyraEngine_v1::init ; retirée sinon

@@ -2547,3 +2547,9 @@ spells, on the in-game automap) remains **unknown**.
   - **Doorway picture**: the place picture is drawn only inside the door's transparent opening (per-column transparent run of the texture). It is not drawn when that run is shorter than 40 % of the face, i.e. the strip under a closed door's leaves. Before, it overflowed onto the floor below the door.
   - **Verified**: closed door clean; picture inside a fully open doorway (free view).
 - **2026-11-24**: maps: unexplored wall or rock cells are no longer greyed at the edge of the exploration, only cells one can walk into.
+- **2026-11-24**: fix for wrong labels on the Yes / No buttons during a sale.
+  - **Cause**: `getLangString` decodes into one of 5 rotating 512-byte buffers (`_stringBuffer`). The dialogue buttons keep their labels as pointers into them (`_dialogueButtonString`) and redraw them on hover.
+  - **Trigger**: the engine's publication read the spell names through `getLangString`, which consumed buffers. Once publication also ran from `update()`, during the Yes / No wait, hovering « Non » showed « POING MORTEL » / « BRUME FATALE » on the buttons.
+  - **Fix**: `webLangString` reads a string and then restores the buffer it used and the rotation index. `webFormat` restores `_dialogueBuffer`.
+  - **Verified**: after Victor's offer, hovering NON highlights it normally and OUI keeps its label.
+  - **Merchant click**: the synthetic click on the merchant is also retried, up to 3 times, until a reply arrives, because it was not always taken.
