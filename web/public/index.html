@@ -20,6 +20,13 @@
   #dos { flex: 3; min-height: 0; }
   #v3d { flex: 2; min-height: 160px; border-top: 1px solid #3a3226; background: #000; position: relative; }
   #v3d.hidden { display: none; }
+  /* séparation réglable entre le jeu et la vue 3D (glisser ; double-clic : répartition d'origine) */
+  #split { flex: none; height: 7px; margin: -3px 0; position: relative; z-index: 5; cursor: row-resize; touch-action: none;
+    background: linear-gradient(transparent 2px, #3a3226 2px, #3a3226 5px, transparent 5px); }
+  #split:hover, #split.drag { background: linear-gradient(transparent 1px, #c9a227 1px, #c9a227 6px, transparent 6px); }
+  body:has(#v3d.hidden) #split { display: none; }
+  body.splitting iframe { pointer-events: none; }
+  body.splitting { cursor: row-resize; user-select: none; }
   #v3d iframe { width: 100%; height: 100%; border: 0; display: block; }
   :root { --mm-size: 384px; --mm-w: max(420px, calc(var(--mm-size) + 36px)); }
   #mm { width: var(--mm-w); flex: none; box-sizing: border-box; padding: 12px; background: #0f0d0a;
@@ -419,6 +426,7 @@
 <body>
 <div id="left">
   <div id="dos"></div>
+  <div id="split" role="separator" aria-orientation="horizontal" title="Glisser pour redimensionner le jeu et la vue 3D (double-clic : répartition d'origine)"></div>
   <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261123q" title="Vue 3D synchronisée"></iframe></div>
 </div>
 <aside id="mm" aria-label="Mini-carte">
@@ -764,6 +772,52 @@
     backend: new URLSearchParams(location.search).get("emu") === "dosbox" ? "dosbox" : "dosboxX",
     kiosk: false,
   }));
+})();
+</script>
+<script>
+// Séparation entre le jeu et la vue 3D : hauteur du jeu en proportion de la colonne, gardée
+// (localStorage « splitRatio »). Pendant le glisser, les cadres (jeu, vue 3D) ne captent pas la souris.
+(() => {
+  const left = document.getElementById("left"), split = document.getElementById("split");
+  const game = document.getElementById("dos"), v3d = document.getElementById("v3d");
+  if (!left || !split || !game || !v3d) return;
+  const MIN = 120;
+  const apply = (ratio) => {
+    if (ratio == null) { game.style.flex = ""; v3d.style.flex = ""; return; }
+    const h = left.clientHeight, gh = Math.max(MIN, Math.min(h - 160, Math.round(h * ratio)));
+    game.style.flex = `0 0 ${gh}px`; v3d.style.flex = "1 1 0";
+  };
+  let ratio = null;
+  try { const v = parseFloat(localStorage.getItem("splitRatio")); if (v > 0 && v < 1) ratio = v; } catch (e) {}
+  apply(ratio);
+  addEventListener("resize", () => apply(ratio));
+  let drag = null;
+  split.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    drag = { y0: e.clientY, h0: game.getBoundingClientRect().height };
+    split.setPointerCapture(e.pointerId); split.classList.add("drag"); document.body.classList.add("splitting");
+    e.preventDefault();
+  });
+  split.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    ratio = (drag.h0 + e.clientY - drag.y0) / left.clientHeight;
+    apply(ratio);
+  });
+  const end = () => {
+    if (!drag) return;
+    drag = null; split.classList.remove("drag"); document.body.classList.remove("splitting");
+    ratio = game.getBoundingClientRect().height / left.clientHeight;
+    try { localStorage.setItem("splitRatio", String(ratio)); } catch (e) {}
+    dispatchEvent(new Event("resize"));
+    const f = document.querySelector("iframe#dos") || game.querySelector("canvas"); if (f && f.focus) f.focus();
+  };
+  split.addEventListener("pointerup", end);
+  split.addEventListener("pointercancel", end);
+  split.addEventListener("dblclick", () => {
+    ratio = null; apply(null);
+    try { localStorage.removeItem("splitRatio"); } catch (e) {}
+    dispatchEvent(new Event("resize"));
+  });
 })();
 </script>
 <script src="minimap.js?v=20261123o"></script>

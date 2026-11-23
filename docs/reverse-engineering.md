@@ -2382,3 +2382,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: spells and attacks dragged into the action bar; bar items taken in hand (throw / drop / use like the original, engine commands 22–23); floor items picked up by clicking them in the 3D view (command 24) (§ 10a).
 - **2026-11-23**: picking up from the 3D view puts the item in hand; right click puts the held item in the bag (§ 10a).
 - **2026-11-23**: action bar greys out attacks while the character cannot strike (flags & 0x314C) and spells the caster cannot afford (§ 10a).
+- **2026-11-23**: draggable separator between the game screen and the 3D view (both versions): game height kept as a share of the column (`splitRatio` in localStorage), iframes ignore the mouse while dragging, double-click restores the 3 : 2 split. Verified with ScummVM: 547 / 365 px → 347 / 565 px, double-click → 547 / 365.
