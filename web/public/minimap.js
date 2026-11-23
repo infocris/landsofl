@@ -2522,6 +2522,8 @@
     .ab.drop { outline: 2px dashed #28dce6; outline-offset: -1px; }
     .ab.empty-stack, .ab.busy { filter: grayscale(1) brightness(.45); }
     .ab.flash { box-shadow: 0 0 0 2px #c9a227 inset; }
+    #action-bar.holding .ab { cursor: copy; }
+    #action-bar.holding .ab:hover { outline: 2px dashed #28dce6; outline-offset: -2px; }
     .ab.fail { box-shadow: 0 0 0 2px #e0442a inset; }
     .ab .k { position: absolute; left: 2px; top: 1px; color: #c9a227; font-weight: 700; text-shadow: 0 0 2px #000; }
     .ab .cnt { position: absolute; right: 2px; bottom: 1px; color: #fff; font-weight: 700; text-shadow: 0 0 2px #000, 0 0 2px #000; }
@@ -2782,8 +2784,28 @@
     }
     el.addEventListener("mouseover", (e) => { const d = e.target.closest(".ab"); if (d) showTip(d, d.dataset.tip); });
     el.addEventListener("mouseleave", () => { tip.hidden = true; });
-    el.addEventListener("click", (e) => {
+    // objet tenu en main (curseur du jeu) déposé sur une case : la case reçoit ce type d'objet et
+    // l'objet retourne dans le sac (première case libre), où la pile de la case le compte
+    async function dropHand(i) {
+      const t = lastInvData ? lastInvData.handType : -1;
+      if (t < 0) return false;
+      bar[i] = { k: "item", t, for: "auto", mode: "hand" }; saveBar();
+      const free = bagTypes().indexOf(-1);
+      if (free >= 0) {
+        await mem.cmd({ op: "move", a: LOC_HAND, b: free }, 4000);
+        lastInv = ""; setTimeout(() => updateInventory().catch(() => {}), 150);
+        flash(i, true, `${(itemInfo[t] || {}).name || "Objet"} : rangé dans le sac, raccourci en case ${i + 1}`);
+      } else flash(i, true, "Raccourci créé (sac plein : l'objet reste en main)");
+      return true;
+    }
+    el.addEventListener("mouseenter", () => el.classList.toggle("holding", !!(lastInvData && lastInvData.handType >= 0)));
+    el.addEventListener("click", async (e) => {
       const d = e.target.closest(".ab"); if (!d) return;
+      if (lastInvData && lastInvData.handType >= 0 && !(bar[+d.dataset.i] && bar[+d.dataset.i].k === "item" && bar[+d.dataset.i].t === lastInvData.handType && bar[+d.dataset.i].mode !== "use")) {
+        await dropHand(+d.dataset.i);
+        const g = document.getElementById("dos"); if (g && g.focus) g.focus();
+        return;
+      }
       trigger(+d.dataset.i);
       const g = document.getElementById("dos"); if (g && g.focus) g.focus();
     });
