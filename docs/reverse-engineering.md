@@ -1672,6 +1672,18 @@ The meaning of the functions, however, can be read directly. Comparison with our
       still reach the game.
   - **Verified**: bar docked at the inventory row (30 px slots at this size), key 1 puts the aloe
     in hand, Michael's portrait redrawn, back to "moderne" → floating bar restored.
+- **Original interface without the game in the background** (2026-11-23, at the user's request).
+  The background is now `PLAYFLD.CPS` from `GENERAL.PAK`, the game's static interface (320 × 200,
+  interface palette), exported as `viewer/data/playfld.png`. Its scene window holds a few spare
+  sprites; the 3D render covers them.
+  - **Taken from the game image** (live, at the same game coordinates):
+    - the message band (84, 121, 204 × 18) and the crown stack (288, 90, 32 × 40);
+    - each portrait's weapon and magic buttons (x + 44, 143, 22 × 34), which show the held weapon
+      and its recovery;
+    - during a game scene, the region `lolView()` asks for (scene window or whole screen).
+  - **Drawn by the page**: the faces and bars of the portraits, and the docked action bar.
+  - **Verified**: rebuilt interface around the 3D render, and the "forward" arrow still moves the
+    party (13,17 → 13,16).
 - **Unavailable actions greyed out** (2026-11-23). `clickedAttackButton` refuses an attack while
   the character's flags & 0x314C (0x4: weapon recovering after a hit; 0x8: unconscious…). The bar
   reads the party records every 200 ms. An attack slot is greyed while those flags are set or
@@ -2416,3 +2428,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: draggable separator between the game screen and the 3D view (both versions): game height kept as a share of the column (`splitRatio` in localStorage), iframes ignore the mouse while dragging, double-click restores the 3 : 2 split. Verified with ScummVM: 547 / 365 px → 347 / 565 px, double-click → 547 / 365.
 - **2026-11-23**: "originale" interface mode: live game screen in the 3D view area with the 3D render in the scene window, clicks forwarded to the game (§ 10a).
 - **2026-11-23**: original interface mode: action bar docked on the game's inventory row, portraits redrawn like the original (§ 10a).
+- **2026-11-23**: original interface rebuilt on PLAYFLD.CPS instead of the live game screen; only messages, crowns, weapon/magic buttons and game scenes are taken from the game image (§ 10a).

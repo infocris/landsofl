@@ -1334,6 +1334,14 @@ def main(game_dir, maps_dir, out_dir):
                 fsheet.blit(frame_image(f, pal), k * 32, row * 32)
     fsheet.save(os.path.join(out_dir, "faces.png"))
 
+    # fond de l'interface du jeu (PLAYFLD.CPS, 320 × 200) pour l'interface originale reconstruite de
+    # la vue 3D (web/public/classic.js), même palette que les icônes
+    pf_pixels = cps(read_pak(os.path.join(game_dir, "GENERAL.PAK"))["PLAYFLD.CPS"])[0]
+    pf = Image(320, 200)
+    for i, c in enumerate(pf_pixels[:64000]):
+        pf.put(i % 320, i // 320, rgb(pal, c))
+    pf.save(os.path.join(out_dir, "playfld.png"))
+
     # objets posés au sol (vue 3D) : image du jeu pour chaque type d'objet (LoLEngine::drawObjects).
     # Drapeau 0x40 du type : image shpIndex de GAMESHP.SHP ; sinon ITEMSHP.SHP, image
     # _gameShapeMap[shpIndex * 2] (table de 276 octets de MAIN.EXE, en 0x2B35C dans la version CD).

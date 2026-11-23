@@ -1,8 +1,10 @@
 // Interface originale dans la vue 3D (version ScummVM ; docs/reverse-engineering.md § 10a).
 // Mode « moderne » : barre d'actions et portraits flottants, vue 3D seule. Mode « originale » :
-// la zone de la vue 3D montre l'écran du jeu en direct (flux vidéo du canevas de ScummVM,
-// captureStream), et seule la fenêtre de scène du jeu (112, 0, 176 × 120) est remplacée par le
-// rendu 3D (le cadre de la vue posé dessus). Les clics sur le reste de l'écran (portraits, sac,
+// l'interface du jeu est reconstruite dans la zone de la vue 3D : fond PLAYFLD.CPS, rendu 3D dans
+// la fenêtre de scène (112, 0, 176 × 120 ; le cadre de la vue posé dessus), portraits redessinés,
+// barre d'actions sur la rangée d'objets. Quelques éléments vivants sont repris de l'image du jeu
+// (flux vidéo du canevas de ScummVM, captureStream) : messages, couronnes, boutons d'arme et de
+// magie, et la scène du jeu quand il en montre une. Les clics sur le reste de l'écran (portraits, sac,
 // flèches, boussole…) sont rejoués sur le canevas du jeu aux mêmes coordonnées : on joue entièrement
 // depuis là. Pendant une scène du jeu (dialogue, lieu plein écran, menu, sort…), lolView() demande
 // l'image du jeu : le rendu 3D s'efface. Choix gardé (localStorage « uiMode »).
@@ -58,7 +60,7 @@
     }
     party = out;
   }, 200);
-  function drawPortraits(g, L, dpr) {
+  function drawPortraits(g, L, dpr, live) {
     const n = party.length;
     if (!n || !faces.complete || !faces.naturalWidth) return;
     const kx = L.w / 320 * dpr, ky = L.h / 200 * dpr, ox = L.x * dpr, oy = L.y * dpr;
@@ -66,7 +68,9 @@
     const R = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(ox + x * kx, oy + y * ky, w * kx, h * ky); };
     party.forEach((c, i) => {
       const x = i * 66 + t * (i + 1) + 83, y = 143;
+      R(x, y, 66, 34, "#000");
       g.drawImage(faces, c.f * 32, (Math.min(9, Math.max(1, c.id)) - 1) * 32, 32, 32, ox + x * kx, oy + (y + 1) * ky, 32 * kx, 32 * ky);
+      live(x + 44, y, 22, 34);                    // boutons d'arme et de magie (main, recharge) : ceux du jeu
       if (c.ko) R(x, y + 1, 32, 32, "rgba(40,40,40,.55)");
       const bar = (bx, cur, max, col) => {
         R(x + bx - 1, y + 1, 6, 32, "#000");
@@ -81,6 +85,14 @@
     });
   }
 
+  // fond de l'interface (PLAYFLD.CPS exporté) : l'écran du jeu n'est plus recopié en entier ;
+  // seuls quelques éléments vivants en sont repris (zones en coordonnées du jeu)
+  const bg = new Image();
+  bg.src = "viewer/data/playfld.png?v=20261123a";
+  const LIVE = [
+    [84, 121, 204, 18],          // bande des messages
+    [288, 90, 32, 40],           // pile de couronnes (nombre au-dessus)
+  ];
   const cv = document.createElement("canvas");
   cv.id = "v3d-classic";
   box.insertBefore(cv, frame);
@@ -137,13 +149,22 @@
     try { const w = gameWin(); st = w && w.lolView ? w.lolView() : null; } catch (e) {}
     const showGameScene = !st || (st.mirror && !st.overlay) || !(gameWin() && gameWin().lolStarted && gameWin().lolStarted());
     frame.classList.toggle("off", showGameScene);
-    if (video.readyState < 2 || !video.videoWidth) return;
+    if (video.readyState < 2 || !video.videoWidth || !bg.complete || !bg.naturalWidth) return;
     const g = cv.getContext("2d");
     g.imageSmoothingEnabled = false;
     g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
     const V = fit(video.videoWidth, video.videoHeight);
-    g.drawImage(video, V.x, V.y, V.w, V.h, L.x * dpr, L.y * dpr, L.w * dpr, L.h * dpr);
-    if (!showGameScene) drawPortraits(g, L, dpr);
+    // région du jeu (x, y, w, h en pixels du jeu) recopiée depuis son image
+    const live = (x, y, w, h) => g.drawImage(video, V.x + x / 320 * V.w, V.y + y / 200 * V.h, w / 320 * V.w, h / 200 * V.h,
+      (L.x + x / 320 * L.w) * dpr, (L.y + y / 200 * L.h) * dpr, w / 320 * L.w * dpr, h / 200 * L.h * dpr);
+    g.drawImage(bg, 0, 0, 320, 200, L.x * dpr, L.y * dpr, L.w * dpr, L.h * dpr);
+    if (showGameScene) {
+      // scène du jeu (dialogue, lieu, menu, introduction) : la région qu'il demande, ou tout l'écran
+      const c = st && st.crop ? st.crop : [0, 0, 320, 200];
+      live(...c);
+    }
+    for (const r of LIVE) live(...r);
+    if (!showGameScene || !(st && st.crop && st.crop[2] >= 320)) drawPortraits(g, L, dpr, live);
     dockBar(L);
   }
   // barre d'actions sur la rangée d'objets du jeu (cachée pendant les scènes : celle du jeu reste visible)
