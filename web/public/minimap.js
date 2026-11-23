@@ -595,7 +595,12 @@
     const img = texMode ? levelImages(L) : null;
     for (let i = 0; i < 1024; i++) {
       const cls = cellClass(L, i), x = (i % 32) * CELL, y = Math.floor(i / 32) * CELL;
-      if (!visible(L, i)) { g.fillStyle = "#15120e"; g.fillRect(x, y, CELL - 1, CELL - 1); continue; }
+      if (!visible(L, i)) {
+        // case inexplorée qui touche une case explorée par un côté : grisée (bord de l'exploration)
+        const cx = i % 32, cy = i >> 5;
+        const edge = (cx > 0 && visible(L, i - 1)) || (cx < 31 && visible(L, i + 1)) || (cy > 0 && visible(L, i - 32)) || (cy < 31 && visible(L, i + 32));
+        g.fillStyle = edge ? "#3d3a35" : "#15120e"; g.fillRect(x, y, CELL - 1, CELL - 1); continue;
+      }
       const tl = img && cellTile(L, img, i, cls);
       if (tl) g.drawImage(tl, x, y);
       else { g.fillStyle = COLORS[cls]; g.fillRect(x, y, CELL - 1, CELL - 1); }
