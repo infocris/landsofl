@@ -1641,6 +1641,22 @@ The meaning of the functions, however, can be read directly. Comparison with our
     slots can be dragged onto each other to swap them, and dropping one outside the bar clears it.
     Verified: Étincelle level 1 → slot 3, attack → slot 4, 3 ↔ 5, slot 4 dropped outside → empty;
     key 5 casts Étincelle (magic 6 → 1).
+- **Original interface in the 3D view** (ScummVM version, 2026-11-23; `web/public/classic.js`).
+  An "Interface : moderne / originale" button switches modes. In "originale", the floating action
+  bar and portraits are hidden.
+  - **Game image**: the 3D view's area shows the live game screen, from the ScummVM canvas through
+    `captureStream`, as in the mirroring removed on 2026-11-10. The 320 × 200 screen is shown at
+    4:3, the game's aspect correction.
+  - **3D render**: the 3D view's frame is laid exactly over the game's scene window (112, 0,
+    176 × 120), so the original interface surrounds the 3D render. The frame is hidden while
+    `lolView()` asks for the game image (dialogues, full-screen places, menus) or before the
+    game starts.
+  - **Clicks**: mouse moves, presses and releases on the rest of the screen are replayed as
+    synthetic `MouseEvent`s on the game canvas at the same game coordinates, so portraits, bag,
+    arrows and compass work from there.
+  - **Verified**: the composite matches the game screen (frame at 267 × 218 px over the scene
+    window), and a click on the copied "forward" arrow (game 43,142) moves the party
+    13,17 → 13,16.
 - **Unavailable actions greyed out** (2026-11-23). `clickedAttackButton` refuses an attack while
   the character's flags & 0x314C (0x4: weapon recovering after a hit; 0x8: unconscious…). The bar
   reads the party records every 200 ms. An attack slot is greyed while those flags are set or
@@ -2383,3 +2399,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: picking up from the 3D view puts the item in hand; right click puts the held item in the bag (§ 10a).
 - **2026-11-23**: action bar greys out attacks while the character cannot strike (flags & 0x314C) and spells the caster cannot afford (§ 10a).
 - **2026-11-23**: draggable separator between the game screen and the 3D view (both versions): game height kept as a share of the column (`splitRatio` in localStorage), iframes ignore the mouse while dragging, double-click restores the 3 : 2 split. Verified with ScummVM: 547 / 365 px → 347 / 565 px, double-click → 547 / 365.
+- **2026-11-23**: "originale" interface mode: live game screen in the 3D view area with the 3D render in the scene window, clicks forwarded to the game (§ 10a).
