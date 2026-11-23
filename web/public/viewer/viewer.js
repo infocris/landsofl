@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261122q";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261123a";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -611,10 +611,11 @@
     for (const it of floorItems()) {                    // objets au sol : même échelle que les monstres
       const dx = it.x - player.x, dy = it.y - player.y;
       const z = dx * fx + dy * fy, lat = dx * rx + dy * ry;
-      if (z < 0.15) continue;
+      if (z < 0) continue;
       const [srx, sry, rw, rh] = it.rect, d = deff(z);
-      const scale = (WALL_H / 96) * proj / d, sw = rw * scale, sh = rh * scale;
-      const left = W / 2 + lat * proj / d - sw / 2, top = half + (WALL_H / 2) * proj / d - sh;
+      const near = z < 0.5 ? nearItem(z, lat, rw, rh, 0) : null;
+      const scale = (WALL_H / 96) * proj / d, sw = near ? near.sw : rw * scale, sh = near ? near.sh : rh * scale;
+      const left = near ? near.left : W / 2 + lat * proj / d - sw / 2, top = near ? near.top : half + (WALL_H / 2) * proj / d - sh + ITEM_DY * scale;
       sprites.push({ tz: z, rx: srx, ry: sry, rw, rh, sw, sh, left, top, mirror: false, imgs: FLOOR.imgs,
         x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
     }
@@ -800,10 +801,16 @@
     for (const it of floorItems()) {                    // objets au sol
       const dx = it.x - player.x, dy = it.y - player.y;
       const tx = inv * (dirY * dx - dirX * dy), tz = inv * (-planeY * dx + planeX * dy);
-      if (tz < 0.15) continue;
+      if (tz < 0) continue;
       const [rx, ry, rw, rh] = it.rect;
+      if (tz < 0.5) {                                   // case du groupe : règle du jeu (nearItem)
+        const t = Math.hypot(planeX, planeY), n = nearItem(tz, (dx * planeX + dy * planeY) / t, rw, rh, pitch);
+        out.push({ tz, rx, ry, rw, rh, ...n, mirror: false, imgs: FLOOR.imgs,
+          x0: Math.max(0, Math.floor(n.left)), x1: Math.min(W - 1, Math.ceil(n.left + n.sw)) });
+        continue;
+      }
       const scale = (WALL_H / 96) / tz * proj, sw = rw * scale, sh = rh * scale;
-      const left = W / 2 * (1 + tx / tz) - sw / 2, top = H / 2 + pitch + (WALL_H / 2) / tz * proj - sh;
+      const left = W / 2 * (1 + tx / tz) - sw / 2, top = H / 2 + pitch + (WALL_H / 2) / tz * proj - sh + ITEM_DY * scale;
       out.push({ tz, rx, ry, rw, rh, sw, sh, left, top, mirror: false, imgs: FLOOR.imgs,
         x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
     }
@@ -1035,6 +1042,19 @@
   Promise.all([fetch(`data/item_floor.json?v=${DATA_V}`).then((r) => r.json()), loadImage(`data/item_floor.png?v=${DATA_V}`)])
     .then(([d, img]) => { FLOOR.rects = d.rects; FLOOR.types = d.types; FLOOR.blood = d.blood || null; FLOOR.imgs = darken(img, SHADES); dirty = true; }, () => {});
   window.lolFloorItems = () => liveItems;   // débogage
+  // Objet à moins d'une demi-case devant le groupe (sa propre case) : le jeu ne le projette
+  // pas, il le dessine en taille réelle, pieds sur la ligne _monsterScaleY[z·8] (124, 120,
+  // 116, 112 sur 120, horizon à 60) et écart latéral _monsterScaleX[z·8]/256 px par 1/256 case
+  // (calcDrawingLayerParameters, tables du .EXE ; docs/reverse-engineering.md, § 9.3h).
+  // En projection, il tomberait sous le bas de l'image dès 0,4 case.
+  // ITEM_DY : drawBlockObjects descend chaque objet de 5 px (à l'échelle), plus un petit écart
+  // propre à son numéro (_sceneItemOffs) qu'on ignore.
+  const NEAR_ROW = [124, 120, 116, 112], NEAR_LAT = [152, 152, 144, 136], ITEM_DY = 5;
+  function nearItem(z, lat, rw, rh, dy) {
+    const l = Math.max(0, Math.min(3, Math.floor(z * 8))), s = H / 120;
+    const sw = rw * W / 176, sh = rh * s;
+    return { sw, sh, left: W / 2 + lat * NEAR_LAT[l] * W / 176 - sw / 2, top: H / 2 + dy + (NEAR_ROW[l] - 60 + ITEM_DY) * s - sh };
+  }
   // objets visibles du niveau affiché -> [{ x, y, rect }]
   function floorItems() {
     if (!EMBED || !FLOOR.imgs || !L) return [];

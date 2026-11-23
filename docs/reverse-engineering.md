@@ -874,6 +874,29 @@ repeated storey.
 Being a horizontal plane, it hides the upper parts of near and far buildings alike, with no
 ordering issue.
 
+### 9.3h Objects in the party's own cell — verified in ScummVM (2026-11-23)
+
+**Engine rule.** `drawSceneShapes` always draws the objects of the party's block (visible block
+16, wall flag `0x80` forced), and `calcDrawingLayerParameters` keeps every object whose depth
+from the party's centre is ≥ 0 (in 1/256 cell). It does not project them: with `l = depth >> 5`
+(1/8 cell steps), the object's feet go to view row `_monsterScaleY[l]`, its lateral offset is
+`_monsterScaleX[l] · x / 256` px (x in 1/256 cell) and its scale is
+`_monsterScaleWH[row − 56] / 256`, i.e. 1.0 for every row > 103. DOS CD tables
+(`devtools/create_kyradat/resources/lol_dos_cd.h`):
+- `_monsterScaleY[0..8]` = 124, 120, 116, 112, 108, 104, 101, 98, 95 (horizon at row 60;
+  108 at 0.5 cell matches the 3D view's projection, 60 + 48/0.5·0.5);
+- `_monsterScaleX[0..4]` = 152, 152, 144, 136, 128 (128 at 0.5 cell, again the projection).
+- `drawBlockObjects` then shifts each item by `fineX = _sceneItemOffs[id & 7] · 2` and
+  `fineY = _sceneItemOffs[(id >> 1) & 7] + 5` (scaled); `_sceneItemOffs` = 0, −2, 1, −1, 2, 0, 1, −1.
+
+So an item dropped in front of the party (depth 0 to 0.5 cell) stays at full size at the bottom
+of the view. The 3D view projected it: its feet fell below the image from 0.4 cell on, and it
+was skipped under 0.15 cell, so dropped items were invisible there. It now applies these tables
+below 0.5 cell (`nearItem` in `viewer.js`, both perspectives) and the +5 px shift to every
+floor item; the per-item jitter is ignored (the item number is not sent).
+- **Check**: ointment dropped at 13.25, 17.25 facing north (level 1): same place and size in
+  both views, feet at the bottom edge.
+
 ### 9.4 Decorations — `.DAT` — verified for the head-on view
 
 ```
@@ -2065,3 +2088,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: sharper Gladstone textures: the floor pattern takes its depth detail from its transpose (diagonal symmetry of the octagons, § 9.3c); beamed ceilings are folded without row interpolation, with cubic resolution weights, at 96×96 (§ 9.3f).
 - **2026-11-22**: switches in the 3D view: door buttons attached by the level script (`assignLevelDecorationShape` + `resetBlockShapeAssignment`) now drawn; walls' switch type and clickable area exported; engine command op 20 (`clickwall`) clicks the wall in front like the game (`clickedWall`); the 3D view outlines the switch in front and clicks it; engine files versioned in URLs and served `no-cache` (§ 9.6).
 - **2026-11-22**: doors of the script-opened series (walls 8–12, 18–22: shape 0, e.g. Gladstone's locked library door) now drawn closed with their leaf; they looked open in the 3D view (§ 9.6).
+- **2026-11-23**: objects in the party's own cell (dropped in front of it) drawn as the engine does, full size at the bottom of the view (`_monsterScaleY`/`_monsterScaleX` tables); the 3D view projected them below the image (§ 9.3h).
