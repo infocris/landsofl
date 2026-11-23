@@ -1160,6 +1160,10 @@ the live grid updates the 3D view (open door, lever moved).
   (`lol-switch-ahead`). Space then sends the same command as the click, from the page or from the
   game's frame. The key still reaches the game, which only uses it in dialogs. Verified: Gladstone
   13,16 facing north, Space opens the door.
+- **Dragging from a switch** (2026-11-23): a press on the outlined switch no longer blocks looking
+  around. The switch is operated on release only if the pointer moved 5 px or less; beyond that
+  the press becomes a look-around drag (and turns the party on release, § 9.3a). Verified: drag
+  right from the switch → East, door still closed; click on it → door opens, Z goes through.
 
 **Engine cache** (2026-11-22). The test server sent no cache header, so Chrome kept the
 previous `scummvm.wasm` and `lol-game.html`, and ignored the rebuilt engine: the new command
@@ -2293,3 +2297,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: configurable keyboard keys (« Touches… » window), translated by the page into the game's fixed keys (§ 10a).
 - **2026-11-23**: saves dialog usable before the game starts: list read from IndexedDB, loading through `save_slot` at launch (§ 10a).
 - **2026-11-23**: keys window: actions can be left without a key; a key taken from another action leaves it unbound (§ 10a). Verified: switch on E, sidestep right unbound, Space no longer opens the door, E does.
+- **2026-11-23**: 3D view: a drag starting on a switch looks around instead of being ignored (§ 9.6).

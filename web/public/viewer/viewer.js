@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261123m";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261123n";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -1164,14 +1164,21 @@
     view.addEventListener("pointerdown", (e) => {
       if (anim) { player.x = anim.x1; player.y = anim.y1; anim = null; turning = false; }
       if (e.button !== 0 || !L) return;
-      // clic sur l'interrupteur devant le groupe : actionné dans le jeu, sans regarder autour
-      const sw = switchAt(e);
-      if (sw) { downAt = sw; e.preventDefault(); return; }
-      looking = true; view.setPointerCapture(e.pointerId); view.style.cursor = "grabbing"; e.preventDefault();
+      // appui sur l'interrupteur devant le groupe : actionné dans le jeu au relâchement, sauf si la
+      // souris bouge de plus de DRAG_PX pixels avant : on regarde alors autour, comme ailleurs
+      view.setPointerCapture(e.pointerId); e.preventDefault();
       window.focus();       // le clavier vient ici pendant qu'on regarde : Q / D deviennent des pas de côté
+      const sw = switchAt(e);
+      if (sw) { downAt = { ...sw, x0: e.clientX, y0: e.clientY }; return; }
+      looking = true; view.style.cursor = "grabbing";
     });
+    const DRAG_PX = 5;
     view.addEventListener("pointermove", (e) => {
+      if (downAt && !looking && Math.hypot(e.clientX - downAt.x0, e.clientY - downAt.y0) > DRAG_PX) {
+        downAt = null; looking = true; view.style.cursor = "grabbing";
+      }
       if (!looking) {
+        if (downAt) return;
         const over = !!switchAt(e);
         if (over !== switchHover) { switchHover = over; view.style.cursor = over ? "pointer" : "grab"; dirty = true; }
         return;
