@@ -695,6 +695,19 @@ are paved with a visible repeating pattern: `KEEP` (level 1, octagons) and `TOWE
   - `floorMirror: false` in `levelNN.json` (paved floors) tells the 3D view not to mirror
     the cell every other cell, since the pattern already tiles without seams.
 
+- **Game perspective of the 3D view (2026-11-23)**: the built-in view used to draw the floor
+  with the walls' projection (horizon at row 60, `deff`), which stretched the near floor in
+  depth (about 120 rows per cell at the bottom, against about 62 in the game) and made a fan
+  of huge tiles. In game perspective the floor now follows this painted model (`GAME_FLOOR`,
+  KEEP's constants):
+  - in game rows (`y · 120 / H`), depth `z = 354.25 / (y − 34.5) / 3.1 − c0` cells and lateral
+    offset `(x − 88) / (0.75 · 3.1 · (y − 39))`;
+  - `c0` puts the cell edge z = 0.5 at the foot of the 3D view's near wall (row 108).
+  
+  The ceiling keeps the walls' projection, and the real-perspective mode is unchanged. As in
+  the game, floor and walls no longer share one geometry. Checked at level 1 next to the game
+  (13,16 and 13,17 facing north): same regular octagon rows, no fan at the bottom.
+
 ### 9.3d Wall pieces and the forest's upper part — verified in ScummVM (2026-11-22)
 
 `KyraRpgEngine::drawVcnBlocks` (`scene_rpg.cpp`) builds the view, 22×15 tiles, from the
@@ -2164,3 +2177,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: forest storey above the walls synthesized from the branches-and-foliage rows of the wall texture (vertical quilting, 3 variants), instead of repeating the whole texture with its roots (§ 9.3d).
 - **2026-11-23**: movement keys work while the built-in 3D view has focus: focus handed back to the game after a click, stray keys replayed in the game window (§ 9.3a).
 - **2026-11-23**: forest trees above the walls fully generated at wall resolution (foliage-only top rows, height 60–100 %, noisy leafy silhouette); the stretched background crown band is no longer used (§ 9.3d).
+- **2026-11-23**: game perspective of the 3D view: the floor follows the game's painted-floor model (§ 9.3c) instead of the walls' projection, which stretched the near floor into a fan of huge tiles.

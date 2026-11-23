@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261123f";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261123g";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -477,6 +477,9 @@
   try { smooth = localStorage.getItem("lol3d:smooth") !== "off"; } catch (e) {}
   const KSTEP = 1 / 0.615;
   const deff = (z) => (z <= 0.5 ? z : 0.5 * Math.pow(KSTEP, z - 0.5));      // « distance » apparente
+  // sol peint du jeu (docs/reverse-engineering.md § 9.3c, KEEP) : point de fuite latéral hx,
+  // horizon de profondeur hk, K = ak / (y − hk) unités, 0,75 px par unité et par ligne, 3,1 unités par case
+  const GAME_FLOOR = { hx: 39, hk: 34.5, ak: 354.25, px: 0.75, upc: 3.1 };
   const zOfDeff = (d) => (d <= 0.5 ? d : 0.5 + Math.log(d / 0.5) / Math.log(KSTEP));
 
   function render() {
@@ -696,21 +699,30 @@
     const fx = Math.round(Math.cos(player.a)), fy = Math.round(Math.sin(player.a));
     const rx = -fy, ry = fx;                                  // vers la droite de l'écran
     const half = H / 2;
-    // sol et plafond
+    // sol et plafond. Le sol suit la perspective du sol peint du jeu (§ 9.3c, GAME_FLOOR) et non
+    // celle des murs : en lignes du jeu (120 de haut), profondeur K = ak / (y − hk) unités, écart
+    // x − 88 = 0,75 · X · (y − hx), 3,1 unités par case ; décalage c0 choisi pour que le bord de la
+    // case suivante (z = 0,5) tombe au pied du mur proche de la vue 3D.
     const F = L.floorTex, mirF = L.floorMirror !== false, cTex = L.outdoor ? null : ceilTexel(player.a);
+    const G = GAME_FLOOR, gs = 120 / H, xs = 176 / W;
+    const c0 = G.ak / ((half + (WALL_H / 2) * proj / 0.5) * gs - G.hk) / G.upc - 0.5;
     for (let y = Math.floor(half) + 1; y < H; y++) {
       const d = (WALL_H / 2) * proj / (y - half), z = zOfDeff(d);
+      const yg = (y + 0.5) * gs, zf = G.ak / (yg - G.hk) / G.upc - c0, lf = xs / (G.px * G.upc * (yg - G.hx));
       const k = Math.round((1 - shadeFor(z) / SHADES * 0.85) * 256);
+      const kf = Math.round((1 - shadeFor(Math.max(0, zf)) / SHADES * 0.85) * 256);
       const fRow = y * W, cRow = (H - 1 - y) * W;
       for (let x = 0; x < W; x++) {
-        const lat = (x + 0.5 - W / 2) * d / proj;
-        const wx = player.x + fx * z + rx * lat, wy = player.y + fy * z + ry * lat;
-        const cx = Math.floor(wx), cy = Math.floor(wy), odd = (cx + cy) & 1;
-        const fu = wx - cx, fv = wy - cy;
+        const u = x + 0.5 - W / 2;
+        let lat = u * lf, wx = player.x + fx * zf + rx * lat, wy = player.y + fy * zf + ry * lat;
+        let cx = Math.floor(wx), cy = Math.floor(wy), odd = (cx + cy) & 1, fu = wx - cx, fv = wy - cy;
         let tx = (fu * F.w) | 0;
         if (mirF && odd) tx = F.w - 1 - tx;
-        frame32[fRow + x] = shade(L.wangTex ? wangPx(wx, wy) : F.px[((fv * F.h) | 0) * F.w + tx], k);
-        if (!L.outdoor) frame32[cRow + x] = shade(L.ceilTex.px[cTex(fu, fv, odd)], k);
+        frame32[fRow + x] = shade(L.wangTex ? wangPx(wx, wy) : F.px[((fv * F.h) | 0) * F.w + tx], kf);
+        if (L.outdoor) continue;
+        lat = u * d / proj; wx = player.x + fx * z + rx * lat; wy = player.y + fy * z + ry * lat;
+        cx = Math.floor(wx); cy = Math.floor(wy); odd = (cx + cy) & 1;
+        frame32[cRow + x] = shade(L.ceilTex.px[cTex(wx - cx, wy - cy, odd)], k);
       }
       if (L.outdoor) frame32.fill(skyAt(H - 1 - y, half), cRow, cRow + W);
     }
