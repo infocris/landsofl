@@ -2486,3 +2486,11 @@ spells, on the in-game automap) remains **unknown**.
   - **Verified in the real perspective**: Gladstone 13,17 facing south with the gate open → forest path behind the guard; 14,12 facing east with the door open → Victor at his grindstone.
 - **2026-11-24**: buttons to the right of each floating portrait (ScummVM). ⚔ attack sends the game's F1–F3 key for that member. 📖 spellbook is a toggle: a small window beside the portrait lists the known spells, then the 4 levels of the chosen one with their magic cost; unaffordable levels are greyed. The `cast` command is used, and Soin 1–3 targets the most wounded. Both buttons are greyed while flags & 0x314C. The window is rebuilt only when its content changes, otherwise a click was lost between press and release. Verified: ⚔ greys the button (weapon recovering); Étincelle level 1 from the book → magic 6 → 1, window closed.
 - **2026-11-24**: minimap and big map: an unexplored cell that shares an edge with an explored cell is drawn grey (#3d3a35) instead of near-black, so the edge of the exploration shows. Verified on Gladstone at the start.
+- **2026-11-24**: the game's character sheet is synchronised with the page's character window.
+  - **Opening and closing in the game**: only `clickedPortraitLeft` sets `_weaponsDisabled` (with `_updateFlags |= 0x0C`), and `clickedExitCharInventory` clears it. `_updateFlags & 2` is not the sheet flag.
+  - **Engine**: it publishes at `0x7F000D00` whether the sheet is open (`_weaponsDisabled`) and which character it shows (`_selectedCharacter`). Command 25 (`charsheet`): a = 0–3 opens it on that character (`clickedPortraitLeft`), a = −1 closes it (`clickedExitCharInventory`).
+  - **Page**:
+    - the sheet opened in the game opens the window and highlights that character; closed in the game, it closes the window it had opened;
+    - the window opened or closed on the page opens or closes the game's sheet;
+    - clicking a member's small portrait in the Équipement section shows that member's sheet in the game.
+  - **Verified**: all four transitions (open and close, from the game and from the page).

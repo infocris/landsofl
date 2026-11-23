@@ -2420,7 +2420,10 @@
       if (pick && !party.some((p) => p.slot === pick.c)) pick = null;
       eqRows.replaceChildren(...party.map((c) => {
         const row = mk("div", "eq-row"), who = mk("span", "who");
+        row.dataset.slot = c.slot;
         who.append(faceMini(c.id), mk("span", null, c.name));
+        who.title = "Afficher la fiche de ce personnage dans le jeu";
+        who.addEventListener("click", () => { mem.cmd({ op: "charsheet", a: c.slot }, 3000); });
         row.appendChild(who);
         for (let k = 0; k < INV.equipSlots; k++) {
           if (strictEquip() && !(c.usable >> k & 1)) continue;          // emplacement absent pour sa race
@@ -2500,12 +2503,42 @@
       lastInv = ""; await updateInventory().catch(() => {}); renderEquip();
       lastStats = ""; updateStats().catch(() => {});
     }
+    // Fiche de personnage du jeu synchronisée avec cette fenêtre (moteur : zone 0x7F000D00, ouverte et
+    // personnage affiché ; commande « charsheet », op 25). Ouverte dans le jeu : la fenêtre s'ouvre sur
+    // ce personnage ; fermée dans le jeu : la fenêtre se ferme (si c'est le jeu qui l'avait ouverte).
+    // Ouverte ou fermée ici : la fiche du jeu suit. Clic sur le petit portrait d'un personnage : le jeu
+    // affiche sa fiche.
+    let gameOpen = false, gameChar = -1, byGame = false, closingFromGame = false;
+    const focusChar = (slot) => {
+      document.querySelectorAll("#st-dlg .st-char, #st-eq-rows .eq-row").forEach((e) => e.classList.toggle("focus", +e.dataset.slot === slot));
+      const el = document.querySelector(`#st-dlg .st-char[data-slot="${slot}"]`);
+      if (el) el.scrollIntoView({ block: "nearest" });
+    };
+    setInterval(async () => {
+      const r = await mem.read([[0x7F000D00, 2]]);
+      if (!r) return;
+      const open = !!r[0][0], ch = r[0][1];
+      if (open && !gameOpen && !stDlg.open) { byGame = true; openStats(); }
+      if (!open && gameOpen && stDlg.open && byGame) { closingFromGame = true; stDlg.close(); }
+      if (open && stDlg.open) focusChar(ch);
+      gameOpen = open; gameChar = ch;
+    }, 300);
+    window.lolStatsOpened = () => {
+      if (gameOpen || byGame) return;
+      const first = lastInvData && lastInvData.party.length ? lastInvData.party[0].slot : 0;
+      mem.cmd({ op: "charsheet", a: first }, 3000);
+    };
+    stDlg.addEventListener("close", () => {
+      if (!closingFromGame && gameOpen) mem.cmd({ op: "charsheet", a: -1 }, 3000);
+      closingFromGame = false; byGame = false;
+    });
     window.lolEquipRefresh = renderEquip;
     window.lolEquipPick = (c, k) => { pick = { c, k }; eqMsg = ""; renderEquip(); };
     stDlg.addEventListener("close", () => { pick = null; eqCand.hidden = true; });
   }
   const openStats = (eqSlot, eqChar) => {
     lastStats = ""; stDlg.showModal(); updateStats().catch(() => {}); updateParty(true).catch(() => {});
+    if (window.lolStatsOpened) window.lolStatsOpened();
     if (MANAGE) { lastInv = ""; updateInventory().catch(() => {}); if (eqSlot !== undefined && typeof eqChar === "number") setTimeout(() => window.lolEquipPick && window.lolEquipPick(eqChar, eqSlot), 400); }
   };
   document.getElementById("st-open").addEventListener("click", (e) => { e.currentTarget.blur(); openStats(); });
@@ -2597,7 +2630,7 @@
           ? `<button type="button" class="lvup" data-slot="${c.slot}" data-skill="${k}" title="Monter ${n} au niveau ${c.lv[k] + 1} (comme le jeu : expérience au seuil, bonus de vie ou de magie)">+</button>` : "";
         return `<span class="sk"><b>${n} ${c.lv[k]}</b><small>${c.xp[k]}${next !== null ? " / " + next : ""} xp</small>${btn}</span>`;
       }).join("");
-      return `<div class="st-char" data-name="${escHtml(c.name)}"><div class="nm"><b></b></div>${bar("hp", "Vie", c.hp)}${bar("mp", "Magie", c.mp)}
+      return `<div class="st-char" data-name="${escHtml(c.name)}" data-slot="${c.slot}"><div class="nm"><b></b></div>${bar("hp", "Vie", c.hp)}${bar("mp", "Magie", c.mp)}
         <span>Force</span><span>${c.force}</span><span>Protection</span><span>${c.prot}</span>
         <div class="st-skills">${cls}</div></div>`;
     }).join("");
