@@ -1306,6 +1306,21 @@ answered like an unknown command.
   4.0.10. A plain `make` picks Homebrew's `emcc`, a different version, and mixes object files
   from two toolchains.
 
+### 9.3j Beyond the map edge: the grid wraps — engine read (2026-11-24)
+
+The engine never clips block indices to the map: the visible blocks are
+`(block + _dscBlockIndex[direction * 18 + i]) & 0x3FF` (`scene_rpg.cpp`), and a step forward is
+`(curBlock + blockPosTable[direction]) & 0x3FF`. The 32 × 32 grid is therefore read as one flat
+ring of 1024 cells:
+- one cell west of x = 0 is x = 31 on the row above;
+- one cell east of x = 31 is x = 0 on the row below;
+- north of y = 0 is y = 31, and south of y = 31 is y = 0, in the same column.
+
+The outer cells are walls (trees in the forests), so the open cells on the edge (South Forest
+x = 0, y = 17/19/21) show a wall towards the outside. The viewer's two ray casters now read faces,
+portals and free-standing objects through the same wrap (`wrapCell`), instead of stopping the ray
+at the map edge. Before this change, those cells showed no wall on the outer side.
+
 ## 10. Not decoded so far
 
 - `.TLC` (5376 bytes per level), `.INF` beyond monster placement, `ITEM.INF`.
@@ -2661,3 +2676,4 @@ spells, on the in-game automap) remains **unknown**.
   - **Merchant click**: the synthetic click on the merchant is also retried, up to 3 times, until a reply arrives, because it was not always taken.
 - **2026-11-24**: leaving a shop works. The user's sequence: click SORTIR, then the merchant says goodbye, and the scene only closes once that line is skipped with Space. The page's "Sortir" now waits for the end of any speech (skipping it), clicks SORTIR, then presses Space every 650 ms until the scene state ends (10 s max). Verified: from Victor's shop, about 2 s after the click, `_updateFlags` 3 → 0 and the party is back at 15,12 facing the door. The shop bar hides, and the 3D view drops the shop picture.
 - **2026-11-24**: general dialogue bubbles (NPC, narration) placed lower in the 3D view: at the greater of 20 % of its height and 56 px (zoomed) from the top, so they no longer sit on the edge or over the shop bar.
+- **2026-11-24**: the map grid wraps beyond its edges (block index `& 0x3FF`, § 9.3j). The 3D view reads the cell beyond the edge with the same wrap, so the open cells on the South Forest's edge now have their outer wall. Verified in the standalone viewer, level 3, cell 0,19 facing west.

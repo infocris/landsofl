@@ -423,6 +423,10 @@
 
   // --- Grille -----------------------------------------------------------------
   const inside = (cx, cy) => cx >= 0 && cy >= 0 && cx < 32 && cy < 32;
+  // Au-delà du bord de la carte, le jeu lit la case d'indice (y·32 + x) & 0x3FF (scene_rpg.cpp,
+  // _dscBlockIndex) : la carte boucle sur elle-même. Les rayons font de même, sinon les cases du bord
+  // (forêt sud…) restent sans faces vers l'extérieur.
+  const wrapCell = (cx, cy) => (cy * 32 + cx) & 1023;
   const face = (cx, cy, f) => L.faces[(cy * 32 + cx) * 4 + f];
   const info = (id) => L.wallInfo[id];
   // Objet posé au centre d'une case (fontaine, statue…) : même décor seul sur ses 4 faces (walls[id].free).
@@ -687,12 +691,12 @@
         let side;
         const pcx = cx, pcy = cy;
         if (sdx < sdy) { sdx += ddx; cx += sx; side = 0; } else { sdy += ddy; cy += sy; side = 1; }
-        if (!inside(cx, cy)) break;
-        if (skipping) { if (cx === portalSkip.x && cy === portalSkip.y) skipping = false; continue; }   // passe du portail
+        const mk = wrapCell(cx, cy), mx = mk & 31, my = mk >> 5, pk = wrapCell(pcx, pcy);
+        if (skipping) { if (mx === portalSkip.x && my === portalSkip.y) skipping = false; continue; }   // passe du portail
         const f = side === 0 ? (sx > 0 ? FACE_W : FACE_E) : (sy > 0 ? FACE_N : FACE_S);
-        if (freeAt(cx, cy)) continue;                       // dessiné comme un sprite (projectSprites)
-        const P = portalAt(cx, cy, pcx, pcy);
-        const t = texFor(cx, cy, f);
+        if (freeAt(mx, my)) continue;                       // dessiné comme un sprite (projectSprites)
+        const P = portalAt(mx, my, pk & 31, pk >> 5);
+        const t = texFor(mx, my, f);
         if (!t && !P) continue;
         const dist = side === 0 ? sdx - ddx : sdy - ddy;
         if (P && !(t && t.block && (t.opaque || t.tex < 0))) {   // porte ouverte d'une sortie ou d'un lieu en image
@@ -1038,11 +1042,12 @@
           let pos, line;
           if (c.axis === 0) { const nx = ncx > cx ? cx + 1 : cx - 1; f = nx > cx ? FACE_W : FACE_E; cx = nx; uu = hy - Math.floor(hy); pos = hy; line = (cx << 3) | f; }
           else { const ny = ncy > cy ? cy + 1 : cy - 1; f = ny > cy ? FACE_N : FACE_S; cy = ny; uu = hx - Math.floor(hx); pos = hx; line = (cy << 3) | f; }
-          if (!inside(cx, cy)) { done = true; break; }
-          if (skipping) { if (cx === portalSkip.x && cy === portalSkip.y) skipping = false; continue; }   // passe du portail
-          if ((fx === 0 ? c.axis === 0 : c.axis === 1) && freeAt(cx, cy)) continue;   // objet : vu de face seulement
-          const P = portalAt(cx, cy, c.axis === 0 ? cx - (f === FACE_W ? 1 : -1) : cx, c.axis === 1 ? cy - (f === FACE_N ? 1 : -1) : cy);
-          const t = texFor(cx, cy, f);
+          const mk = wrapCell(cx, cy), mx = mk & 31, my = mk >> 5;
+          const pk = wrapCell(c.axis === 0 ? cx - (f === FACE_W ? 1 : -1) : cx, c.axis === 1 ? cy - (f === FACE_N ? 1 : -1) : cy);
+          if (skipping) { if (mx === portalSkip.x && my === portalSkip.y) skipping = false; continue; }   // passe du portail
+          if ((fx === 0 ? c.axis === 0 : c.axis === 1) && freeAt(mx, my)) continue;   // objet : vu de face seulement
+          const P = portalAt(mx, my, pk & 31, pk >> 5);
+          const t = texFor(mx, my, f);
           if (!t && !P) continue;
           if (f === FACE_E || f === FACE_N) uu = 1 - uu;
           if (P && !(t && t.block && (t.opaque || t.tex < 0))) {   // porte ouverte d'une sortie ou d'un lieu en image
