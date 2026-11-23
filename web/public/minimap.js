@@ -2833,8 +2833,11 @@
       let x, y;
       if (pos) { x = pos.x; y = pos.y; }
       else { const g = document.getElementById("dos"), gr = g ? g.getBoundingClientRect() : { left: 0, top: 0, width: innerWidth, height: innerHeight };
-        // juste sous l'écran du jeu (sa rangée d'objets est en bas), sinon en bas de la fenêtre
-        x = gr.left + gr.width / 2 - w / 2; y = gr.top + gr.height + 6 + h <= innerHeight ? gr.top + gr.height + 6 : innerHeight - h - 8; }
+        // dans la bande libre sous la vue 3D s'il y en a une, sinon juste sous l'écran du jeu (sa rangée
+        // d'objets est en bas), sinon en bas de la fenêtre
+        const free = document.getElementById("v3d-free"), fr = free && free.offsetHeight >= h ? free.getBoundingClientRect() : null;
+        x = gr.left + gr.width / 2 - w / 2;
+        y = fr ? fr.top + (fr.height - h) / 2 : gr.top + gr.height + 6 + h <= innerHeight ? gr.top + gr.height + 6 : innerHeight - h - 8; }
       el.style.left = Math.max(0, Math.min(innerWidth - w, x)) + "px"; el.style.top = Math.max(0, Math.min(innerHeight - h, y)) + "px";
     }
     // cachée tant que la partie n'a pas commencé (introduction, menu principal : boutons du jeu dessous)

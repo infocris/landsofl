@@ -25,7 +25,12 @@
   body:has(#v3d.hidden) #split { display: none; }
   body.splitting iframe { pointer-events: none; }
   body.splitting { cursor: row-resize; user-select: none; }
-  #v3d iframe { width: 100%; height: 100%; border: 0; display: block; }
+  #v3d iframe { width: 100%; height: calc(100% - var(--v3d-free, 72px)); border: 0; display: block; }
+  /* bande libre sous la vue 3D : rien n'y est dessiné, pour y poser les éléments flottants (barre
+     d'actions, portraits) ; hauteur réglable en glissant son bord du haut (0 : supprimée) */
+  #v3d-free { position: absolute; left: 0; right: 0; bottom: 0; height: var(--v3d-free, 72px); background: #0b0907; }
+  #v3d-free-grip { position: absolute; left: 0; right: 0; top: -3px; height: 7px; cursor: row-resize; z-index: 1; touch-action: none; }
+  #v3d-free-grip:hover, #v3d-free-grip.drag { background: linear-gradient(transparent 2px, #c9a227 2px, #c9a227 4px, transparent 4px); }
   :root { --mm-size: 384px; --mm-w: max(420px, calc(var(--mm-size) + 36px)); }
   #mm { width: var(--mm-w); flex: none; box-sizing: border-box; padding: 12px; background: #0f0d0a;
     border-left: 1px solid #3a3226; color: #e8dcc0; font: 13px/1.4 system-ui, sans-serif;
@@ -430,7 +435,7 @@
 <div id="left">
   <iframe id="dos" src="lol-game.html?v=1795451224-13265750#lol-fr" title="Lands of Lore (ScummVM)" allow="autoplay; fullscreen"></iframe>
   <div id="split" role="separator" aria-orientation="horizontal" title="Glisser pour redimensionner le jeu et la vue 3D (double-clic : répartition d'origine)"></div>
-  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261123q" title="Vue 3D synchronisée"></iframe></div>
+  <div id="v3d"><div id="v3d-free"><div id="v3d-free-grip" title="Glisser pour régler la bande libre sous la vue 3D (double-clic : 72 px)"></div></div><iframe id="v3d-frame" src="viewer/?embed=1&v=20261123q" title="Vue 3D synchronisée"></iframe></div>
 </div>
 <aside id="mm" aria-label="Mini-carte">
   <div id="mm-title"><span>Mini-carte</span><button id="mm-tex" type="button" title="Cases illustrées avec les textures du lieu / couleurs simples">▦</button><button id="mm-fog" type="button" title="Exploration progressive : n'afficher que les cases déjà vues / toute la carte">◐</button><button id="mm-forget" type="button" title="Oublier l'exploration de ce niveau (nouvelle partie)" disabled>↺</button><button id="mm-center" type="button" title="Centrer automatiquement la carte sur le groupe / carte fixe">⌖</button><span class="mm-grp" title="Taille de la carte à l'écran">Taille</span><button id="mm-smaller" type="button" title="Réduire la mini-carte">−</button><button id="mm-bigger" type="button" title="Agrandir la mini-carte">+</button><span class="mm-grp" title="Zoom (aussi : molette sur la carte)">Zoom</span><button id="mm-zout" type="button" title="Dézoomer (molette)">−</button><button id="mm-zin" type="button" title="Zoomer (molette)">+</button></div>
@@ -581,6 +586,35 @@ window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes
 })();
 </script>
 <script>
+// Bande libre sous la vue 3D (localStorage « v3dFree », pixels)
+(() => {
+  const v3d = document.getElementById("v3d"), grip = document.getElementById("v3d-free-grip");
+  if (!v3d || !grip) return;
+  const DEF = 72;
+  let h = DEF;
+  try { const v = parseInt(localStorage.getItem("v3dFree"), 10); if (v >= 0) h = v; } catch (e) {}
+  const apply = () => { h = Math.max(0, Math.min(v3d.clientHeight - 80, h)); v3d.style.setProperty("--v3d-free", h + "px"); };
+  apply();
+  let drag = null;
+  grip.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    drag = { y0: e.clientY, h0: h }; grip.setPointerCapture(e.pointerId); grip.classList.add("drag");
+    document.body.classList.add("splitting"); e.preventDefault();
+  });
+  grip.addEventListener("pointermove", (e) => { if (!drag) return; h = Math.round(drag.h0 - (e.clientY - drag.y0)); apply(); });
+  const end = () => {
+    if (!drag) return;
+    drag = null; grip.classList.remove("drag"); document.body.classList.remove("splitting");
+    if (h < 8) h = 0;
+    apply();
+    try { localStorage.setItem("v3dFree", String(h)); } catch (e) {}
+    dispatchEvent(new Event("resize"));
+  };
+  grip.addEventListener("pointerup", end);
+  grip.addEventListener("pointercancel", end);
+  grip.addEventListener("dblclick", () => { h = DEF; apply(); try { localStorage.setItem("v3dFree", String(h)); } catch (e) {} dispatchEvent(new Event("resize")); });
+  addEventListener("resize", apply);
+})();
 // Séparation entre le jeu et la vue 3D : hauteur du jeu en proportion de la colonne, gardée
 // (localStorage « splitRatio »). Pendant le glisser, les cadres (jeu, vue 3D) ne captent pas la souris.
 (() => {
@@ -626,7 +660,7 @@ window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes
   });
 })();
 </script>
-<script src="minimap.js?v=20261123p"></script>
+<script src="minimap.js?v=20261123q"></script>
 <script src="engine.js?v=20261113a"></script>
 <script src="classic.js?v=20261123e"></script>
 </body>

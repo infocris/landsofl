@@ -2429,3 +2429,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: "originale" interface mode: live game screen in the 3D view area with the 3D render in the scene window, clicks forwarded to the game (§ 10a).
 - **2026-11-23**: original interface mode: action bar docked on the game's inventory row, portraits redrawn like the original (§ 10a).
 - **2026-11-23**: original interface rebuilt on PLAYFLD.CPS instead of the live game screen; only messages, crowns, weapon/magic buttons and game scenes are taken from the game image (§ 10a).
+- **2026-11-23**: free band below the 3D view for floating interface elements (both versions): the 3D frame is shortened by `--v3d-free` (72 px by default, adjustable by dragging its top edge, 0 = none, double-click = 72; localStorage `v3dFree`), and the action bar is placed there by default when it has not been moved. Verified: band 72 px, bar centred in it; dragged to 112 px, 3D view 292 → 252 px and the bar follows.
