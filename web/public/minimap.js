@@ -2202,7 +2202,15 @@
     });
   }
 
-  // --- Fenêtre « Inventaire et équipement » (bouton « Gérer… » ou touche I) ---------------------
+  // --- Fenêtre « Inventaire et équipement » (bouton « Gérer… » ou touche B, réglable) -------------
+  const invKey = () => { try { const c = LoLKeys.codeOf("inv"); return c ? LoLKeys.keyName(c) : ""; } catch (e) { return "B"; } };
+  const invTitles = () => {
+    const k = invKey(), o = document.getElementById("inv-open"), x = document.getElementById("inv-close");
+    if (o) o.title = "Gérer le sac et l'équipement" + (k ? ` (touche ${k})` : "");
+    if (x) x.title = "Fermer (Échap" + (k ? `, ${k}` : "") + ")";
+  };
+  invTitles();
+  if (window.LoLKeys) LoLKeys.onChange(invTitles);
   {
     const invDlg = document.getElementById("inv-dlg");
     const openInv = () => { if (!invDlg.open && !document.querySelector("dialog[open]")) { lastInv = ""; invDlg.showModal(); updateInventory().catch(() => {}); } };
@@ -2216,7 +2224,7 @@
       const t = e.target;
       if (LoLKeys.is(e, "inv") && !(t && (t.tagName === "INPUT" || t.tagName === "SELECT"))) { e.preventDefault(); invDlg.close(); }
     });
-    // touche I : depuis la page ou depuis le jeu (cadre ScummVM), hors saisie
+    // touche de l'inventaire : depuis la page ou depuis le jeu (cadre ScummVM), hors saisie
     const onI = (e) => {
       if (!LoLKeys.is(e, "inv")) return;
       const t = e.target;
@@ -2657,7 +2665,7 @@
         box.lastChild.textContent = p ? p.name : `perso ${a.c + 1}`;
         d.appendChild(box);
         d.dataset.tip = `Attaque : ${p ? p.name : "personnage " + (a.c + 1)}`;
-      } else d.dataset.tip = inDialog ? "Case vide : glisser un objet du sac ici" : "Case vide : glisser un sort ou une attaque du panneau Magie, ou un objet depuis l'inventaire (I) ; clic droit : attaques";
+      } else d.dataset.tip = inDialog ? "Case vide : glisser un objet du sac ici" : `Case vide : glisser un sort ou une attaque du panneau Magie, ou un objet depuis l'inventaire (${invKey() || "Gérer…"}) ; clic droit : attaques`;
       d.appendChild(k);
       return d;
     }
@@ -2900,7 +2908,7 @@
         for (const p of partyNow()) add(p.name, () => { a.for = p.slot; saveBar(); }, a.for === p.slot);
       }
       if (a) add("Vider la case", () => { bar[i] = null; saveBar(); });
-      if (!partyNow().length && !a) head("Glisser un objet depuis l'inventaire (I)");
+      if (!partyNow().length && !a) head(`Glisser un objet depuis l'inventaire (${invKey() || "Gérer…"})`);
       menu.hidden = false;
       menu.style.left = Math.min(innerWidth - menu.offsetWidth - 4, x) + "px";
       menu.style.top = Math.max(4, y - menu.offsetHeight) + "px";

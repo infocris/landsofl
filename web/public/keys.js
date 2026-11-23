@@ -26,7 +26,7 @@
     { id: "AT3", group: "jeu", label: "Attaque, personnage 3", def: SCUMM ? "" : "Digit3" },
     ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({ id: "bar" + n, group: "barre", label: `Case ${n}`, def: "Digit" + n, scumm: true })),
     { id: "map", group: "page", label: "Grande carte", def: "Tab" },
-    { id: "inv", group: "page", label: "Inventaire", def: "KeyI" },
+    { id: "inv", group: "page", label: "Inventaire", def: "KeyB" },
     { id: "switch", group: "page", label: "Actionner l'interrupteur devant le groupe", def: "Space", scumm: true },
     { id: "minimap", group: "page", label: "Afficher/masquer le panneau", def: "F9" },
     { id: "view3d", group: "page", label: "Afficher/masquer la vue 3D", def: "F10" },
