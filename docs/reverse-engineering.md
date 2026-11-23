@@ -726,7 +726,19 @@ generates the part above the walls pseudo-randomly, always identical at the same
 - the crown is read continuously across the whole band (176 px of the background, 48 px per
   face), mirrored back and forth so it never shows a seam, from an offset drawn per row.
 Neighbouring faces therefore join without a step, and the treeline rises and falls
-irregularly. `viewer.js`: `forestNoise`, `drawUpper` (`?p=` in the URL raises the gaze, for
+irregularly.
+
+**Synthesized trunk storey (2026-11-23).** The storey between the wall and the crown repeated
+the wall texture itself, so roots and tree feet reappeared one storey up, with a visible seam
+at the wall's top. The forest wall texture (128×96) has roots and trunk bases in its lower half
+and only branches and foliage in rows 0–47. The 3D view now synthesizes the storey from those
+rows by vertical quilting (`buildCanopy`):
+- full-width strips of 10 rows plus 4 rows of overlap, stacked bottom-up from the wall's top;
+- each strip is drawn among the 3 that best match the overlap, with a per-column seam at
+  the row of least difference;
+- columns keep their x, so trunks and branches stay aligned.
+There are 3 variants per plain texture (140 rows, enough for the 1.5 storeys of `TRUNK`); each
+row of faces picks one from its hash. `viewer.js`: `forestNoise`, `drawUpper` (`?p=` in the URL raises the gaze, for
 screenshots).
 
 ### 9.3e Generating floors from the floor images (2026-11-22)
@@ -2130,3 +2142,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: objects in the party's own cell (dropped in front of it) drawn as the engine does, full size at the bottom of the view (`_monsterScaleY`/`_monsterScaleX` tables); the 3D view projected them below the image (§ 9.3h).
 - **2026-11-23**: forest treetops in the 3D view generated pseudo-randomly per row of faces (trunk and crown heights from a smoothed noise, crown read across the whole background band); the skyline was flat and repeated every cell (§ 9.3d).
 - **2026-11-23**: blood pools (cell flag 0x80, `ICE.SHP` frame 3, floor halved plus red through `_grayOverlay`) read from the live grid and drawn in the 3D view (§ 9.3i).
+- **2026-11-23**: forest storey above the walls synthesized from the branches-and-foliage rows of the wall texture (vertical quilting, 3 variants), instead of repeating the whole texture with its roots (§ 9.3d).

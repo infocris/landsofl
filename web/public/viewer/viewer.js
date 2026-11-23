@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261123c";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261123d";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -179,6 +179,68 @@
       }
       return L.upper.get(tex);
     };
+    L.canopy = L.outdoor.crown ? buildCanopy(px, W2, plain) : null;
+  }
+
+  // Forêt : étage au-dessus du mur synthétisé à partir du haut de la texture du mur (branches et
+  // feuillage, lignes 0 à CANOPY.src), pour ne pas répéter racines et pieds des troncs en hauteur.
+  // De bas en haut, bandes de pleine largeur (CANOPY.strip lignes + CANOPY.ov de recouvrement) :
+  // la première se raccorde au haut du mur, chaque suivante est tirée parmi les 3 qui recouvrent
+  // le mieux la précédente, avec une couture par colonne à la ligne de moindre écart. Les
+  // colonnes gardent leur x : les troncs et branches restent alignés. CANOPY.n variantes par
+  // texture ; image de hauteur CANOPY.h (fond = haut du mur).
+  const CANOPY = { src: 48, strip: 10, ov: 4, h: 140, n: 3 };
+  function buildCanopy(px, W2, texs) {
+    const fw = L.faceW, fh = L.faceH, cols = L.atlasCols, { src, strip, ov, h, n } = CANOPY;
+    if (!texs.length) return null;
+    const c = document.createElement("canvas");
+    c.width = fw * texs.length * n; c.height = h;
+    const g = c.getContext("2d"), id = g.createImageData(c.width, h), out = new Uint32Array(id.data.buffer);
+    const diff = (p, q) => Math.abs((p & 255) - (q & 255)) + Math.abs(((p >> 8) & 255) - ((q >> 8) & 255)) + Math.abs(((p >> 16) & 255) - ((q >> 16) & 255));
+    texs.forEach((tex, ti) => {
+      const x0 = (tex % cols) * fw, y0 = Math.floor(tex / cols) * fh;
+      const at = (x, y) => px[(y0 + y) * W2 + x0 + x];
+      for (let v = 0; v < n; v++) {
+        const ox = (ti * n + v) * fw;
+        // col[y] : ligne source posée à la hauteur y de l'image, par colonne ; on commence par
+        // les ov lignes du haut du mur, sous le bas de l'image
+        const rows = [];                              // rows[k] = Int16Array(fw) : ligne source par colonne
+        for (let k = 0; k < ov; k++) rows.push(new Int16Array(fw).fill(ov - 1 - k));   // de bas en haut
+        let seed = (tex * 131 + v * 7919 + 17) | 0;
+        while (rows.length < h + ov) {
+          const base = rows.length - ov;              // les ov dernières lignes posées (rows[base..])
+          const cand = [];
+          for (let y = 0; y + strip + ov <= src; y++) {
+            // bande y..y+strip+ov-1 (haut en y) ; ses ov lignes du bas recouvrent rows[base..]
+            let e = 0;
+            for (let k = 0; k < ov; k++) {
+              const sy = y + strip + ov - 1 - k, r = rows[base + k];
+              for (let x = 0; x < fw; x += 2) e += diff(at(x, sy), at(x, r[x]));
+            }
+            cand.push([e, y]);
+          }
+          cand.sort((a, b) => a[0] - b[0]);
+          seed = Math.imul(seed ^ (seed >>> 13), 0x5bd1e995) + 0x6b43a9b5 | 0;
+          const y = cand[Math.min(cand.length - 1, ((seed >>> 8) & 0xffff) % 3)][1];
+          // couture : par colonne, on garde l'ancienne ligne sous la ligne de moindre écart
+          for (let x = 0; x < fw; x++) {
+            let best = 0, be = Infinity;
+            for (let k = 0; k < ov; k++) {
+              const e = diff(at(x, y + strip + ov - 1 - k), at(x, rows[base + k][x]));
+              if (e < be) { be = e; best = k; }
+            }
+            for (let k = best; k < ov; k++) rows[base + k][x] = y + strip + ov - 1 - k;
+          }
+          for (let k = 0; k < strip; k++) rows.push(new Int16Array(fw).fill(y + strip - 1 - k));
+        }
+        for (let yy = 0; yy < h; yy++) {             // ligne d'image h-1-yy = rows[ov + yy]
+          const r = rows[ov + yy], o = (h - 1 - yy) * c.width + ox;
+          for (let x = 0; x < fw; x++) out[o + x] = at(x, r[x]);
+        }
+      }
+    });
+    g.putImageData(id, 0, 0);
+    return { imgs: darken(c, SHADES), index: new Map(texs.map((t, i) => [t, i])) };
   }
   // bandeau du fond (toute la largeur) : 48 px pour une face, 24 px de haut pour un mur de 40
   const CROWN = { w: 48, h: 24, wall: 40 };
@@ -215,7 +277,13 @@
     if (L.crownImgs && pos !== undefined) {         // forêt : hauteurs tirées au hasard
       const tr = TRUNK[0] + (TRUNK[1] - TRUNK[0]) * forestNoise(pos, line, 0);
       const ck = CROWN_K[0] + (CROWN_K[1] - CROWN_K[0]) * forestNoise(pos, line, 101.5);
-      for (let k = 0, rest = tr; rest > 0 && top - k * h > 0; k++, rest--) {
+      const cp = L.canopy, ti = cp && cp.index.get(ut);
+      if (ti !== undefined) {                         // étage synthétisé (buildCanopy)
+        const v = Math.floor(hash01(line, 11) * CANOPY.n) % CANOPY.n;
+        const rowsH = Math.min(CANOPY.h, tr * sh);
+        const cx = (ti * CANOPY.n + v) * fw + Math.min(fw - 1, Math.floor(u * fw));
+        part(cp.imgs[shadeFor(dist)], cx, CANOPY.h - rowsH, rowsH, top - rowsH / sh * h, rowsH / sh * h);
+      } else for (let k = 0, rest = tr; rest > 0 && top - k * h > 0; k++, rest--) {
         const f = Math.min(1, rest);
         part(img, tx, ty + sh * (1 - f), sh * f, top - k * h - f * h, f * h);
       }
