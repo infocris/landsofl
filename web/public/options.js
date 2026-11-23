@@ -66,6 +66,7 @@
       const c = document.getElementById(id);
       if (c && c.checked) c.click();                 // coupe la triche (la page renvoie l'état au jeu)
     }
+    dispatchEvent(new Event("lol-cheats"));          // la mini-carte filtre sa liste de niveaux
   }
   box.addEventListener("change", () => {
     shown = box.checked;

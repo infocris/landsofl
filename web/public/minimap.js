@@ -865,16 +865,25 @@
   });
   const bigLevelSel = document.getElementById("bm-level");
   let bigFilledFor = undefined;
+  // Sans triches (Options) : seulement les cartes connues, c'est-à-dire le niveau du groupe, ceux
+  // que la carte du jeu marque comme visités (ScummVM) et ceux déjà explorés sur cette page.
+  const cheatsOn = () => !window.lolCheatsShown || window.lolCheatsShown();
+  const knownLevel = (L, cur) => L.level === cur || gameMaps.has(L.level) || seenFor(L).some((v) => v);
   function fillBigLevels() {
     if (!levels.length) return;
     const cur = current ? current.level : null;
     bigFilledFor = cur;
-    bigLevelSel.replaceChildren(...levels.map((L) => {
+    const list = cheatsOn() ? levels : levels.filter((L) => knownLevel(L, cur));
+    if (bigLevel !== null && !list.some((L) => L.level === bigLevel)) bigLevel = null;
+    if (!list.length) { bigLevelSel.replaceChildren(); return; }
+    bigLevelSel.replaceChildren(...list.map((L) => {
       const o = document.createElement("option"); o.value = L.level;
       o.textContent = `${L.level}. ${L.fr}${L.level === cur ? " (groupe)" : ""}`; return o;
     }));
-    bigLevelSel.value = bigLevel !== null ? bigLevel : cur !== null ? cur : levels[0].level;
+    bigLevelSel.value = bigLevel !== null ? bigLevel : cur !== null ? cur : list[0].level;
   }
+  function refillBigLevels() { if (bigOpen) { fillBigLevels(); drawBig(); } }
+  addEventListener("lol-cheats", refillBigLevels);           // triches affichées ou cachées
   bigLevelSel.addEventListener("change", () => {
     const v = +bigLevelSel.value;
     bigLevel = current && v === current.level ? null : v;
@@ -886,6 +895,7 @@
     bigCanvas.width = bigCanvas.height = 32 * bigCell;
     bigCanvas.style.width = bigCanvas.style.height = 32 * bigCell + "px";
     bigLevel = null; fillBigLevels(); syncBigOpts();
+    if (!cheatsOn()) readGameMaps().then(refillBigLevels, () => {});   // niveaux visités selon le jeu
     document.getElementById("bm-legend").innerHTML = document.getElementById("mm-legend").innerHTML;
     bigHint.textContent = MANAGE ? "Double-clic sur une case : s'y téléporter. Tab ou Échap : fermer." : "Tab ou Échap : fermer.";
     bigDlg.showModal(); bigOpen = true;
@@ -1224,7 +1234,7 @@
     forgetBtn.disabled = !fogOn || fogGame;
     if (fogGame && fogOn && now - gameMapsTime > 1000) {      // autres niveaux de la carte du jeu (ScummVM)
       gameMapsTime = now;
-      if (await readGameMaps() && bigOpen && bigOther()) drawBig();
+      if (await readGameMaps() && bigOpen) { if (!cheatsOn()) fillBigLevels(); if (bigOther()) drawBig(); }
     }
     if (fogListKey(current) !== fogKey) { fogKey = fogListKey(current); renderItemList(current); }
     // objets à portée (case du groupe et cases voisines)
