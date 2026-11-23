@@ -400,7 +400,16 @@
   const seenOf = new Map();                     // n° de niveau -> Uint8Array(1024)
   const gameSeen = new Uint8Array(1024);        // marques du jeu dans la grille vivante
   let fogOn = true, fogGame = false;
-  try { const v = localStorage.getItem("minimapFog"); fogOn = v !== "0"; fogGame = v === "game"; } catch (e) {}
+  // Sans triches (Options) : la carte est limitée au mode « carte du jeu » (bouton ◐ bloqué) ;
+  // le réglage choisi (localStorage « minimapFog ») revient quand les triches sont affichées.
+  const cheatsOn = () => !window.lolCheatsShown || window.lolCheatsShown();
+  const fogLocked = () => !cheatsOn();
+  function loadFog() {
+    if (fogLocked()) { fogOn = true; fogGame = true; return; }
+    fogOn = true; fogGame = false;
+    try { const v = localStorage.getItem("minimapFog"); fogOn = v !== "0"; fogGame = v === "game"; } catch (e) {}
+  }
+  loadFog();
   const gameMaps = new Map();                   // n° de niveau -> Uint8Array(1024), autres niveaux (ScummVM)
   let gameSeenLevel = null;                     // niveau de la grille vivante (gameSeen)
   const NO_CELLS = new Uint8Array(1024);
@@ -463,6 +472,7 @@
   const fogBtn = document.getElementById("mm-fog"), forgetBtn = document.getElementById("mm-forget");
   let fogKey = "";
   const FOG_TITLE = {
+    locked: "Carte du jeu : mêmes cases que la carte automatique du jeu (autres modes : triches, dans Options)",
     off: "Toute la carte (clic : exploration de la page)",
     web: "Exploration de la page : cases déjà vues par le groupe (clic : carte du jeu)",
     game: "Carte du jeu : mêmes cases que la carte automatique du jeu, atlas requis (clic : toute la carte)",
@@ -470,7 +480,8 @@
   function showFogBtn(b) {
     const mode = !fogOn ? "off" : fogGame ? "game" : "web";
     b.classList.toggle("on", fogOn); b.classList.toggle("game", fogGame && fogOn);
-    b.textContent = mode === "game" ? "◐ jeu" : "◐"; b.title = FOG_TITLE[mode];
+    b.textContent = mode === "game" ? "◐ jeu" : "◐"; b.title = FOG_TITLE[fogLocked() ? "locked" : mode];
+    b.disabled = fogLocked();
   }
   function refreshFog() {
     showFogBtn(fogBtn);
@@ -480,6 +491,7 @@
     draw(lastDraw[0], lastDraw[1]);
   }
   fogBtn.addEventListener("click", (e) => {
+    if (fogLocked()) return;
     // cycle : toute la carte -> exploration de la page -> carte du jeu -> toute la carte
     if (!fogOn) { fogOn = true; fogGame = false; } else if (!fogGame) fogGame = true; else { fogOn = false; fogGame = false; }
     try { localStorage.setItem("minimapFog", !fogOn ? "0" : fogGame ? "game" : "1"); } catch (err) {}
@@ -867,8 +879,9 @@
   let bigFilledFor = undefined;
   // Sans triches (Options) : seulement les cartes connues, c'est-à-dire le niveau du groupe, ceux
   // que la carte du jeu marque comme visités (ScummVM) et ceux déjà explorés sur cette page.
-  const cheatsOn = () => !window.lolCheatsShown || window.lolCheatsShown();
-  const knownLevel = (L, cur) => L.level === cur || gameMaps.has(L.level) || seenFor(L).some((v) => v);
+  // (avec le moteur ScummVM, la carte du jeu fait foi : l'exploration de la page ne compte pas)
+  const knownLevel = (L, cur) => L.level === cur || gameMaps.has(L.level)
+    || (window.LOL_ENGINE !== "scummvm" && seenFor(L).some((v) => v));
   function fillBigLevels() {
     if (!levels.length) return;
     const cur = current ? current.level : null;
@@ -883,7 +896,11 @@
     bigLevelSel.value = bigLevel !== null ? bigLevel : cur !== null ? cur : list[0].level;
   }
   function refillBigLevels() { if (bigOpen) { fillBigLevels(); drawBig(); } }
-  addEventListener("lol-cheats", refillBigLevels);           // triches affichées ou cachées
+  addEventListener("lol-cheats", () => {                     // triches affichées ou cachées
+    loadFog();
+    if (fogGame) readGameMaps().then(() => { refreshFog(); refillBigLevels(); }, () => {});
+    refreshFog(); syncBigOpts(); refillBigLevels();
+  });
   bigLevelSel.addEventListener("change", () => {
     const v = +bigLevelSel.value;
     bigLevel = current && v === current.level ? null : v;
