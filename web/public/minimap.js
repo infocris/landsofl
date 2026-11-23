@@ -3138,7 +3138,8 @@
         say.classList.add("top");
         const z = UZ();
         say.style.left = Math.max(4, v.left + v.width / 2 - say.offsetWidth * z / 2) / z + "px";
-        say.style.top = (v.top + 10) / z + "px";
+        // un peu plus bas que le haut de la vue 3D (sous la barre de boutique, au-dessus du centre)
+        say.style.top = (v.top + Math.max(56 * z, v.height * 0.2)) / z + "px";
       }
       clearTimeout(hideT);
       hideT = setTimeout(() => { say.style.opacity = 0; setTimeout(() => { say.hidden = true; }, 260); }, 2500 + 55 * text.length);
