@@ -2474,3 +2474,13 @@ spells, on the in-game automap) remains **unknown**.
   - **Equipping**: a click uses the move command (strict without cheats). If another member's piece cannot take the current one in exchange, the current one first goes to the bag.
   - **Inventory window**: its equipment rows and per-character equip buttons are replaced by "Équipement des personnages…". The item card's "Équiper…" opens the sheets on that slot.
   - **Verified**: Michael's weapon slot (dagger) lists Sabre (Force +2) and "Cougar" sabre (Force +6, Protection +3) in green; clicking Sabre equips it. Not checked: worse items (red) and pieces worn by another member (Michael alone after loading).
+- **2026-11-24**: transitions behind doors in the 3D view (portals).
+  - **Exits to another level** (`exits`: exit cell → arrival cell): behind the open door, the view shows the arrival level. It renders in two passes.
+    - The arrival level is drawn first, on an offscreen canvas. It uses the same perspective, with the party moved by (arrival − exit), and its own walls, floor and sky. That pass ignores faces until it enters the arrival cell (door and decoration on the other side), and drops the arrival cell's free-standing decoration.
+    - The normal pass, on entering the exit cell through the open door, copies that column of the opening (wall height at that distance) and stops there.
+    - Gladstone 13,19 → Northern Forest 10,3: the forest path is seen through the south gate.
+  - **Places shown as a picture** (label whose cell or stand cell has a scene: Victor's armoury, the herbalist, Geron's office): the nook behind the door is not drawn. The opening shows the place's picture, the one the game shows on entering, dimmed, on black.
+  - **When inactive**: never when the party stands in the exit cell or the place.
+  - **Code**: `fetchLevel` now loads a level without activating it. Building the forest needs `L`, so it is set during that synchronous call.
+  - **Forest side**: the Gladstone gate there (10,3) is a free-standing decoration showing the castle, so no empty map is visible from that side.
+  - **Verified in the real perspective**: Gladstone 13,17 facing south with the gate open → forest path behind the guard; 14,12 facing east with the door open → Victor at his grindstone.

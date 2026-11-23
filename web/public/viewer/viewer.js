@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261124a";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261124c";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -29,7 +29,7 @@
   let anim = null, turning = false;                     // {x0, y0, a0, x1, y1, a1, t0, dur}
   const ANIM_MOVE = 220, ANIM_TURN = 200;               // durées en ms
   const view = document.getElementById("view");
-  const ctx = view.getContext("2d");
+  let ctx = view.getContext("2d");      // remplacé le temps du rendu d'un portail (renderPortal)
   const mapCanvas = document.getElementById("map");
   const mctx = mapCanvas.getContext("2d");
   const levelSel = document.getElementById("level");
@@ -354,7 +354,8 @@
     }
   }
 
-  async function loadLevel(n, keepPos) {
+  // Données et images d'un niveau, sans en faire le niveau affiché (aussi pour les portails)
+  async function fetchLevel(n) {
     const nn = String(n).padStart(2, "0");
     const [data, walls, spr, floor, ceil, bg, wang, upper] = await Promise.all([
       fetch(`data/level${nn}.json?v=${DATA_V}`).then((r) => r.json()),
@@ -366,22 +367,32 @@
       loadImage(`data/level${nn}_floor_wang.png?v=${DATA_V}`).catch(() => null),
       loadImage(`data/level${nn}_upper.png?v=${DATA_V}`).catch(() => null),
     ]);
-    L = data;
-    L.wallImgs = darken(walls, SHADES);
-    L.floorTex = pixels(floor);
-    L.ceilTex = pixels(ceil);
-    L.wangTex = data.floorWang && wang ? pixels(wang) : null;
-    L.sprImgs = darken(spr, SHADES);
-    L.sprSrc = spr; L.compCache = new Map();
-    L.wallInfo = [];
-    for (const [id, w] of Object.entries(L.walls)) L.wallInfo[+id] = w;
-    L.outdoor = OUTDOOR[L.tileset] || null;
-    if (L.outdoor) setupOutdoor(L, walls, bg);
+    const V = data;
+    V.wallImgs = darken(walls, SHADES);
+    V.floorTex = pixels(floor);
+    V.ceilTex = pixels(ceil);
+    V.wangTex = data.floorWang && wang ? pixels(wang) : null;
+    V.sprImgs = darken(spr, SHADES);
+    V.sprSrc = spr; V.compCache = new Map();
+    V.wallInfo = [];
+    for (const [id, w] of Object.entries(V.walls)) V.wallInfo[+id] = w;
+    V.outdoor = OUTDOOR[V.tileset] || null;
+    if (V.outdoor) {                                     // buildForest lit le niveau dans L (appel synchrone)
+      const prevL = L; L = V;
+      try { setupOutdoor(V, walls, bg); } finally { L = prevL; }
+    }
     // étage reconstitué des vues lointaines (docs/reverse-engineering.md § 9.3g), par texture
-    L.upperImgs = upper && L.outdoor ? darken(upper, SHADES) : null;
-    L.upperByTex = new Map();
-    for (const w of Object.values(L.walls)) if (w.upper !== undefined && w.tex >= 0) L.upperByTex.set(w.tex, w.upper);
-    buildDoorPanels(walls);
+    V.upperImgs = upper && V.outdoor ? darken(upper, SHADES) : null;
+    V.upperByTex = new Map();
+    for (const w of Object.values(V.walls)) if (w.upper !== undefined && w.tex >= 0) V.upperByTex.set(w.tex, w.upper);
+    V.wallsSrc = walls;
+    return V;
+  }
+  async function loadLevel(n, keepPos) {
+    const data = await fetchLevel(n), nn = String(n).padStart(2, "0");
+    L = data;
+    setupPortals(L);
+    buildDoorPanels(L.wallsSrc);
     doorShown.clear();
     openDoors = new Set();
     const saved = store.get("pos");
@@ -508,7 +519,7 @@
   function texFor(cx, cy, f) {
     const id = face(cx, cy, f), w = info(id);
     if (!w) return null;
-    const shown = doorShown.get((cy * 32 + cx) * 4 + f);
+    const shown = inPortal ? null : doorShown.get((cy * 32 + cx) * 4 + f);
     if (shown && w.door) {
       const s = doorSeries(id), closed = s && info(s.start);
       if (closed && closed.panel && closed.openTex !== undefined) {
@@ -516,7 +527,7 @@
         return { tex: closed.openTex, opaque: false, block: shown.q < 0.001, panel: closed.panel, panelTex: closed.tex, q: shown.q };
       }
     }
-    if (w.door && openDoors.has(cy * 32 + cx)) return w.openTex !== undefined ? { tex: w.openTex, opaque: false, block: false } : null;
+    if (w.door && !inPortal && openDoors.has(cy * 32 + cx)) return w.openTex !== undefined ? { tex: w.openTex, opaque: false, block: false } : null;
     if (w.tex < 0) return w.block ? { tex: -1, opaque: false, block: true } : null;
     return { tex: w.tex, opaque: w.opaque, block: w.block };
   }
@@ -536,7 +547,81 @@
   const GAME_FLOOR = { hx: 39, hk: 34.5, ak: 354.25, px: 0.75, upc: 3.1 };
   const zOfDeff = (d) => (d <= 0.5 ? d : 0.5 + Math.log(d / 0.5) / Math.log(KSTEP));
 
+  // --- Portails : passages vers un autre niveau et lieux en image -----------------------------
+  // Sortie vers un autre niveau (L.exits : case de sortie -> case d'arrivée) : derrière la porte, la
+  // vue montre le niveau d'arrivée. Rendu en deux passes : le niveau d'arrivée est d'abord dessiné
+  // (même perspective, position du groupe décalée de la sortie à l'arrivée) sur un canevas à part,
+  // puis la passe normale, arrivée à la case de sortie, y recopie la colonne de l'ouverture. Dans
+  // la passe du portail, les faces sont ignorées jusqu'à la case d'arrivée (porte et décor de l'autre
+  // côté). Lieu en image (boutique, bureau : case de la scène et case du lieu) : obscurité derrière
+  // la porte au lieu du bout de couloir vide de la carte. Rien de tout cela quand le groupe est dedans.
+  let inPortal = false, portalSkip = null, portalDrawn = null;
+  const portalCanvas = document.createElement("canvas"), portalLevels = new Map();
+  function setupPortals(V) {
+    V.portalCells = new Map();
+    for (const e of V.exits || []) {
+      const i = e.y * 32 + e.x;
+      V.portalCells.set(i, { kind: "level", level: e.level, ex: e.x, ey: e.y, tx: e.tx, ty: e.ty, region: new Set([i]) });
+    }
+    const scenes = V.scenes || {};
+    for (const l of V.labels || []) {
+      if (l.x2 == null) continue;
+      const a = l.y * 32 + l.x, b = l.y2 * 32 + l.x2;
+      if (!scenes[a] && !scenes[b]) continue;
+      const P = { kind: "void", region: new Set([a, b]), image: scenes[b] || scenes[a] };
+      for (const i of P.region) if (!V.portalCells.has(i)) V.portalCells.set(i, P);
+    }
+  }
+  function portalAt(cx, cy, pcx, pcy) {
+    if (inPortal || !L.portalCells) return null;
+    const P = L.portalCells.get(cy * 32 + cx);
+    if (!P || P.region.has(pcy * 32 + pcx) || P.region.has(Math.floor(player.y) * 32 + Math.floor(player.x))) return null;
+    return P;
+  }
+  function renderPortal() {
+    portalDrawn = null;
+    if (!L.portalCells) return;
+    let P = null, best = 1e9;
+    for (const q of L.portalCells.values()) {
+      if (q.kind !== "level") continue;
+      const d = Math.hypot(q.ex + 0.5 - player.x, q.ey + 0.5 - player.y);
+      if (d < best && d < 12) { best = d; P = q; }
+    }
+    if (!P || P.region.has(Math.floor(player.y) * 32 + Math.floor(player.x))) return;
+    const V = portalLevels.get(P.level);
+    if (!V) {
+      portalLevels.set(P.level, "loading");
+      fetchLevel(P.level).then((lv) => { portalLevels.set(P.level, lv); dirty = true; }, () => portalLevels.delete(P.level));
+      return;
+    }
+    if (V === "loading") return;
+    if (portalCanvas.width !== W || portalCanvas.height !== H) { portalCanvas.width = W; portalCanvas.height = H; }
+    const saved = { L, x: player.x, y: player.y, ctx, openDoors };
+    L = V; player.x += P.tx - P.ex; player.y += P.ty - P.ey; ctx = portalCanvas.getContext("2d"); openDoors = new Set();
+    inPortal = true; portalSkip = { x: P.tx, y: P.ty };
+    try { render(); portalDrawn = P; }
+    finally { L = saved.L; player.x = saved.x; player.y = saved.y; ctx = saved.ctx; openDoors = saved.openDoors; inPortal = false; portalSkip = null; }
+  }
+  // colonne x de l'ouverture d'un portail (top, hauteur colH à l'écran, u : position dans la face).
+  // Lieu en image : l'image du lieu (celle que le jeu montre en y entrant), assombrie, dans l'ouverture.
+  const sceneImgs = new Map();
+  function sceneImg(name) {
+    let im = sceneImgs.get(name);
+    if (!im) { im = new Image(); im.onload = () => { dirty = true; }; im.src = "data/scenes/" + name; sceneImgs.set(name, im); }
+    return im.complete && im.naturalWidth ? im : null;
+  }
+  function drawPortalColumn(P, x, top, colH, u) {
+    if (P.kind === "level" && portalDrawn === P) { ctx.drawImage(portalCanvas, x, top, 1, colH, x, top, 1, colH); return; }
+    ctx.fillStyle = "#050403"; ctx.fillRect(x, top, 1, colH);
+    const im = P.image && sceneImg(P.image);
+    if (!im || u === undefined) return;
+    ctx.globalAlpha = 0.8;
+    ctx.drawImage(im, Math.min(im.naturalWidth - 1, Math.floor(u * im.naturalWidth)), 0, 1, im.naturalHeight, x, top, 1, colH);
+    ctx.globalAlpha = 1;
+  }
+
   function render() {
+    if (!inPortal) renderPortal();
     // pendant une rotation, la perspective du jeu (4 directions seulement) cède la place à la réelle
     if (EMBED && persp === "jeu" && !looking && !turning) { renderGamePerspective(); return; }
     const dirX = Math.cos(player.a), dirY = Math.sin(player.a);
@@ -556,16 +641,28 @@
       let sdx = (rx < 0 ? player.x - cx : cx + 1 - player.x) * ddx;
       let sdy = (ry < 0 ? player.y - cy : cy + 1 - player.y) * ddy;
       items.length = 0;
-      let nearestOpaque = 1e9;
+      let nearestOpaque = 1e9, skipping = !!portalSkip;
       for (let s = 0; s < MAX_STEPS; s++) {
         let side;
+        const pcx = cx, pcy = cy;
         if (sdx < sdy) { sdx += ddx; cx += sx; side = 0; } else { sdy += ddy; cy += sy; side = 1; }
         if (!inside(cx, cy)) break;
+        if (skipping) { if (cx === portalSkip.x && cy === portalSkip.y) skipping = false; continue; }   // passe du portail
         const f = side === 0 ? (sx > 0 ? FACE_W : FACE_E) : (sy > 0 ? FACE_N : FACE_S);
         if (freeAt(cx, cy)) continue;                       // dessiné comme un sprite (projectSprites)
+        const P = portalAt(cx, cy, pcx, pcy);
         const t = texFor(cx, cy, f);
-        if (!t) continue;
+        if (!t && !P) continue;
         const dist = side === 0 ? sdx - ddx : sdy - ddy;
+        if (P && !(t && t.block && (t.opaque || t.tex < 0))) {   // porte ouverte d'une sortie ou d'un lieu en image
+          let u = side === 0 ? player.y + dist * ry : player.x + dist * rx;
+          u -= Math.floor(u);
+          if (f === FACE_E || f === FACE_N) u = 1 - u;
+          if (t && t.tex >= 0) items.push({ d: dist, tex: t.tex, u, pos: 0, line: 0, door: t.panel ? t : null });
+          items.push({ d: dist + 1e-3, portal: P, u });
+          nearestOpaque = dist; break;
+        }
+        if (!t) continue;
         let u = side === 0 ? player.y + dist * ry : player.x + dist * rx;
         const pos = u, line = side === 0 ? (cx << 3) | f : (cy << 3) | f;   // rangée de faces
         u -= Math.floor(u);
@@ -585,6 +682,7 @@
       items.sort((a, b) => b.d - a.d);
       for (const it of items) {
         const dist = Math.max(0.05, it.d);
+        if (it.portal) { const colH = WALL_H / dist * proj; drawPortalColumn(it.portal, x, H / 2 + pitch - colH / 2, colH, it.u); continue; }
         if (it.sp) {
           const sp = it.sp;
           if (sp.ghost) ctx.globalAlpha = sp.ghost === true ? 0.55 : sp.ghost;   // apparition sur événement, flaque
@@ -602,6 +700,7 @@
         }
       }
     }
+    if (inPortal) return;
     drawHealthBars(sprites);
     drawSwitch();
     pickables = sprites.filter((sp) => sp.item);
@@ -851,7 +950,7 @@
     for (let x = 0; x < W; x++) {
       const u = x + 0.5 - W / 2;
       let cx = Math.floor(player.x), cy = Math.floor(player.y);
-      let pwx = player.x, pwy = player.y, pz = 0, nearest = 1e9, done = false;
+      let pwx = player.x, pwy = player.y, pz = 0, nearest = 1e9, done = false, skipping = !!portalSkip;
       items.length = 0;
       for (let z = DZ; z < ZMAX && !done; z += DZ) {
         const lat = u * deff(z) / proj;
@@ -869,10 +968,18 @@
           if (c.axis === 0) { const nx = ncx > cx ? cx + 1 : cx - 1; f = nx > cx ? FACE_W : FACE_E; cx = nx; uu = hy - Math.floor(hy); pos = hy; line = (cx << 3) | f; }
           else { const ny = ncy > cy ? cy + 1 : cy - 1; f = ny > cy ? FACE_N : FACE_S; cy = ny; uu = hx - Math.floor(hx); pos = hx; line = (cy << 3) | f; }
           if (!inside(cx, cy)) { done = true; break; }
+          if (skipping) { if (cx === portalSkip.x && cy === portalSkip.y) skipping = false; continue; }   // passe du portail
           if ((fx === 0 ? c.axis === 0 : c.axis === 1) && freeAt(cx, cy)) continue;   // objet : vu de face seulement
+          const P = portalAt(cx, cy, c.axis === 0 ? cx - (f === FACE_W ? 1 : -1) : cx, c.axis === 1 ? cy - (f === FACE_N ? 1 : -1) : cy);
           const t = texFor(cx, cy, f);
-          if (!t) continue;
+          if (!t && !P) continue;
           if (f === FACE_E || f === FACE_N) uu = 1 - uu;
+          if (P && !(t && t.block && (t.opaque || t.tex < 0))) {   // porte ouverte d'une sortie ou d'un lieu en image
+            if (t && t.tex >= 0) items.push({ d: hz, tex: t.tex, u: uu, pos, line, door: t.panel ? t : null });
+            items.push({ d: hz + 1e-3, portal: P, u: uu });
+            nearest = hz; done = true; break;
+          }
+          if (!t) continue;
           if (t.tex >= 0) items.push({ d: hz, tex: t.tex, u: uu, pos, line, door: t.panel ? t : null });
           if (t.block && (t.opaque || t.tex < 0)) { nearest = hz; done = true; break; }
         }
@@ -888,6 +995,7 @@
       items.sort((a, b) => b.d - a.d);
       for (const it of items) {
         const dist = Math.max(0.05, it.d);
+        if (it.portal) { const colH = WALL_H * proj / deff(dist); drawPortalColumn(it.portal, x, half - colH / 2, colH, it.u); continue; }
         if (it.sp) {
           const sp = it.sp;
           if (sp.alpha) ctx.globalAlpha = sp.alpha;
@@ -903,6 +1011,7 @@
         }
       }
     }
+    if (inPortal) return;
     drawHealthBars(sprites);
     drawSwitch();
     pickables = sprites.filter((sp) => sp.item);
@@ -1025,6 +1134,7 @@
     }
     const cols = L.atlasCols, fw = L.faceW, fh = L.faceH, unit = W / 2 / Math.hypot(planeX, planeY);
     for (const [cx, cy] of freeObjects()) {             // objets au centre d'une case : face entière, de face
+      if (portalSkip && cx === portalSkip.x && cy === portalSkip.y) continue;   // décor de la porte, de l'autre côté
       const dx = cx + 0.5 - player.x, dy = cy + 0.5 - player.y;
       const tx = inv * (dirY * dx - dirX * dy), tz = inv * (-planeY * dx + planeX * dy);
       if (tz < 0.2) continue;
