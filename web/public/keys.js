@@ -20,15 +20,18 @@
     { id: "TR", group: "jeu", label: "Tourner à droite", def: SCUMM ? "KeyD" : "KeyE" },
     { id: "SLL", group: "jeu", label: "Pas à gauche", def: SCUMM ? "KeyQ" : "KeyA" },
     { id: "SLR", group: "jeu", label: "Pas à droite", def: SCUMM ? "KeyE" : "KeyD" },
-    { id: "AT1", group: "jeu", label: "Attaque, personnage 1", def: "Digit1" },
-    { id: "AT2", group: "jeu", label: "Attaque, personnage 2", def: "Digit2" },
-    { id: "AT3", group: "jeu", label: "Attaque, personnage 3", def: "Digit3" },
+    // sous ScummVM, 1 à 9 vont à la barre d'actions (minimap.js) ; les attaques gardent F1-F3
+    { id: "AT1", group: "jeu", label: "Attaque, personnage 1", def: SCUMM ? "" : "Digit1" },
+    { id: "AT2", group: "jeu", label: "Attaque, personnage 2", def: SCUMM ? "" : "Digit2" },
+    { id: "AT3", group: "jeu", label: "Attaque, personnage 3", def: SCUMM ? "" : "Digit3" },
+    ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({ id: "bar" + n, group: "barre", label: `Case ${n}`, def: "Digit" + n, scumm: true })),
     { id: "map", group: "page", label: "Grande carte", def: "Tab" },
     { id: "inv", group: "page", label: "Inventaire", def: "KeyI" },
     { id: "switch", group: "page", label: "Actionner l'interrupteur devant le groupe", def: "Space", scumm: true },
     { id: "minimap", group: "page", label: "Afficher/masquer le panneau", def: "F9" },
     { id: "view3d", group: "page", label: "Afficher/masquer la vue 3D", def: "F10" },
     { id: "party", group: "page", label: "Afficher/masquer les portraits", def: "F7" },
+    { id: "bar", group: "page", label: "Afficher/masquer la barre d'actions", def: "F6", scumm: true },
     { id: "zqsd", group: "page", label: "Activer/désactiver les touches du jeu", def: "F8", dosbox: true },
   ].filter((a) => !(a.scumm && !SCUMM) && !(a.dosbox && SCUMM));
   // touches fixes du jeu sous ScummVM (keymap de scummvm.ini, tools/scummvm_web.py)
@@ -85,7 +88,18 @@
   const is = (e, id) => !!e && !e.ctrlKey && !e.metaKey && !e.altKey && e.code === codeOf(id) && !!e.code;
   const typing = (t) => !!(t && t.closest && t.closest("input, textarea, select, [contenteditable]"));
 
-  window.LoLKeys = { ACTIONS, FIXED, ENGINE, codeOf, actionFor, assign, reset, keyName, is, typing,
+  // appui sur la touche fixe d'une action du jeu (ScummVM), p. ex. une attaque depuis la barre d'actions
+  function pressGame(id) {
+    const f = document.getElementById("dos"), k = FIXED[id];
+    let win; try { win = f && f.contentWindow; } catch (e) { return; }
+    if (!win || !k) return;
+    for (const type of ["keydown", "keyup"]) {
+      const ev = new win.KeyboardEvent(type, { key: k[0], code: k[0], keyCode: k[1], which: k[1], bubbles: true, cancelable: true });
+      ev.lolMapped = true;
+      (win.document.body || win.document).dispatchEvent(ev);
+    }
+  }
+  window.LoLKeys = { ACTIONS, FIXED, ENGINE, codeOf, actionFor, assign, reset, keyName, is, typing, pressGame,
     onChange: (f) => listeners.add(f), fixedLabel: (id) => FIXED_LABEL[id] || "" };
 
   // --- ScummVM : traduction dans la fenêtre du jeu ---------------------------------------------------
@@ -175,7 +189,8 @@
     let waiting = null;
     function render() {
       body.innerHTML = "";
-      for (const [group, title, note] of [["jeu", "Jeu", "en plus de"], ["page", "Page", ""]]) {
+      for (const [group, title, note] of [["jeu", "Jeu", "en plus de"], ["barre", "Barre d'actions", ""], ["page", "Page", ""]]) {
+        if (!ACTIONS.some((q) => q.group === group)) continue;
         const h = document.createElement("h3"); h.textContent = title; body.appendChild(h);
         for (const a of ACTIONS.filter((q) => q.group === group)) {
           const row = document.createElement("div"); row.className = "kr";

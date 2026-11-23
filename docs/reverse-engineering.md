@@ -1613,6 +1613,28 @@ The meaning of the functions, however, can be read directly. Comparison with our
   - **Verified with ScummVM**: Michael's frame at the start (20 / 20, 6 / 6), moved by dragging,
     position kept, F7 hides and shows it. The wounded face was not checked, because the test
     profile has the infinite-life cheat.
+- **Action bar and item stacks** (ScummVM version, 2026-11-23).
+  - **Using an item**: in the game, an item is used by holding it and right-clicking a portrait
+    (`clickedPortraitEtcRight`). The item must have property flag 1, and the character must not be
+    out of action (flags & 8), unless the item has flag 0x20. The game then runs the item script
+    with 0x400 and the level script (`runLevelScriptCustom` 0x400).
+  - **Command 21** (`use`): a = bag slot, b = character. It does the same with the bag item: it
+    puts the item in hand, runs both scripts, then gives back the item held before. Whatever is
+    left in hand (an item not consumed) goes back into the bag. Answers: 0 used, 3 empty slot, 4 not
+    usable, 5 character out of action, 11 dialogue or scene, 13 magic menu open.
+  - **Bar**: 9 floating slots, keys 1–9 (configurable; under ScummVM the attacks keep only F1–F3).
+    It sits below the game screen and can be moved with its grip; F6 shows or hides it. It is
+    hidden until the game has started, because it covered the start menu's buttons.
+  - **Slot content**: an item type or a character's attack (the game's F1–F3 key). An item slot
+    shows the number of that type in the bag (a stack). Pressing the key uses the first one on the
+    chosen character, by default the most wounded (lowest share of life).
+  - **Filling the bar**: drag an item from the inventory onto the bar row shown in the inventory
+    window, which is modal, so the floating bar cannot be reached. Right-click a slot for attacks,
+    target and clearing.
+  - **Stacks view**: the "Par piles" button shows the bag as one slot per item type, with a count;
+    each item still has its own slot in the game. Dragging a stack moves its first item.
+  - **Verified**: 3 aloes created (4 in the bag), life lowered to 8 / 20, aloe dragged onto slot 1
+    in the stacks view, key 1 → 13 / 20 and 3 left. Slot 2 set to "Attaque : Michael" from its menu.
 - **Teleportation** (ScummVM version, 2026-11-13).
   - **Within the level**: command op 13 (a = cell, b = direction or -1). It does the same as
     `olol_setGlobalVar(0, …)`, used by the scripts' teleporters: `_currentBlock`,
@@ -2312,3 +2334,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: keys window: actions can be left without a key; a key taken from another action leaves it unbound (§ 10a). Verified: switch on E, sidestep right unbound, Space no longer opens the door, E does.
 - **2026-11-23**: 3D view: a drag starting on a switch looks around instead of being ignored (§ 9.6).
 - **2026-11-23**: floating party portraits (FACEnn.SHP, frame chosen like gui_drawCharFaceShape) (§ 10a).
+- **2026-11-23**: action bar (keys 1–9, items used by engine command 21, attacks) and stacks view of the bag (§ 10a).

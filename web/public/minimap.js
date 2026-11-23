@@ -1499,7 +1499,9 @@
   // rôle des 11 emplacements d'équipement, déduit des masques de la table des objets (§ 8.2)
   const EQUIP_NAMES = ["arme", "bouclier", "arme (2)", "bouclier (2)", "tête", "corps", "cou", "poignets", "pieds", "anneau", "anneau (2)"];
   let lastInvData = null;
-  let lastInv = "", owned = new Set(), lastHand = -1;         // types d'objets possédés (inventaire, main, équipement)
+  let lastInv = "", owned = new Set(), lastHand = -1;
+  let stackView = false;                                     // sac affiché par piles d'objets identiques
+  try { stackView = localStorage.getItem("invStacks") === "on"; } catch (e) {}         // types d'objets possédés (inventaire, main, équipement)
   async function updateInventory() {
     if (!itemInfo || previewing) return;
     const r = await mem.read([[INV.bar, INV.barSlots * 2], [INV.hand, 2], [INV.items, INV.itemSize * INV.maxItems],
@@ -1518,8 +1520,19 @@
     if (key === lastInv) return;          // on ne reconstruit la grille que si elle a changé
     lastInv = key;
 
-    invBar.replaceChildren(...barTypes.map((t, k) => slot(t, `case ${k + 1}`, k)));
+    if (stackView) {
+      // par piles : une case par type d'objet (la première où il se trouve), avec le nombre
+      // d'exemplaires ; chaque objet garde sa propre case dans le sac du jeu
+      const first = new Map(), count = new Map();
+      barTypes.forEach((t, k) => { if (t < 0) return; if (!first.has(t)) first.set(t, k); count.set(t, (count.get(t) || 0) + 1); });
+      invBar.replaceChildren(...[...first].map(([t, k]) => {
+        const d = slot(t, count.get(t) > 1 ? `pile de ${count.get(t)}` : `case ${k + 1}`, k);
+        if (count.get(t) > 1) { const n = document.createElement("span"); n.className = "cnt"; n.textContent = count.get(t); d.appendChild(n); }
+        return d;
+      }));
+    } else invBar.replaceChildren(...barTypes.map((t, k) => slot(t, `case ${k + 1}`, k)));
     invCount.textContent = `${barTypes.filter((t) => t >= 0).length} / ${INV.barSlots} cases occupées`;
+    if (window.lolActionBarRefresh) window.lolActionBarRefresh();
     document.getElementById("inv-mini-count").textContent = invCount.textContent;
     invHand.replaceChildren(slot(handType, "en main", LOC_HAND));
     document.querySelectorAll("#inv .slot.sel").forEach((e) => e.classList.remove("sel"));
@@ -2428,6 +2441,259 @@
     }
     setInterval(() => { updateFloat().catch(() => {}); }, 250);
     show(on);
+  }
+
+  // --- Barre d'actions (version ScummVM) ---------------------------------------------------------
+  // 9 cases, touches 1 à 9 (réglables, keys.js). Une case contient un type d'objet (pile : nombre
+  // d'exemplaires dans le sac) ou l'attaque d'un personnage. Objet : la commande « use » (op 21)
+  // l'utilise sur un personnage comme un clic droit sur son portrait avec l'objet en main ; cible
+  // « auto » = le personnage valide le plus blessé (proportion de vie). Attaque : touche F1-F3 du jeu.
+  // On remplit la barre depuis l'inventaire (glisser un objet sur une case) ; clic droit sur une case :
+  // attaques, cible, vider. Barre déplaçable (poignée ⠿), position gardée ; F6 : afficher/masquer.
+  if (MANAGE) {
+    const css = document.createElement("style");
+    css.textContent = `
+    #action-bar { position: fixed; z-index: 1002; display: flex; align-items: center; gap: 3px; padding: 4px 6px 4px 2px;
+      background: rgba(12, 10, 7, .8); border: 1px solid #6d5a3a; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.6);
+      font: 11px/1 system-ui, sans-serif; color: #e8dcc0; user-select: none; touch-action: none; }
+    #action-bar[hidden] { display: none; }
+    #action-bar .grip { width: 14px; align-self: stretch; display: flex; align-items: center; justify-content: center; color: #6d5a3a; cursor: grab; font-size: 14px; }
+    .ab { position: relative; width: 40px; height: 40px; box-sizing: border-box; border: 1px solid #3a3226; border-radius: 4px;
+      background-color: #17130e; image-rendering: pixelated; cursor: pointer; }
+    .ab.full { border-color: #6d5a3a; background-image: url("viewer/data/item_icons.png"); background-size: 640px auto; background-repeat: no-repeat; }
+    .ab:hover { border-color: #c9a227; }
+    .ab.drop { outline: 2px dashed #28dce6; outline-offset: -1px; }
+    .ab.empty-stack { filter: grayscale(1) brightness(.5); }
+    .ab.flash { box-shadow: 0 0 0 2px #c9a227 inset; }
+    .ab.fail { box-shadow: 0 0 0 2px #e0442a inset; }
+    .ab .k { position: absolute; left: 2px; top: 1px; color: #c9a227; font-weight: 700; text-shadow: 0 0 2px #000; }
+    .ab .cnt { position: absolute; right: 2px; bottom: 1px; color: #fff; font-weight: 700; text-shadow: 0 0 2px #000, 0 0 2px #000; }
+    .ab .atk { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; font-size: 9px; color: #ffd2a0; }
+    .ab .atk b { font-size: 16px; }
+    #ab-tip { position: fixed; z-index: 1003; padding: 3px 7px; border-radius: 4px; background: #0f0d0a; border: 1px solid #6d5a3a; color: #e8dcc0;
+      font: 12px system-ui, sans-serif; pointer-events: none; }
+    #ab-tip[hidden] { display: none; }
+    #ab-menu { position: fixed; z-index: 1004; min-width: 170px; padding: 4px; border: 1px solid #6d5a3a; border-radius: 6px; background: #0f0d0a;
+      font: 13px system-ui, sans-serif; box-shadow: 0 8px 24px rgba(0,0,0,.7); }
+    #ab-menu[hidden] { display: none; }
+    #ab-menu .h { padding: 3px 8px; color: #8a7f68; font-size: 11px; }
+    #ab-menu button { display: block; width: 100%; text-align: left; padding: 4px 8px; border: 0; border-radius: 4px; background: none; color: #e8dcc0; cursor: pointer; font: inherit; }
+    #ab-menu button:hover { background: #2a2217; }
+    #ab-menu button.on::before { content: "✓ "; color: #c9a227; }`;
+    document.head.appendChild(css);
+    const N = 9, AB_ICON = 40;
+    let bar = [];
+    try { bar = JSON.parse(localStorage.getItem("lol-actionbar") || "[]") || []; } catch (e) { bar = []; }
+    bar = Array.from({ length: N }, (_, i) => bar[i] || null);
+    const saveBar = () => { try { localStorage.setItem("lol-actionbar", JSON.stringify(bar)); } catch (e) {} refresh(); };
+    const el = document.createElement("div"); el.id = "action-bar";
+    const grip = document.createElement("div"); grip.className = "grip"; grip.textContent = "⠿"; grip.title = "Glisser pour déplacer la barre";
+    el.appendChild(grip);
+    const tip = document.createElement("div"); tip.id = "ab-tip"; tip.hidden = true;
+    const menu = document.createElement("div"); menu.id = "ab-menu"; menu.hidden = true;
+    document.body.append(el, tip, menu);
+    const invRow = document.getElementById("inv-abar-row"), invAbar = document.getElementById("inv-abar");
+    if (invRow) invRow.hidden = false;
+
+    const bagTypes = () => (lastInvData ? lastInvData.barTypes : []);
+    const countOf = (t) => bagTypes().filter((x) => x === t).length;
+    const partyNow = () => (lastInvData ? lastInvData.party : []);
+    function slotEl(i, inDialog) {
+      const a = bar[i], d = document.createElement("div");
+      d.className = "ab"; d.dataset.i = i;
+      const k = document.createElement("span"); k.className = "k";
+      const code = window.LoLKeys ? LoLKeys.codeOf("bar" + (i + 1)) : "Digit" + (i + 1);
+      k.textContent = code ? LoLKeys.keyName(code) : "";
+      if (a && a.k === "item" && itemInfo) {
+        const it = itemInfo[a.t] || { name: `objet ${a.t}`, icon: -1 }, n = countOf(a.t);
+        d.classList.add("full");
+        if (it.icon >= 0) d.style.backgroundPosition = `-${(it.icon % ICON_COLS) * AB_ICON}px -${Math.floor(it.icon / ICON_COLS) * AB_ICON}px`;
+        if (!n) d.classList.add("empty-stack");
+        const c = document.createElement("span"); c.className = "cnt"; c.textContent = n; d.appendChild(c);
+        const who = a.for === undefined || a.for === "auto" ? "le plus blessé" : (partyNow().find((p) => p.slot === a.for) || {}).name || "?";
+        d.dataset.tip = `${it.name} — ${n} dans le sac · utiliser sur : ${who}`;
+      } else if (a && a.k === "atk") {
+        const p = partyNow().find((q) => q.slot === a.c);
+        const box = document.createElement("div"); box.className = "atk"; box.innerHTML = "<b>⚔</b><span></span>";
+        box.lastChild.textContent = p ? p.name : `perso ${a.c + 1}`;
+        d.appendChild(box);
+        d.dataset.tip = `Attaque : ${p ? p.name : "personnage " + (a.c + 1)}`;
+      } else d.dataset.tip = inDialog ? "Case vide : glisser un objet du sac ici" : "Case vide : clic droit pour une attaque, ou glisser un objet depuis l'inventaire (I)";
+      d.appendChild(k);
+      return d;
+    }
+    function refresh() {
+      if (!itemInfo) return;
+      const keep = el.querySelectorAll(".ab").length;
+      el.replaceChildren(grip, ...bar.map((_, i) => slotEl(i, false)));
+      if (invAbar) invAbar.replaceChildren(...bar.map((_, i) => {
+        const d = slotEl(i, true);
+        // dépôt d'un objet glissé depuis le sac, la main ou l'équipement (dragFrom = emplacement)
+        d.addEventListener("dragover", (e) => { if (dragFrom >= 0) { e.preventDefault(); d.classList.add("drop"); } });
+        d.addEventListener("dragleave", () => d.classList.remove("drop"));
+        d.addEventListener("drop", (e) => {
+          e.preventDefault(); d.classList.remove("drop");
+          const t = typeAtLoc(dragFrom); dragFrom = -1;
+          if (t >= 0) { bar[i] = { k: "item", t, for: "auto" }; saveBar(); }
+        });
+        return d;
+      }));
+      if (!keep) place();
+    }
+    window.lolActionBarRefresh = refresh;
+    function typeAtLoc(loc) {
+      if (!lastInvData) return -1;
+      if (loc >= 0 && loc < 48) return lastInvData.barTypes[loc];
+      if (loc === LOC_HAND) return lastInvData.handType;
+      if (loc >= 200) { const c = lastInvData.party.find((p) => p.slot === Math.floor((loc - 200) / 11)); return c ? c.eq[(loc - 200) % 11] : -1; }
+      return -1;
+    }
+
+    // déclenchement
+    const USE_ERR = { 1: "impossible", 3: "case vide", 4: "cet objet ne s'utilise pas ainsi", 5: "personnage hors de combat",
+      11: "pas pendant un dialogue", 13: "menu de magie ouvert" };
+    function flash(i, ok, msg) {
+      for (const d of document.querySelectorAll(`.ab[data-i="${i}"]`)) {
+        d.classList.add(ok ? "flash" : "fail"); setTimeout(() => d.classList.remove("flash", "fail"), 350);
+      }
+      if (msg) showTip(el.querySelector(`.ab[data-i="${i}"]`), msg, 1800);
+    }
+    async function autoTarget() {
+      const r = await mem.read([PARTY_RANGE()]);
+      if (!r) return 0;
+      let best = -1, bestQ = 2;
+      for (const c of partyChars(r[0])) {
+        const u16 = (k) => c.at(k) | c.at(k + 1) << 8, s16 = (k) => (u16(k) << 16) >> 16;
+        const flags = r[0][c.slot * INV.charSize] | r[0][c.slot * INV.charSize + 1] << 8;
+        const hp = s16(55), max = u16(57);
+        if (flags & 8 || hp <= 0 || !max) continue;
+        const q = hp / max;
+        if (q < bestQ) { bestQ = q; best = c.slot; }
+      }
+      return best < 0 ? 0 : best;
+    }
+    let busyUse = false;
+    async function trigger(i) {
+      const a = bar[i];
+      if (!a) { flash(i, false, "Case vide"); return; }
+      if (a.k === "atk") { LoLKeys.pressGame("AT" + (a.c + 1)); flash(i, true); return; }
+      if (busyUse) return;
+      const loc = bagTypes().indexOf(a.t);
+      if (loc < 0) { flash(i, false, `Plus de ${(itemInfo[a.t] || {}).name || "cet objet"} dans le sac`); return; }
+      busyUse = true;
+      try {
+        const who = a.for === undefined || a.for === "auto" ? await autoTarget() : a.for;
+        const r = await mem.cmd({ op: "use", a: loc, b: who }, 4000);
+        if (!r) flash(i, false, "Le jeu ne répond pas (menu ouvert ?)");
+        else if (r.code) flash(i, false, USE_ERR[r.code] || `refusé (code ${r.code})`);
+        else flash(i, true);
+        lastInv = ""; setTimeout(() => updateInventory().catch(() => {}), 150);
+      } finally { busyUse = false; }
+    }
+    // touches : depuis la page et depuis la fenêtre du jeu (où arrivent aussi celles de la vue 3D)
+    const onKey = (e) => {
+      if (!window.LoLKeys || e.ctrlKey || e.metaKey || e.altKey || LoLKeys.typing(e.target)) return;
+      if (LoLKeys.is(e, "bar")) { if (document.querySelector("dialog[open]")) return; e.preventDefault(); e.stopImmediatePropagation(); showBar(el.hidden); return; }
+      const id = LoLKeys.actionFor(e.code, "barre");
+      if (!id || document.querySelector("dialog[open]")) return;
+      try { const w = document.getElementById("dos").contentWindow; if (w.lolMenuOpen && w.lolMenuOpen()) return; } catch (err) {}
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (!e.repeat) trigger(+id.slice(3) - 1);
+    };
+    addEventListener("keydown", onKey, true);
+    const hookK = () => { const f = document.querySelector("iframe#dos"); try { if (f && f.contentWindow) f.contentWindow.addEventListener("keydown", onKey, true); } catch (e) {} };
+    hookK();
+    { const f = document.querySelector("iframe#dos"); if (f) f.addEventListener("load", hookK); }
+    if (window.LoLKeys) LoLKeys.onChange(refresh);
+
+    // souris : clic = déclencher, clic droit = menu, poignée = déplacer
+    function showTip(d, text, ms) {
+      if (!d || !text) { tip.hidden = true; return; }
+      const r = d.getBoundingClientRect();
+      tip.textContent = text; tip.hidden = false;
+      tip.style.left = Math.max(4, Math.min(innerWidth - tip.offsetWidth - 4, r.left + r.width / 2 - tip.offsetWidth / 2)) + "px";
+      tip.style.top = Math.max(4, r.top - tip.offsetHeight - 6) + "px";
+      clearTimeout(showTip.t); if (ms) showTip.t = setTimeout(() => { tip.hidden = true; }, ms);
+    }
+    el.addEventListener("mouseover", (e) => { const d = e.target.closest(".ab"); if (d) showTip(d, d.dataset.tip); });
+    el.addEventListener("mouseleave", () => { tip.hidden = true; });
+    el.addEventListener("click", (e) => {
+      const d = e.target.closest(".ab"); if (!d) return;
+      trigger(+d.dataset.i);
+      const g = document.getElementById("dos"); if (g && g.focus) g.focus();
+    });
+    function openMenu(i, x, y) {
+      const a = bar[i], items = [];
+      menu.replaceChildren();
+      const add = (text, fn, on) => { const b = document.createElement("button"); b.type = "button"; b.textContent = text; if (on) b.className = "on"; b.addEventListener("click", () => { menu.hidden = true; fn(); }); menu.appendChild(b); };
+      const head = (t) => { const h = document.createElement("div"); h.className = "h"; h.textContent = t; menu.appendChild(h); };
+      head(`Case ${i + 1}`);
+      for (const p of partyNow()) add(`Attaque : ${p.name}`, () => { bar[i] = { k: "atk", c: p.slot }; saveBar(); }, a && a.k === "atk" && a.c === p.slot);
+      if (a && a.k === "item") {
+        head("Utiliser sur");
+        add("Le plus blessé", () => { a.for = "auto"; saveBar(); }, a.for === undefined || a.for === "auto");
+        for (const p of partyNow()) add(p.name, () => { a.for = p.slot; saveBar(); }, a.for === p.slot);
+      }
+      if (a) add("Vider la case", () => { bar[i] = null; saveBar(); });
+      if (!partyNow().length && !a) head("Glisser un objet depuis l'inventaire (I)");
+      menu.hidden = false;
+      menu.style.left = Math.min(innerWidth - menu.offsetWidth - 4, x) + "px";
+      menu.style.top = Math.max(4, y - menu.offsetHeight) + "px";
+    }
+    const ctx = (e) => { const d = e.target.closest(".ab"); if (!d) return; e.preventDefault(); openMenu(+d.dataset.i, e.clientX, e.clientY); };
+    el.addEventListener("contextmenu", ctx);
+    if (invAbar) invAbar.addEventListener("contextmenu", (e) => {
+      // dans la fenêtre d'inventaire (modale) : menu dans la fenêtre pour rester cliquable
+      const dlg = document.getElementById("inv-dlg");
+      if (menu.parentNode !== dlg) dlg.appendChild(menu);
+      ctx(e);
+    });
+    el.addEventListener("contextmenu", () => { if (menu.parentNode !== document.body) document.body.appendChild(menu); }, true);
+    addEventListener("pointerdown", (e) => { if (!menu.hidden && !menu.contains(e.target)) menu.hidden = true; }, true);
+
+    let pos = null, on = true;
+    try { pos = JSON.parse(localStorage.getItem("actionBarPos") || "null"); on = localStorage.getItem("actionBar") !== "off"; } catch (e) {}
+    function place() {
+      const r = el.getBoundingClientRect(), w = r.width || 420, h = r.height || 50;
+      let x, y;
+      if (pos) { x = pos.x; y = pos.y; }
+      else { const g = document.getElementById("dos"), gr = g ? g.getBoundingClientRect() : { left: 0, top: 0, width: innerWidth, height: innerHeight };
+        // juste sous l'écran du jeu (sa rangée d'objets est en bas), sinon en bas de la fenêtre
+        x = gr.left + gr.width / 2 - w / 2; y = gr.top + gr.height + 6 + h <= innerHeight ? gr.top + gr.height + 6 : innerHeight - h - 8; }
+      el.style.left = Math.max(0, Math.min(innerWidth - w, x)) + "px"; el.style.top = Math.max(0, Math.min(innerHeight - h, y)) + "px";
+    }
+    // cachée tant que la partie n'a pas commencé (introduction, menu principal : boutons du jeu dessous)
+    const started = () => { try { const w = document.getElementById("dos").contentWindow; return !!(w.lolStarted && w.lolStarted()); } catch (e) { return false; } };
+    function showBar(v) { on = v; try { localStorage.setItem("actionBar", on ? "on" : "off"); } catch (e) {} sync(); }
+    function sync() { const vis = on && started(); if (el.hidden === !vis) return; el.hidden = !vis; if (vis) place(); }
+    el.hidden = true;
+    setInterval(sync, 500);
+    addEventListener("resize", place);
+    let drag = null;
+    grip.addEventListener("pointerdown", (e) => {
+      const r = el.getBoundingClientRect();
+      drag = { dx: e.clientX - r.left, dy: e.clientY - r.top }; grip.setPointerCapture(e.pointerId); e.preventDefault();
+    });
+    grip.addEventListener("pointermove", (e) => { if (!drag) return; pos = { x: e.clientX - drag.dx, y: e.clientY - drag.dy }; place(); });
+    grip.addEventListener("pointerup", () => {
+      if (!drag) return; drag = null;
+      try { localStorage.setItem("actionBarPos", JSON.stringify(pos)); } catch (e) {}
+      const g = document.getElementById("dos"); if (g && g.focus) g.focus();
+    });
+    const waitItems = () => { if (itemInfo) { refresh(); showBar(on); } else setTimeout(waitItems, 300); };
+    waitItems();
+  }
+  {
+    const b = document.getElementById("inv-stacks");
+    if (b) {
+      const paint = () => { b.classList.toggle("on", stackView); b.textContent = stackView ? "Par piles ✓" : "Par piles"; };
+      paint();
+      b.addEventListener("click", () => {
+        stackView = !stackView; paint(); b.blur();
+        try { localStorage.setItem("invStacks", stackView ? "on" : "off"); } catch (e) {}
+        lastInv = ""; updateInventory().catch(() => {});
+      });
+    }
   }
 
   // --- Triche : monter de niveau ---------------------------------------------------

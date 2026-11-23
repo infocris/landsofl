@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lands of Lore</title>
 <script src="volume.js?v=20261110a"></script>
-<script src="keys.js?v=20261123c"></script>
+<script src="keys.js?v=20261123d"></script>
 <link rel="stylesheet" href="js-dos.css">
 <script src="js-dos.js"></script>
 <!-- ?v= : à changer à chaque modification des scripts (évite les copies en cache) -->
@@ -288,6 +288,13 @@
   /* emplacement d'équipement vide : silhouette du jeu (slot_shapes.png) */
   .slot.ph { background-image: url("viewer/data/slot_shapes.png?v=20261114b"); background-repeat: no-repeat; image-rendering: pixelated; }
   .slot.sel { outline: 2px solid #c9a227; outline-offset: -1px; }
+  .slot { position: relative; }
+  .slot .cnt { position: absolute; right: 1px; bottom: 0; font: bold 10px/1 system-ui, sans-serif; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000; }
+  #inv-stacks.on { border-color: #c9a227; color: #c9a227; }
+  #inv-abar-row { margin-top: 6px; color: #a39578; font-size: 11px; }
+  #inv-abar-row[hidden] { display: none; }
+  #inv-abar-row small { color: #8a7f68; }
+  #inv-abar { display: flex; gap: 3px; margin-top: 3px; }
   /* gestion de l'inventaire (version ScummVM) : glisser-déposer et actions de la fiche */
   .slot.drop { outline: 2px dashed #28dce6; outline-offset: -1px; }
   #inv-detail .acts { grid-column: 1 / 4; display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
@@ -448,8 +455,9 @@
   <div class="cat-head"><h2>Inventaire et équipement</h2><button type="button" id="inv-close" title="Fermer (Échap, I)">✕</button></div>
   <div class="inv-body">
     <div id="inv">
-      <div class="inv-head"><span class="inv-title">Inventaire</span><span id="inv-count">en attente du jeu…</span><span class="inv-actions"><button type="button" id="inv-copy" title="Copier le contenu de l'inventaire en texte">Copier</button><button type="button" id="inv-save" title="Enregistrer le contenu de l'inventaire dans un fichier texte">.txt</button><button type="button" id="inv-clear" hidden title="Détruire tous les objets du sac (l'équipement et l'objet en main sont gardés) — deuxième clic pour confirmer">Vider</button></span></div>
+      <div class="inv-head"><span class="inv-title">Inventaire</span><span id="inv-count">en attente du jeu…</span><span class="inv-actions"><button type="button" id="inv-stacks" title="Afficher le sac case par case ou par piles d'objets identiques">Par piles</button><button type="button" id="inv-copy" title="Copier le contenu de l'inventaire en texte">Copier</button><button type="button" id="inv-save" title="Enregistrer le contenu de l'inventaire dans un fichier texte">.txt</button><button type="button" id="inv-clear" hidden title="Détruire tous les objets du sac (l'équipement et l'objet en main sont gardés) — deuxième clic pour confirmer">Vider</button></span></div>
       <div id="inv-bar" class="inv-grid"></div>
+      <div id="inv-abar-row" hidden>Barre d'actions <small>(glisser un objet sur une case ; clic droit : options)</small><div id="inv-abar"></div></div>
       <div id="inv-handrow">En main <span id="inv-hand"></span></div>
       <div id="inv-chars"></div>
       <div id="inv-hint"></div>
@@ -752,7 +760,7 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261123f"></script>
+<script src="minimap.js?v=20261123i"></script>
 <script src="engine.js?v=20261113a"></script>
 </body>
 </html>
