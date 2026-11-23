@@ -903,6 +903,7 @@
   bigCanvas.addEventListener("dblclick", (e) => {
     const c = (current || bigOther()) && bigCellAt(e);
     if (!c || !MANAGE) return;
+    if (window.lolCheatsShown && !window.lolCheatsShown()) { bigHint.textContent = "Téléportation : triche cachée (Options…)."; return; }
     const i = c[1] * 32 + c[0];
     // mêmes règles que sur le niveau du groupe ; un autre niveau est chargé (commande goto)
     const check = withBigLevel(() => !visible(current, i) ? "Case inexplorée." : opaque(current, i) && cellClass(current, i) !== "doorClosed" ? "Case pleine." : "");
