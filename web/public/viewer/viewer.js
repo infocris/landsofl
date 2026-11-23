@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261123n";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261123p";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -604,6 +604,7 @@
     }
     drawHealthBars(sprites);
     drawSwitch();
+    pickables = sprites.filter((sp) => sp.item);
   }
   // Barre de vie au-dessus de chaque monstre visible (version ScummVM : points de vie actuels du
   // monstre / maximum de son type, publiés par le moteur). Seulement pour les monstres proches
@@ -615,6 +616,22 @@
   // 5 porte). La zone cliquable de ce mur (walls[id].hot, pixels de la face) est surlignée ; un
   // clic dessus demande à la page de cliquer le mur dans le jeu (message « lol-clickwall »).
   let switchHover = false;
+  // Objets au sol dessinés à la dernière image (vue intégrée) : un clic dessus les ramasse dans le
+  // sac (commande « pickup » du moteur : case du groupe ou case devant lui, comme dans le jeu)
+  let pickables = [];
+  window.lolPickables = () => pickables.map((sp) => ({ type: sp.item.type, x: sp.item.x, y: sp.item.y, left: sp.left, top: sp.top, sw: sp.sw, sh: sp.sh }));   // débogage
+  function itemAt(e) {
+    const r = view.getBoundingClientRect();
+    const px = (e.clientX - r.left) * W / r.width, py = (e.clientY - r.top) * H / r.height;
+    let best = null;
+    for (const sp of pickables) {
+      if (px < sp.left || px > sp.left + sp.sw || py < sp.top - 2 || py > sp.top + sp.sh + 2) continue;
+      const col = Math.max(0, Math.min(W - 1, Math.floor(px)));
+      if (zbuf[col] <= sp.tz) continue;                 // derrière un mur
+      if (!best || sp.tz < best.tz) best = sp;
+    }
+    return best;
+  }
   // seule la page ScummVM peut faire cliquer le jeu (commande du moteur modifié)
   const canClickWalls = () => { try { return parent.LOL_ENGINE === "scummvm"; } catch (e) { return false; } };
   function facingSwitch() {
@@ -802,7 +819,7 @@
       const near = z < 0.5 ? nearItem(z, lat, rw, rh, 0, it.dy) : null;
       const scale = (WALL_H / 96) * proj / d, sw = near ? near.sw : rw * scale, sh = near ? near.sh : rh * scale;
       const left = near ? near.left : W / 2 + lat * proj / d - sw / 2, top = near ? near.top : half + (WALL_H / 2) * proj / d - sh + it.dy * scale;
-      sprites.push({ tz: z + it.dz, rx: srx, ry: sry, rw, rh, sw, sh, left, top, mirror: false, imgs: FLOOR.imgs, alpha: it.alpha,
+      sprites.push({ tz: z + it.dz, rx: srx, ry: sry, rw, rh, sw, sh, left, top, mirror: false, imgs: FLOOR.imgs, alpha: it.alpha, item: it.item,
         x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
     }
     for (const m of (EMBED ? liveMonsters.filter((q) => q.level === L.level) : [])) {
@@ -888,6 +905,7 @@
     }
     drawHealthBars(sprites);
     drawSwitch();
+    pickables = sprites.filter((sp) => sp.item);
   }
 
   // Animation des monstres : 16 images par sprite (0-3 face, 4-7 profil, 8-11 dos ; 12-15
@@ -995,13 +1013,13 @@
       const [rx, ry, rw, rh] = it.rect;
       if (tz < 0.5) {                                   // case du groupe : règle du jeu (nearItem)
         const t = Math.hypot(planeX, planeY), n = nearItem(tz, (dx * planeX + dy * planeY) / t, rw, rh, pitch, it.dy);
-        out.push({ tz: tz + it.dz, rx, ry, rw, rh, ...n, mirror: false, imgs: FLOOR.imgs, ghost: it.alpha,
+        out.push({ tz: tz + it.dz, rx, ry, rw, rh, ...n, mirror: false, imgs: FLOOR.imgs, ghost: it.alpha, item: it.item,
           x0: Math.max(0, Math.floor(n.left)), x1: Math.min(W - 1, Math.ceil(n.left + n.sw)) });
         continue;
       }
       const scale = (WALL_H / 96) / tz * proj, sw = rw * scale, sh = rh * scale;
       const left = W / 2 * (1 + tx / tz) - sw / 2, top = H / 2 + pitch + (WALL_H / 2) / tz * proj - sh + it.dy * scale;
-      out.push({ tz: tz + it.dz, rx, ry, rw, rh, sw, sh, left, top, mirror: false, imgs: FLOOR.imgs, ghost: it.alpha,
+      out.push({ tz: tz + it.dz, rx, ry, rw, rh, sw, sh, left, top, mirror: false, imgs: FLOOR.imgs, ghost: it.alpha, item: it.item,
         x0: Math.max(0, Math.floor(left)), x1: Math.min(W - 1, Math.ceil(left + sw)) });
     }
     const cols = L.atlasCols, fw = L.faceW, fh = L.faceH, unit = W / 2 / Math.hypot(planeX, planeY);
@@ -1160,8 +1178,9 @@
     if (document.pointerLockElement === view) player.a += e.movementX * 0.0035;
   });
   if (EMBED) {
-    let downAt = null;
+    let downAt = null, pressAt = null;
     view.addEventListener("pointerdown", (e) => {
+      pressAt = { x: e.clientX, y: e.clientY };
       if (anim) { player.x = anim.x1; player.y = anim.y1; anim = null; turning = false; }
       if (e.button !== 0 || !L) return;
       // appui sur l'interrupteur devant le groupe : actionné dans le jeu au relâchement, sauf si la
@@ -1180,7 +1199,8 @@
       if (!looking) {
         if (downAt) return;
         const over = !!switchAt(e);
-        if (over !== switchHover) { switchHover = over; view.style.cursor = over ? "pointer" : "grab"; dirty = true; }
+        if (over !== switchHover) { switchHover = over; dirty = true; }
+        view.style.cursor = over || (!handCursor && itemAt(e)) ? "pointer" : baseCursor();
         return;
       }
       const r = view.getBoundingClientRect();
@@ -1190,13 +1210,26 @@
       player.a = gameA + lookYaw;
       dirty = true;
     });
+    // Objet en main (message « lol-hand » de la page) : il sert de curseur dans la vue. Clic sur le
+    // sol de la case du groupe : posé à gauche / à droite (mode 1 / 2) ; sur le sol de la case de
+    // devant : mode 3 / 4 ; plus haut : lancé devant le groupe (mode 0), sur un monstre s'il y en a un
+    // (clickedSceneDropItem / clickedSceneThrowItem du jeu).
+    function handClickMode(e) {
+      const r = view.getBoundingClientRect();
+      const px = (e.clientX - r.left) * W / r.width, py = (e.clientY - r.top) * H / r.height;
+      const foot = (z) => H / 2 + pitch + (WALL_H / 2) * proj / (persp === "jeu" ? deff(z) : z);
+      const right = px > W / 2 ? 1 : 0;
+      if (py > foot(0.5)) return 1 + right;
+      if (py > foot(1.5)) return 3 + right;
+      return 0;
+    }
     // Relâcher après avoir regardé de côté fait tourner le groupe de ce côté dans le jeu :
     // un quart de tour au-delà de 30°, un demi-tour au-delà de 135°. La vue garde son angle
     // et rejoint en douceur la direction que le jeu renvoie.
     const LOOK_TURN = Math.PI / 6;
     const endLook = (turn) => {
       if (!looking) return;
-      looking = false; pitch = 0; view.style.cursor = "grab"; dirty = true;
+      looking = false; pitch = 0; view.style.cursor = baseCursor(); dirty = true;
       releaseStrafe();
       const yaw = lookYaw; lookYaw = 0;
       const n = turn && Math.abs(yaw) > LOOK_TURN ? Math.min(2, Math.max(1, Math.round(Math.abs(yaw) / (Math.PI / 2)))) : 0;
@@ -1211,6 +1244,20 @@
       if (downAt) {
         if (switchAt(e)) parent.postMessage({ type: "lol-clickwall", special: downAt.special }, location.origin);
         downAt = null;
+        return;
+      }
+      // clic sans glisser sur un objet au sol, main vide : ramassé dans le sac
+      const tapped = pressAt && Math.hypot(e.clientX - pressAt.x, e.clientY - pressAt.y) <= DRAG_PX;
+      const hit = tapped && !handCursor ? itemAt(e) : null;
+      if (hit) {
+        endLook(false);
+        parent.postMessage({ type: "lol-pickup", block: Math.floor(hit.item.y) * 32 + Math.floor(hit.item.x), itemType: hit.item.type }, location.origin);
+        return;
+      }
+      // objet en main (curseur) : un clic sans glisser fait comme un clic dans la vue du jeu
+      if (handCursor && pressAt && Math.hypot(e.clientX - pressAt.x, e.clientY - pressAt.y) <= DRAG_PX) {
+        endLook(false);
+        parent.postMessage({ type: "lol-handclick", mode: handClickMode(e) }, location.origin);
         return;
       }
       endLook(true);
@@ -1292,6 +1339,29 @@
     sceneEl.hidden = false;
   });
 
+  // Mode intégré : objet en main dans le jeu (icône d'ITEMICN.SHP), montré en curseur
+  let handCursor = null;
+  const baseCursor = () => handCursor || "grab";
+  const handIcons = new Image();
+  handIcons.src = "data/item_icons.png?v=" + DATA_V;
+  addEventListener("message", (e) => {
+    if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-hand") return;
+    const icon = e.data.icon;
+    const apply = () => {
+      if (icon < 0) handCursor = null;
+      else {
+        const c = document.createElement("canvas"); c.width = c.height = 40;
+        const g = c.getContext("2d"); g.imageSmoothingEnabled = false;
+        g.drawImage(handIcons, (icon % 16) * 20, Math.floor(icon / 16) * 20, 20, 20, 0, 0, 40, 40);
+        handCursor = `url(${c.toDataURL()}) 20 20, auto`;
+      }
+      if (!looking) view.style.cursor = baseCursor();
+      view.title = handCursor ? "Objet en main : clic sur le sol pour le poser, plus haut pour le lancer ; glisser pour regarder autour"
+        : "Maintenir le clic gauche et glisser pour regarder autour";
+    };
+    if (handIcons.complete && handIcons.naturalWidth) apply(); else handIcons.onload = apply;
+  });
+
   // Mode intégré : choix de la perspective (bouton de la page du jeu).
   addEventListener("message", (e) => {
     if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-persp") return;
@@ -1355,7 +1425,7 @@
     for (const it of liveItems) {
       if (it.level !== L.level) continue;
       const k = FLOOR.types[it.type], rect = k >= 0 ? FLOOR.rects[k] : null;
-      if (rect) out.push({ x: it.x, y: it.y, rect, dy: ITEM_DY, dz: 0 });
+      if (rect) out.push({ x: it.x, y: it.y, rect, dy: ITEM_DY, dz: 0, item: it });
     }
     return out;
   }
@@ -1479,7 +1549,7 @@
     if (q.has("hud")) { helpEl.classList.add("hidden"); }
     if (EMBED) {
       for (const id of ["top", "help", "map"]) document.getElementById(id).style.display = "none";
-      view.style.cursor = "grab";
+      view.style.cursor = baseCursor();
       view.title = "Maintenir le clic gauche et glisser pour regarder autour";
     }
     requestAnimationFrame(frame);

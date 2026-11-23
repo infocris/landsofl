@@ -1635,6 +1635,41 @@ The meaning of the functions, however, can be read directly. Comparison with our
     each item still has its own slot in the game. Dragging a stack moves its first item.
   - **Verified**: 3 aloes created (4 in the bag), life lowered to 8 / 20, aloe dragged onto slot 1
     in the stacks view, key 1 → 13 / 20 and 3 left. Slot 2 set to "Attaque : Michael" from its menu.
+  - **Dragging actions** (2026-11-23). The magic panel's level buttons and new attack chips
+    ("⚔ name") can be dragged onto the floating bar. A spell slot keeps the spell, level and caster
+    (`cast` command). For Soin levels 1–3, the target is the most wounded or a chosen character. Bar
+    slots can be dragged onto each other to swap them, and dropping one outside the bar clears it.
+    Verified: Étincelle level 1 → slot 3, attack → slot 4, 3 ↔ 5, slot 4 dropped outside → empty;
+    key 5 casts Étincelle (magic 6 → 1).
+- **Item in hand, as in the original** (2026-11-23).
+  - **The game's mouse actions** with an item in hand:
+    - a click high in the view throws it ahead (`clickedSceneThrowItem` → `launchObject`, which
+      hits a monster);
+    - a click on the floor drops it (`clickedSceneDropItem`: buttons 0/1 = party cell left/right,
+      2/3 = cell ahead);
+    - a right click on a portrait uses it (`clickedPortraitEtcRight`).
+  - **Bar item slot**: by default it now takes the first bag item of that type in hand, with the
+    move command to slot 100. Pressing it again while holding that type puts it back. "Utiliser
+    directement" in the slot menu keeps the command 21 behaviour.
+  - **Command 22** (`hand`): a = 0 throws, 1–4 drops (button a − 1). **Command 23** (`handuse`):
+    uses the held item on character a.
+  - **3D view**: the page sends the held item's icon (`lol-hand`), and the view uses it as cursor.
+    A click without dragging is sorted by height on screen, using the wall-foot projection of
+    each perspective: below the near foot (z 0.5) → drop on the party cell, below the next foot
+    (z 1.5) → drop on the cell ahead, higher → throw.
+  - **Floating portraits**: a right click uses the held item on that character.
+- **Picking up from the 3D view** (2026-11-23). With an empty hand, a click on a floor item (sprite
+  hit-test, not behind a wall per the z-buffer) sends `lol-pickup`. **Command 24** (`pickup`, a =
+  cell, b = item type) is allowed only on the party's cell or the cell ahead, without a wall
+  between, as in `clickedScenePickupItem`. It finds the item in the cell's `drawObjects` chain,
+  removes it (`removeLevelItem`, cell script 0x100) and adds it to the bag
+  (`addItemToInventory`). If the bag is full, the item goes in hand.
+- **Verified** (Gladstone 13,17 facing north):
+  - key 1 puts an aloe in hand, and the 3D view shows it as cursor;
+  - a floor click drops it at 13.25,17.25, and a click on it puts it back in the bag;
+  - a high click throws it, and it lands at 13.75,16.25 (door closed beyond);
+  - a right click on the portrait uses it (life 12 → 15).
+  - Throwing at a monster was not tried (none in Gladstone).
 - **Teleportation** (ScummVM version, 2026-11-13).
   - **Within the level**: command op 13 (a = cell, b = direction or -1). It does the same as
     `olol_setGlobalVar(0, …)`, used by the scripts' teleporters: `_currentBlock`,
@@ -2335,3 +2370,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: 3D view: a drag starting on a switch looks around instead of being ignored (§ 9.6).
 - **2026-11-23**: floating party portraits (FACEnn.SHP, frame chosen like gui_drawCharFaceShape) (§ 10a).
 - **2026-11-23**: action bar (keys 1–9, items used by engine command 21, attacks) and stacks view of the bag (§ 10a).
+- **2026-11-23**: spells and attacks dragged into the action bar; bar items taken in hand (throw / drop / use like the original, engine commands 22–23); floor items picked up by clicking them in the 3D view (command 24) (§ 10a).

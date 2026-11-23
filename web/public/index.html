@@ -295,6 +295,11 @@
   #inv-abar-row[hidden] { display: none; }
   #inv-abar-row small { color: #8a7f68; }
   #inv-abar { display: flex; gap: 3px; margin-top: 3px; }
+  /* actions glissables vers la barre d'actions (niveaux de sort, attaques) */
+  #sp-list button[draggable="true"] { cursor: grab; }
+  #sp-atk { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 4px; font-size: 11px; color: #a39578; }
+  #sp-atk .chip { padding: 2px 7px; border: 1px solid #8a5a3a; border-radius: 10px; background: #2a1c14; color: #ffd2a0; cursor: grab; }
+  #sp-atk .chip:hover { border-color: #c9a227; }
   /* gestion de l'inventaire (version ScummVM) : glisser-déposer et actions de la fiche */
   .slot.drop { outline: 2px dashed #28dce6; outline-offset: -1px; }
   #inv-detail .acts { grid-column: 1 / 4; display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
@@ -414,7 +419,7 @@
 <body>
 <div id="left">
   <div id="dos"></div>
-  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261123n" title="Vue 3D synchronisée"></iframe></div>
+  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261123p" title="Vue 3D synchronisée"></iframe></div>
 </div>
 <aside id="mm" aria-label="Mini-carte">
   <div id="mm-title"><span>Mini-carte</span><button id="mm-tex" type="button" title="Cases illustrées avec les textures du lieu / couleurs simples">▦</button><button id="mm-fog" type="button" title="Exploration progressive : n'afficher que les cases déjà vues / toute la carte">◐</button><button id="mm-forget" type="button" title="Oublier l'exploration de ce niveau (nouvelle partie)" disabled>↺</button><button id="mm-center" type="button" title="Centrer automatiquement la carte sur le groupe / carte fixe">⌖</button><span class="mm-grp" title="Taille de la carte à l'écran">Taille</span><button id="mm-smaller" type="button" title="Réduire la mini-carte">−</button><button id="mm-bigger" type="button" title="Agrandir la mini-carte">+</button><span class="mm-grp" title="Zoom (aussi : molette sur la carte)">Zoom</span><button id="mm-zout" type="button" title="Dézoomer (molette)">−</button><button id="mm-zin" type="button" title="Zoomer (molette)">+</button></div>
@@ -439,6 +444,7 @@
         <label>Lanceur <select id="sp-caster"></select></label>
         <label id="sp-target-l" hidden title="Soin de niveau 1 à 3 : personnage soigné (niveau 4 : tout le groupe)">Soigner <select id="sp-target"></select></label></div>
       <div id="sp-list"></div>
+      <div id="sp-atk"></div>
       <div id="sp-msg"></div>
     </div>
   </div>
@@ -760,7 +766,7 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261123i"></script>
+<script src="minimap.js?v=20261123m"></script>
 <script src="engine.js?v=20261113a"></script>
 </body>
 </html>

@@ -1550,7 +1550,30 @@
       else if (fromHand) hideDetail();
     } else if (fromHand && handType >= 0) invHand.firstChild.classList.add("sel");
     lastHand = handType;
+    sendHandTo3d(handType);
   }
+  // Objet en main : la vue 3D le montre en curseur ; un clic dedans le lance (haut de la vue) ou le
+  // pose (sol), comme un clic dans la vue du jeu (commande « hand », op 22)
+  let lastHandSent = null;
+  function sendHandTo3d(t) {
+    const icon = t >= 0 && itemInfo && itemInfo[t] ? itemInfo[t].icon : -1;
+    if (icon === lastHandSent || !frame3d || !frame3d.contentWindow) return;
+    lastHandSent = icon;
+    frame3d.contentWindow.postMessage({ type: "lol-hand", icon }, location.origin);
+  }
+  // clic sur un objet au sol dans la vue 3D : ramassé dans le sac (commande « pickup », op 24)
+  const PICK_ERR = { 1: "Trop loin : seulement sur la case du groupe ou celle de devant.", 2: "Un mur est devant.", 3: "L'objet n'est plus là.", 11: "Pas pendant un dialogue." };
+  addEventListener("message", async (e) => {
+    if (e.origin !== location.origin || !e.data || e.data.type !== "lol-pickup" || window.LOL_ENGINE !== "scummvm") return;
+    const r = await mem.cmd({ op: "pickup", a: e.data.block | 0, b: e.data.itemType | 0 }, 4000);
+    if (r && (r.code === 0 || r.code === 6)) { lastInv = ""; setTimeout(() => updateInventory().catch(() => {}), 150); }
+    else console.info("Ramasser :", r ? PICK_ERR[r.code] || `refusé (code ${r.code})` : "le jeu ne répond pas");
+  });
+  addEventListener("message", async (e) => {
+    if (e.origin !== location.origin || !e.data || e.data.type !== "lol-handclick" || window.LOL_ENGINE !== "scummvm") return;
+    await mem.cmd({ op: "hand", a: e.data.mode | 0 }, 4000);
+    lastInv = ""; setTimeout(() => updateInventory().catch(() => {}), 150);
+  });
 
   // --- Gestion de l'inventaire (version ScummVM) ------------------------------------
   // Le moteur exécute les commandes avec ses propres fonctions (scripts des objets équipés,
@@ -1814,10 +1837,27 @@
           + (s.type === HEAL ? (l < 3 ? " — soigne le personnage choisi" : " — soigne tout le groupe") : "")
           + (ok ? "" : " (pas assez pour " + (caster ? caster.name : "le lanceur") + ")");
         b.addEventListener("click", () => { b.blur(); cast(s, l).catch(() => {}); });
+        // glisser vers la barre d'actions : ce sort, ce niveau, ce lanceur
+        b.draggable = true;
+        b.addEventListener("dragstart", (e) => {
+          e.dataTransfer.effectAllowed = "copy";
+          e.dataTransfer.setData("application/x-lol-action", JSON.stringify({ k: "spell", s: s.type, l, c: +spCaster.value, n: s.name }));
+        });
         row.appendChild(b);
       }
       return row;
     }));
+    // attaques des personnages, à glisser dans la barre d'actions
+    const atk = document.getElementById("sp-atk");
+    if (atk) {
+      atk.replaceChildren(Object.assign(document.createElement("span"), { textContent: "Attaques :" }), ...spellParty.map((c) => {
+        const chip = document.createElement("span"); chip.className = "chip"; chip.textContent = "⚔ " + c.name; chip.draggable = true;
+        chip.title = `Glisser dans la barre d'actions : attaque de ${c.name}`;
+        chip.addEventListener("dragstart", (e) => { e.dataTransfer.effectAllowed = "copy"; e.dataTransfer.setData("application/x-lol-action", JSON.stringify({ k: "atk", c: c.slot })); });
+        return chip;
+      }));
+      atk.title = "Glisser un niveau de sort ou une attaque sur une case de la barre d'actions";
+    }
   }
   async function cast(s, level) {
     const a = +spCaster.value, target = s.type === HEAL && level < 3 ? +spTarget.value : -1;
@@ -2396,6 +2436,14 @@
       else if (d.target.closest(".pf") && typeof openStats === "function") openStats();
       const g = document.getElementById("dos"); if (g && g.focus) g.focus();
     });
+    // clic droit sur un portrait avec un objet en main : utilisé sur ce personnage, comme dans le jeu
+    pf.addEventListener("contextmenu", async (e) => {
+      const m = e.target.closest(".pm"); if (!m) return;
+      e.preventDefault();
+      if (!lastInvData || lastInvData.handType < 0 || !window.LOL_ENGINE || window.LOL_ENGINE !== "scummvm") return;
+      await mem.cmd({ op: "handuse", a: +m.dataset.slot }, 4000);
+      lastInv = ""; setTimeout(() => updateInventory().catch(() => {}), 150);
+    });
     const toggleKey = (e) => {
       if (!window.LoLKeys || !LoLKeys.is(e, "party") || LoLKeys.typing(e.target) || document.querySelector("dialog[open]")) return;
       e.preventDefault(); e.stopImmediatePropagation(); show(!on);
@@ -2421,7 +2469,7 @@
           let f = cur < 7 && temp ? temp : temp === 0 && cur > 1 && cur < 7 ? 0 : cur;
           if (flags & 0x1108 && f < 7) f = 1;
           if (hp <= hpMax >> 1) f += 14;
-          return { name: c.name, id, f: Math.max(0, Math.min(27, f)), hp, hpMax, mp, mpMax, ko: !!(flags & 8) || hp <= 0 };
+          return { slot: c.slot, name: c.name, id, f: Math.max(0, Math.min(27, f)), hp, hpMax, mp, mpMax, ko: !!(flags & 8) || hp <= 0 };
         });
         const key = JSON.stringify(list);
         if (key === lastFloat) return;
@@ -2431,7 +2479,7 @@
           const q = max > 0 ? Math.max(0, Math.min(1, cur / max)) : 0;
           return `<div class="pb ${cls}${cls === "hp" ? (q <= 0.25 ? " low" : q <= 0.5 ? " mid" : "") : ""}"><i style="width:${q * 100}%"></i><span>${cur} / ${max}</span></div>`;
         };
-        pf.innerHTML = list.map((c) => `<div class="pm${c.ko ? " ko" : ""}">
+        pf.innerHTML = list.map((c) => `<div class="pm${c.ko ? " ko" : ""}" data-slot="${c.slot}">
           <div class="pf" style="background-position:-${c.f * 48}px -${(Math.min(9, Math.max(1, c.id)) - 1) * 48}px"></div>
           <div class="pn"></div>${bar("hp", c.hp, c.hpMax)}${c.mpMax > 0 ? bar("mp", c.mp, c.mpMax) : "<div></div>"}</div>`).join("");
         pf.querySelectorAll(".pn").forEach((el, i) => { el.textContent = list[i].name; });
@@ -2470,6 +2518,8 @@
     .ab .cnt { position: absolute; right: 2px; bottom: 1px; color: #fff; font-weight: 700; text-shadow: 0 0 2px #000, 0 0 2px #000; }
     .ab .atk { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; font-size: 9px; color: #ffd2a0; }
     .ab .atk b { font-size: 16px; }
+    .ab .atk.spell { color: #b8d0ff; }
+    .ab[draggable="true"] { cursor: grab; }
     #ab-tip { position: fixed; z-index: 1003; padding: 3px 7px; border-radius: 4px; background: #0f0d0a; border: 1px solid #6d5a3a; color: #e8dcc0;
       font: 12px system-ui, sans-serif; pointer-events: none; }
     #ab-tip[hidden] { display: none; }
@@ -2481,7 +2531,7 @@
     #ab-menu button:hover { background: #2a2217; }
     #ab-menu button.on::before { content: "✓ "; color: #c9a227; }`;
     document.head.appendChild(css);
-    const N = 9, AB_ICON = 40;
+    const N = 9, AB_ICON = 40, HEAL_SPELL = 1;
     let bar = [];
     try { bar = JSON.parse(localStorage.getItem("lol-actionbar") || "[]") || []; } catch (e) { bar = []; }
     bar = Array.from({ length: N }, (_, i) => bar[i] || null);
@@ -2511,36 +2561,72 @@
         if (!n) d.classList.add("empty-stack");
         const c = document.createElement("span"); c.className = "cnt"; c.textContent = n; d.appendChild(c);
         const who = a.for === undefined || a.for === "auto" ? "le plus blessé" : (partyNow().find((p) => p.slot === a.for) || {}).name || "?";
-        d.dataset.tip = `${it.name} — ${n} dans le sac · utiliser sur : ${who}`;
+        d.dataset.tip = `${it.name} — ${n} dans le sac · ` + (a.mode === "use" ? `utiliser sur : ${who}` : "prendre en main");
+        if (lastInvData && lastInvData.handType === a.t) d.classList.add("flash");
+      } else if (a && a.k === "spell") {
+        const p = partyNow().find((q) => q.slot === a.c);
+        const box = document.createElement("div"); box.className = "atk spell"; box.innerHTML = "<b>✦</b><span></span>";
+        box.lastChild.textContent = `${(a.n || "sort").slice(0, 7)} ${a.l + 1}`;
+        d.appendChild(box);
+        const healWho = a.s === HEAL_SPELL && a.l < 3 ? ` · soigne : ${a.for === undefined || a.for === "auto" ? "le plus blessé" : (partyNow().find((q) => q.slot === a.for) || {}).name || "?"}` : "";
+        d.dataset.tip = `${a.n || "Sort"} niveau ${a.l + 1} · lanceur : ${p ? p.name : "?"}${healWho}`;
       } else if (a && a.k === "atk") {
         const p = partyNow().find((q) => q.slot === a.c);
         const box = document.createElement("div"); box.className = "atk"; box.innerHTML = "<b>⚔</b><span></span>";
         box.lastChild.textContent = p ? p.name : `perso ${a.c + 1}`;
         d.appendChild(box);
         d.dataset.tip = `Attaque : ${p ? p.name : "personnage " + (a.c + 1)}`;
-      } else d.dataset.tip = inDialog ? "Case vide : glisser un objet du sac ici" : "Case vide : clic droit pour une attaque, ou glisser un objet depuis l'inventaire (I)";
+      } else d.dataset.tip = inDialog ? "Case vide : glisser un objet du sac ici" : "Case vide : glisser un sort ou une attaque du panneau Magie, ou un objet depuis l'inventaire (I) ; clic droit : attaques";
       d.appendChild(k);
       return d;
     }
-    function refresh() {
-      if (!itemInfo) return;
-      const keep = el.querySelectorAll(".ab").length;
-      el.replaceChildren(grip, ...bar.map((_, i) => slotEl(i, false)));
-      if (invAbar) invAbar.replaceChildren(...bar.map((_, i) => {
-        const d = slotEl(i, true);
-        // dépôt d'un objet glissé depuis le sac, la main ou l'équipement (dragFrom = emplacement)
-        d.addEventListener("dragover", (e) => { if (dragFrom >= 0) { e.preventDefault(); d.classList.add("drop"); } });
-        d.addEventListener("dragleave", () => d.classList.remove("drop"));
-        d.addEventListener("drop", (e) => {
-          e.preventDefault(); d.classList.remove("drop");
-          const t = typeAtLoc(dragFrom); dragFrom = -1;
-          if (t >= 0) { bar[i] = { k: "item", t, for: "auto" }; saveBar(); }
+    // glisser-déposer : actions du panneau de magie, objets du sac (fenêtre d'inventaire), cases de
+    // la barre (déplacer / échanger ; lâchée hors de la barre : case vidée)
+    let dragSlot = -1;
+    function wire(d, i) {
+      if (bar[i]) {
+        d.draggable = true;
+        d.addEventListener("dragstart", (e) => {
+          dragSlot = i; tip.hidden = true;
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("application/x-lol-action", JSON.stringify({ from: i }));
         });
-        return d;
-      }));
+        d.addEventListener("dragend", (e) => {
+          const from = dragSlot; dragSlot = -1;
+          const r = (d.closest("#action-bar, #inv-abar") || d).getBoundingClientRect();
+          const out = e.clientX < r.left - 8 || e.clientX > r.right + 8 || e.clientY < r.top - 8 || e.clientY > r.bottom + 8;
+          if (from >= 0 && e.dataTransfer.dropEffect === "none" && out && (e.clientX || e.clientY)) { bar[from] = null; saveBar(); }
+          else refresh();
+        });
+      }
+      d.addEventListener("dragover", (e) => {
+        if (dragFrom >= 0 || dragSlot >= 0 || e.dataTransfer.types.includes("application/x-lol-action")) {
+          e.preventDefault(); e.dataTransfer.dropEffect = dragSlot >= 0 ? "move" : "copy"; d.classList.add("drop");
+        }
+      });
+      d.addEventListener("dragleave", () => d.classList.remove("drop"));
+      d.addEventListener("drop", (e) => {
+        e.preventDefault(); d.classList.remove("drop");
+        let data = null;
+        try { data = JSON.parse(e.dataTransfer.getData("application/x-lol-action") || "null"); } catch (err) {}
+        if (data && data.from !== undefined) {
+          const f = data.from; if (f !== i) { [bar[f], bar[i]] = [bar[i], bar[f]]; }
+          dragSlot = -1; saveBar(); return;
+        }
+        if (data && (data.k === "atk" || data.k === "spell")) { bar[i] = data.k === "spell" ? { ...data, for: "auto" } : data; saveBar(); return; }
+        const t = typeAtLoc(dragFrom); dragFrom = -1;
+        if (t >= 0) { bar[i] = { k: "item", t, for: "auto", mode: "hand" }; saveBar(); }
+      });
+    }
+    function refresh() {
+      if (!itemInfo || dragSlot >= 0) return;
+      const keep = el.querySelectorAll(".ab").length;
+      el.replaceChildren(grip, ...bar.map((_, i) => { const d = slotEl(i, false); wire(d, i); return d; }));
+      if (invAbar) invAbar.replaceChildren(...bar.map((_, i) => { const d = slotEl(i, true); wire(d, i); return d; }));
       if (!keep) place();
     }
     window.lolActionBarRefresh = refresh;
+    window.lolActionBar = { get: () => bar.slice(), set: (i, a) => { bar[i] = a; saveBar(); } };   // débogage
     function typeAtLoc(loc) {
       if (!lastInvData) return -1;
       if (loc >= 0 && loc < 48) return lastInvData.barTypes[loc];
@@ -2577,8 +2663,44 @@
       const a = bar[i];
       if (!a) { flash(i, false, "Case vide"); return; }
       if (a.k === "atk") { LoLKeys.pressGame("AT" + (a.c + 1)); flash(i, true); return; }
+      if (a.k === "spell") {
+        if (busyUse) return;
+        busyUse = true;
+        try {
+          const caster = partyNow().some((p) => p.slot === a.c) ? a.c : (partyNow()[0] || { slot: 0 }).slot;
+          const target = a.s === HEAL_SPELL && a.l < 3 ? (a.for === undefined || a.for === "auto" ? await autoTarget() : a.for) : -1;
+          const r = await mem.cmd({ op: "cast", a: caster, b: a.s | a.l << 8 | (target + 1) << 12 }, 20000);
+          if (!r) flash(i, false, "Le jeu ne répond pas (menu ouvert ?)");
+          else if (r.code) flash(i, false, { 1: "impossible maintenant", 4: "pas assez de magie", 5: "le sort ne peut pas partir d'ici" }[r.code] || `refusé (code ${r.code})`);
+          else flash(i, true);
+        } finally { busyUse = false; }
+        return;
+      }
       if (busyUse) return;
       const loc = bagTypes().indexOf(a.t);
+      if (a.mode !== "use") {
+        // prendre en main (curseur du jeu), comme un clic sur l'objet dans le sac : on l'utilise
+        // ensuite comme dans le jeu (clic dans la vue : lancé sur un monstre ; sur le sol : posé ;
+        // clic droit sur un portrait : utilisé). Déjà en main : reposé dans le sac.
+        const held = lastInvData ? lastInvData.handType : -1;
+        busyUse = true;
+        try {
+          let r;
+          if (held === a.t) {
+            const free = bagTypes().indexOf(-1);
+            if (free < 0) { flash(i, false, "Le sac est plein"); return; }
+            r = await mem.cmd({ op: "move", a: LOC_HAND, b: free }, 4000);
+          } else {
+            if (loc < 0) { flash(i, false, `Plus de ${(itemInfo[a.t] || {}).name || "cet objet"} dans le sac`); return; }
+            r = await mem.cmd({ op: "move", a: loc, b: LOC_HAND }, 4000);
+          }
+          if (!r) flash(i, false, "Le jeu ne répond pas (menu ouvert ?)");
+          else if (r.code) flash(i, false, `impossible (code ${r.code})`);
+          else flash(i, true, held === a.t ? "Rangé dans le sac" : "En main : clic dans la vue pour le lancer, sur le sol pour le poser, clic droit sur un portrait pour l'utiliser");
+          lastInv = ""; setTimeout(() => updateInventory().catch(() => {}), 150);
+        } finally { busyUse = false; }
+        return;
+      }
       if (loc < 0) { flash(i, false, `Plus de ${(itemInfo[a.t] || {}).name || "cet objet"} dans le sac`); return; }
       busyUse = true;
       try {
@@ -2629,8 +2751,17 @@
       const head = (t) => { const h = document.createElement("div"); h.className = "h"; h.textContent = t; menu.appendChild(h); };
       head(`Case ${i + 1}`);
       for (const p of partyNow()) add(`Attaque : ${p.name}`, () => { bar[i] = { k: "atk", c: p.slot }; saveBar(); }, a && a.k === "atk" && a.c === p.slot);
+      if (a && a.k === "spell") {
+        head("Lanceur");
+        for (const p of partyNow()) add(p.name, () => { a.c = p.slot; saveBar(); }, a.c === p.slot);
+      }
       if (a && a.k === "item") {
-        head("Utiliser sur");
+        head("Action");
+        add("Prendre en main", () => { a.mode = "hand"; saveBar(); }, a.mode !== "use");
+        add("Utiliser directement", () => { a.mode = "use"; saveBar(); }, a.mode === "use");
+      }
+      if (a && ((a.k === "item" && a.mode === "use") || (a.k === "spell" && a.s === HEAL_SPELL && a.l < 3))) {
+        head(a.k === "item" ? "Utiliser sur" : "Soigner");
         add("Le plus blessé", () => { a.for = "auto"; saveBar(); }, a.for === undefined || a.for === "auto");
         for (const p of partyNow()) add(p.name, () => { a.for = p.slot; saveBar(); }, a.for === p.slot);
       }
