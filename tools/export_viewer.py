@@ -114,11 +114,22 @@ def rgb(pal, c):
     return bytes(min(255, pal[c * 3 + j] * 4 + pal[c * 3 + j] // 16) for j in range(3))
 
 
-def frame_image(frame, pal):
+# Ombre des monstres et personnages : couleur 255 de leurs sprites. Le jeu ne la peint pas mais
+# assombrit le décor dessous (drawShapePlotType37 : _dsBackgroundFadingTable, table d'assombrissement
+# du niveau). Exportée en noir à demi transparent ; quasi-noir (2, 1, 0) pour qu'aucune variante de
+# couleurs (remplacements RVB exacts dans la vue 3D) ne la touche.
+SHADOW_RGB, SHADOW_ALPHA = bytes((2, 1, 0)), 128
+
+
+def frame_image(frame, pal, shadow=False):
     w, h, px = frame
     img = Image(w, h)
     for i, c in enumerate(px):
-        if c is not None:
+        if c is None:
+            continue
+        if shadow and c == 255:
+            img.put_rgba(i % w, i // w, SHADOW_RGB, SHADOW_ALPHA)
+        else:
             img.put(i % w, i // w, rgb(pal, c))
     return img
 
@@ -1171,7 +1182,7 @@ def main(game_dir, maps_dir, out_dir):
             for fi in range(16):
                 if fi < len(frames) and frames[fi] and frames[fi][0] > 8:
                     entry.append(len(sprite_imgs))
-                    sprite_imgs.append(frame_image(frames[fi], pal))
+                    sprite_imgs.append(frame_image(frames[fi], pal, shadow=True))
                 else:                                   # image absente : première de son groupe
                     entry.append(entry[fi - fi % 4] if fi % 4 and entry else (entry[0] if entry else None))
             sprites[sname] = entry
@@ -1213,7 +1224,7 @@ def main(game_dir, maps_dir, out_dir):
                     k = 17 + v * 16 + fi
                     if k < len(frames) and frames[k] and frames[k][0] > 1 and any(c is not None for c in frames[k][2]):
                         row.append(len(sprite_imgs))
-                        sprite_imgs.append(frame_image(frames[k], pal))
+                        sprite_imgs.append(frame_image(frames[k], pal, shadow=True))
                     else:
                         row.append(None)
                 equip.append(row)
