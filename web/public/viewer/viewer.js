@@ -610,8 +610,41 @@
     if (!im) { im = new Image(); im.onload = () => { dirty = true; }; im.src = "data/scenes/" + name; sceneImgs.set(name, im); }
     return im.complete && im.naturalWidth ? im : null;
   }
-  function drawPortalColumn(P, x, top, colH, u) {
+  // Ouverture d'une porte (lieu en image) : lignes transparentes de sa texture, colonne par colonne
+  // (pas le sol devant le seuil ni l'encadrement) ; l'image du lieu n'est dessinée que là
+  const openingCache = new Map();
+  function opening(tex) {
+    if (tex < 0 || !L.wallsSrc) return null;
+    const key = L.level + ":" + tex;
+    let o = openingCache.get(key);
+    if (o) return o;
+    const fw = L.faceW, fh = L.faceH, c = document.createElement("canvas"); c.width = fw; c.height = fh;
+    const g = c.getContext("2d");
+    g.drawImage(L.wallsSrc, (tex % L.atlasCols) * fw, Math.floor(tex / L.atlasCols) * fh, fw, fh, 0, 0, fw, fh);
+    const px = g.getImageData(0, 0, fw, fh).data, y0 = new Int16Array(fw).fill(-1), y1 = new Int16Array(fw).fill(-1);
+    for (let x = 0; x < fw; x++) {
+      // plus longue suite de pixels transparents de la colonne, en partant du haut de l'ouverture
+      let best = [-1, -1], run = -1;
+      for (let y = 0; y <= fh; y++) {
+        const clear = y < fh && px[(y * fw + x) * 4 + 3] < 128;
+        if (clear && run < 0) run = y;
+        if (!clear && run >= 0) { if (y - run > best[1] - best[0]) best = [run, y]; run = -1; }
+      }
+      y0[x] = best[0]; y1[x] = best[1];
+    }
+    o = { y0, y1, fw, fh };
+    openingCache.set(key, o);
+    return o;
+  }
+  function drawPortalColumn(P, x, top, colH, u, tex) {
     if (P.kind === "level" && portalDrawn === P) { ctx.drawImage(portalCanvas, x, top, 1, colH, x, top, 1, colH); return; }
+    const o = opening(tex);
+    if (o && u !== undefined) {                          // seulement dans l'ouverture de la porte
+      const cx = Math.min(o.fw - 1, Math.floor(u * o.fw)), a = o.y0[cx], b = o.y1[cx];
+      // porte fermée : seule une bande sous les battants est transparente (le sol) ; pas d'image
+      if (a < 0 || b - a < o.fh * 0.4) return;
+      top += a / o.fh * colH; colH = (b - a) / o.fh * colH;
+    }
     ctx.fillStyle = "#050403"; ctx.fillRect(x, top, 1, colH);
     const im = P.image && sceneImg(P.image);
     if (!im || u === undefined) return;
@@ -659,7 +692,7 @@
           u -= Math.floor(u);
           if (f === FACE_E || f === FACE_N) u = 1 - u;
           if (t && t.tex >= 0) items.push({ d: dist, tex: t.tex, u, pos: 0, line: 0, door: t.panel ? t : null });
-          items.push({ d: dist + 1e-3, portal: P, u });
+          items.push({ d: dist + 1e-3, portal: P, u, tex: t ? t.tex : -1 });
           nearestOpaque = dist; break;
         }
         if (!t) continue;
@@ -682,7 +715,7 @@
       items.sort((a, b) => b.d - a.d);
       for (const it of items) {
         const dist = Math.max(0.05, it.d);
-        if (it.portal) { const colH = WALL_H / dist * proj; drawPortalColumn(it.portal, x, H / 2 + pitch - colH / 2, colH, it.u); continue; }
+        if (it.portal) { const colH = WALL_H / dist * proj; drawPortalColumn(it.portal, x, H / 2 + pitch - colH / 2, colH, it.u, it.tex); continue; }
         if (it.sp) {
           const sp = it.sp;
           if (sp.ghost) ctx.globalAlpha = sp.ghost === true ? 0.55 : sp.ghost;   // apparition sur événement, flaque
@@ -976,7 +1009,7 @@
           if (f === FACE_E || f === FACE_N) uu = 1 - uu;
           if (P && !(t && t.block && (t.opaque || t.tex < 0))) {   // porte ouverte d'une sortie ou d'un lieu en image
             if (t && t.tex >= 0) items.push({ d: hz, tex: t.tex, u: uu, pos, line, door: t.panel ? t : null });
-            items.push({ d: hz + 1e-3, portal: P, u: uu });
+            items.push({ d: hz + 1e-3, portal: P, u: uu, tex: t ? t.tex : -1 });
             nearest = hz; done = true; break;
           }
           if (!t) continue;
@@ -995,7 +1028,7 @@
       items.sort((a, b) => b.d - a.d);
       for (const it of items) {
         const dist = Math.max(0.05, it.d);
-        if (it.portal) { const colH = WALL_H * proj / deff(dist); drawPortalColumn(it.portal, x, half - colH / 2, colH, it.u); continue; }
+        if (it.portal) { const colH = WALL_H * proj / deff(dist); drawPortalColumn(it.portal, x, half - colH / 2, colH, it.u, it.tex); continue; }
         if (it.sp) {
           const sp = it.sp;
           if (sp.alpha) ctx.globalAlpha = sp.alpha;
@@ -1455,6 +1488,7 @@
     if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-scene") return;
     const { image, label } = e.data;
     if (image === null) { sceneEl.hidden = true; dirty = true; return; }
+    applyEnter();                                       // entrée dans le lieu : position prise maintenant
     const img = sceneEl.querySelector("img");
     if (image) { img.src = "data/scenes/" + image; img.hidden = false; } else img.hidden = true;
     document.getElementById("scene-label").textContent = label || (image ? "" : "Lieu");
@@ -1603,7 +1637,14 @@
   // Mode intégré : position du groupe envoyée par la page du jeu (case entière + direction).
   // Une position reçue pendant le chargement d'un niveau n'est pas perdue : la dernière est
   // appliquée à la fin du chargement (la page ne renvoie une position que si elle change).
-  let loadingLevel = null, pendingPos = null;
+  let loadingLevel = null, pendingPos = null, enterWait = null;
+  function applyEnter() {
+    if (!enterWait) return;
+    const w = enterWait; enterWait = null; clearTimeout(w.t);
+    anim = null; turning = false;
+    player.x = w.tx; player.y = w.ty; player.a = w.ta + lookYaw; gameA = w.ta;
+    dirty = true;
+  }
   addEventListener("message", async (e) => {
     if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-pos") return;
     let { level, x, y, dir } = e.data;
@@ -1619,6 +1660,16 @@
       }
     }
     const tx = x + 0.5, ty = y + 0.5, ta = DIR_ANGLE[dir & 3];
+    // entrée dans un lieu en image (boutique) : le jeu joue d'abord l'ouverture de la porte, puis
+    // montre la scène. La vue reste devant la porte jusqu'à l'image du lieu (« lol-scene »), alors
+    // la position est prise d'un coup, l'image en plein cadre (4 s au plus sans scène).
+    const Pin = L.portalCells && L.portalCells.get(y * 32 + x);
+    if (!freshLevel && Pin && Pin.kind === "void" && !Pin.region.has(Math.floor(player.y) * 32 + Math.floor(player.x))) {
+      if (enterWait) clearTimeout(enterWait.t);
+      enterWait = { tx, ty, ta, t: setTimeout(() => applyEnter(), 4000) };
+      return;
+    }
+    if (enterWait) { clearTimeout(enterWait.t); enterWait = null; }
     const same = Math.abs(tx - (anim ? anim.x1 : player.x)) < 1e-6 && Math.abs(ty - (anim ? anim.y1 : player.y)) < 1e-6 && ta === gameA;
     if (same && !freshLevel) return;          // niveau rechargé : loadLevel a remis sa case de départ
     let da = ta - (player.a - lookYaw);                 // plus court chemin angulaire

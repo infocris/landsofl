@@ -37,7 +37,8 @@
   // touches fixes du jeu sous ScummVM (keymap de scummvm.ini, tools/scummvm_web.py)
   const FIXED = { MVF: ["ArrowUp", 38], MVB: ["ArrowDown", 40], TL: ["Home", 36], TR: ["PageUp", 33],
     SLL: ["ArrowLeft", 37], SLR: ["ArrowRight", 39], AT1: ["F1", 112], AT2: ["F2", 113], AT3: ["F3", 114],
-    RST: ["r", 82, "KeyR"] };                    // repos du groupe (action RST du keymap, touche r par défaut)
+    RST: ["r", 82, "KeyR"],
+    SKIP: [" ", 32, "Space"] };                  // passer une réplique (dialogues du jeu)                    // repos du groupe (action RST du keymap, touche r par défaut)
   const FIXED_LABEL = { MVF: "↑", MVB: "↓", TL: SCUMM ? "Origine" : "pavé 4", TR: SCUMM ? "Page↑" : "pavé 6",
     SLL: SCUMM ? "←" : "pavé 7", SLR: SCUMM ? "→" : "pavé 9", AT1: "F1", AT2: "F2", AT3: "F3" };
   const STORE = "lol-keys";

@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..4ca7d14e 100644
+index 392e4c2d..e8723df0 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -32,6 +32,7 @@
@@ -21,7 +21,7 @@ index 392e4c2d..4ca7d14e 100644
  namespace Kyra {
  
  const char *const LoLEngine::kMouseKeymapName = "lolmouse";
-@@ -929,6 +934,747 @@ void LoLEngine::startupNew() {
+@@ -929,6 +934,756 @@ void LoLEngine::startupNew() {
  	_screen->showMouse();
  }
  
@@ -39,9 +39,11 @@ index 392e4c2d..4ca7d14e 100644
 +		_webLoopCount++;
 +		_webLoadingLevel = false;
 +	}
-+	const bool changed = mainLoop && EM_ASM_INT({ return Module.lolCmds && Module.lolCmds.length ? 1 : 0; });
++	// hors de la boucle principale (dialogues, scènes de lieu comme une boutique) : seuls les
++	// déplacements d'objets sac <-> main (commande 1) sont exécutés, pour vendre en montrant un objet
++	const bool changed = EM_ASM_INT({ return Module.lolCmds && Module.lolCmds.length ? 1 : 0; });
 +	if (changed)
-+		webRunCommands();
++		webRunCommands(mainLoop);
 +	// attaque automatique : chaque personnage prêt frappe le monstre le plus proche de la case
 +	// devant le groupe, comme un clic sur son arme (clickedAttackButton). Monstres paisibles
 +	// (mode 1, ex. gardes de Gladstone) et mourants (mode >= 13) épargnés.
@@ -115,7 +117,9 @@ index 392e4c2d..4ca7d14e 100644
 +	begin(0x7F000A00); u8(_currentLevel); end();
 +	// fiche de personnage du jeu : ouverte (u8), personnage affiché (u8)
 +	// (_weaponsDisabled : mis par clickedPortraitLeft à l'ouverture, remis à zéro par clickedExitCharInventory)
-+	begin(0x7F000D00); u8(_weaponsDisabled ? 1 : 0); u8(_selectedCharacter); end();
++	// + réplique parlée en cours (voix jouée ou en file) : dialogue d'accueil d'une boutique… (u8)
++	begin(0x7F000D00); u8(_weaponsDisabled ? 1 : 0); u8(_selectedCharacter);
++	u8((_sound->voiceIsPlaying(&_speechHandle) || _speechList.begin() != _speechList.end()) ? 1 : 0); end();
 +	// emplacements d'équipement utilisables par la race de chaque personnage (4 × u16, bit k = emplacement k)
 +	begin(0x7F000C00);
 +	for (int c = 0; c < 4; c++) {
@@ -316,10 +320,15 @@ index 392e4c2d..4ca7d14e 100644
 +// op 5 : triches vie (a & 1) / magie (a & 2) infinies ; op 6 : ajouter a couronnes ;
 +// op 7 / 8 (tests) : b points de dégâts / de magie dépensée au perso a. Résultat (Module.lolCmdDone(id, code)) :
 +// 0 fait, 1 emplacement ou objet impossible, 2 sac plein, 3 emplacement vide.
-+void LoLEngine::webRunCommands() {
++void LoLEngine::webRunCommands(bool all) {
 +#ifdef __EMSCRIPTEN__
 +	while (EM_ASM_INT({ return Module.lolCmds.length; })) {
 +		const int op = EM_ASM_INT({ return Module.lolCmds[0][0]; });
++		if (!all) {	// hors de la boucle principale : seulement sac <-> main
++			const int a0 = EM_ASM_INT({ return Module.lolCmds[0][1]; }) & 0x3FFF, b0 = EM_ASM_INT({ return Module.lolCmds[0][2]; });
++			if (op != 1 || !((a0 < 48 && b0 == 100) || (a0 == 100 && b0 < 48)))
++				break;
++		}
 +		const int a = EM_ASM_INT({ return Module.lolCmds[0][1]; });
 +		const int b = EM_ASM_INT({ return Module.lolCmds[0][2]; });
 +		EM_ASM({ Module.lolText = Module.lolCmds[0][4] || null; });
@@ -769,7 +778,7 @@ index 392e4c2d..4ca7d14e 100644
  void LoLEngine::runLoop() {
  	// Initialize debugger since how it should be fully usable
  	static_cast<Debugger_LoL *>(getDebugger())->initialize();
-@@ -957,6 +1703,7 @@ void LoLEngine::runLoop() {
+@@ -957,6 +1712,7 @@ void LoLEngine::runLoop() {
  		gui_updateInput();
  
  		update();
@@ -777,7 +786,15 @@ index 392e4c2d..4ca7d14e 100644
  
  		updatePlayTimer();
  
-@@ -1178,6 +1925,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
+@@ -1031,6 +1787,7 @@ void LoLEngine::readSettings() {
+ }
+ 
+ void LoLEngine::update() {
++	webPublishState(false);	// version web : aussi dans les boucles des scènes de lieu (boutiques), qui n'appellent pas delay()
+ 	updateSequenceBackgroundAnimations();
+ 
+ 	if (_updateCharNum != -1 && _system->getMillis() > _updatePortraitNext)
+@@ -1178,6 +1935,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
  	return size;
  }
  
@@ -875,7 +892,7 @@ index 392e4c2d..4ca7d14e 100644
  bool LoLEngine::addCharacter(int id) {
  	const uint16 *cdf[] = {
  		_charDefsMan, _charDefsMan, _charDefsMan, _charDefsWoman,
-@@ -1477,6 +2315,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
+@@ -1477,6 +2325,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
  
  	int newVal = (mode == 2) ? (pointsMax + points) : (mode ? (pointsCur + points) : points);
  	newVal = CLIP(newVal, 0, pointsMax);
@@ -884,7 +901,7 @@ index 392e4c2d..4ca7d14e 100644
  
  	if (type) {
  		c->magicPointsCur = newVal;
-@@ -1969,6 +2809,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
+@@ -1969,6 +2819,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
  		}
  	}
  
@@ -892,7 +909,7 @@ index 392e4c2d..4ca7d14e 100644
  	if (!skipAnim && charId < 3) {
  		_updateCharNum = charId;
  		_portraitSpeechAnimMode = mode;
-@@ -1981,6 +2822,8 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
+@@ -1981,6 +2832,8 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
  	else if (paramList)
  		snd_playCharacterSpeech(paramList[2], ch, 0);
  
@@ -901,7 +918,7 @@ index 392e4c2d..4ca7d14e 100644
  	if (textEnabled()) {
  		if (mode == 0) {
  			_txt->printDialogueText2(3, str, script, paramList, paramIndex);
-@@ -2074,6 +2917,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
+@@ -2074,6 +2927,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
  
  void LoLEngine::delay(uint32 millis, bool doUpdate, bool) {
  	while (millis && !shouldQuit()) {
@@ -909,7 +926,7 @@ index 392e4c2d..4ca7d14e 100644
  		if (doUpdate)
  			update();
  		else
-@@ -2092,6 +2936,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
+@@ -2092,6 +2946,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
  // spells
  
  int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
@@ -922,7 +939,7 @@ index 392e4c2d..4ca7d14e 100644
  	_activeSpell.spell = spellType;
  	_activeSpell.p = &_spellProperties[spellType];
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index 2cfadf37..4f1c3732 100644
+index 2cfadf37..cd5a0200 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
 @@ -315,6 +315,12 @@ private:
@@ -930,7 +947,7 @@ index 2cfadf37..4f1c3732 100644
  	// main loop
  	void runLoop();
 +	void webPublishState(bool mainLoop = true);	// version web : état du jeu aux adresses du jeu DOS, pour la mini-carte
-+	void webRunCommands();	// version web : commandes d'inventaire envoyées par la page
++	void webRunCommands(bool all = true);	// version web : commandes d'inventaire envoyées par la page
 +	int webInventoryCommand(int op, int a, int b);
 +	Item webItemAt(int loc);
 +	bool webSlotUsable(int c, int k) const;

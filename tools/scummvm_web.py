@@ -223,7 +223,11 @@ LAUNCH_JS = r"""<script src="volume.js"></script>
   const view = { loops: -1, at: 0, scene: false, upd: 0, seq: [0, 0, 0, 0], menu: false, loading: false, casting: false };
   const SCENE = [112, 0, 176, 120];
   window.lolMenuOpen = () => !!(zones && view.menu);   // keys.js : pas de traduction des touches dans le menu
-  window.lolStarted = () => !!zones && view.loops > 0;   // partie lancée (boucle du jeu) : commandes possibles
+  window.lolStarted = () => !!zones && view.loops > 0;
+  // boucle principale arrêtée depuis 0,5 s (scène d'un lieu, dialogue, séquence) : minimap.js (boutique)
+  window.lolMainStalled = () => !!zones && view.loops > 0 && performance.now() - view.at > 500;
+  // scène d'un lieu ou dialogue dans la fenêtre de scène (initSceneWindowDialogue : _updateFlags |= 3)
+  window.lolSceneWindow = () => !!zones && !!(view.upd & 1);   // partie lancée (boucle du jeu) : commandes possibles
   window.lolView = () => {
     if (!zones || view.loops <= 0) return { mirror: true, crop: [0, 0, 320, 200] };   // avant la partie (introduction)
     if (view.menu || view.loading) return { mirror: false };

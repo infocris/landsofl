@@ -56,8 +56,8 @@
   if (!location.hash) history.replaceState(null, "", "#lol-fr");
   const DB = "/home/web_user", KEY = DB + "/scummvm.ini", SEC = "[lol-fr]";
   // version du moteur dans les adresses : un navigateur qui a gardé l'ancien moteur en cache le recharge
-  Module.locateFile = (p, dir) => dir + p + (p.endsWith(".wasm") ? "?v=1795468226-13269027" : "");
-  const start = () => { const s = document.createElement("script"); s.src = "scummvm.js?v=1795468226-13269027"; document.body.appendChild(s); };
+  Module.locateFile = (p, dir) => dir + p + (p.endsWith(".wasm") ? "?v=1795469996-13269305" : "");
+  const start = () => { const s = document.createElement("script"); s.src = "scummvm.js?v=1795469996-13269305"; document.body.appendChild(s); };
   const section = (t) => { const i = t.indexOf(SEC); if (i < 0) return ""; const j = t.indexOf("\n[", i + 1); return j < 0 ? t.slice(i) : t.slice(i, j + 1); };
   // sauvegarde à charger dès le lancement (fenêtre « Sauvegardes… » avant le début de la partie,
   // minimap.js) : clé save_slot de la section, lue par KyraEngine_v1::init ; retirée sinon
@@ -115,7 +115,11 @@
   const view = { loops: -1, at: 0, scene: false, upd: 0, seq: [0, 0, 0, 0], menu: false, loading: false, casting: false };
   const SCENE = [112, 0, 176, 120];
   window.lolMenuOpen = () => !!(zones && view.menu);   // keys.js : pas de traduction des touches dans le menu
-  window.lolStarted = () => !!zones && view.loops > 0;   // partie lancée (boucle du jeu) : commandes possibles
+  window.lolStarted = () => !!zones && view.loops > 0;
+  // boucle principale arrêtée depuis 0,5 s (scène d'un lieu, dialogue, séquence) : minimap.js (boutique)
+  window.lolMainStalled = () => !!zones && view.loops > 0 && performance.now() - view.at > 500;
+  // scène d'un lieu ou dialogue dans la fenêtre de scène (initSceneWindowDialogue : _updateFlags |= 3)
+  window.lolSceneWindow = () => !!zones && !!(view.upd & 1);   // partie lancée (boucle du jeu) : commandes possibles
   window.lolView = () => {
     if (!zones || view.loops <= 0) return { mirror: true, crop: [0, 0, 320, 200] };   // avant la partie (introduction)
     if (view.menu || view.loading) return { mirror: false };

@@ -598,7 +598,8 @@
       if (!visible(L, i)) {
         // case inexplorée qui touche une case explorée par un côté : grisée (bord de l'exploration)
         const cx = i % 32, cy = i >> 5;
-        const edge = (cx > 0 && visible(L, i - 1)) || (cx < 31 && visible(L, i + 1)) || (cy > 0 && visible(L, i - 32)) || (cy < 31 && visible(L, i + 32));
+        // (pas les murs ni la roche : seulement les cases où l'on peut aller)
+        const edge = !isWallCell(L, i) && ((cx > 0 && visible(L, i - 1)) || (cx < 31 && visible(L, i + 1)) || (cy > 0 && visible(L, i - 32)) || (cy < 31 && visible(L, i + 32)));
         g.fillStyle = edge ? "#3d3a35" : "#15120e"; g.fillRect(x, y, CELL - 1, CELL - 1); continue;
       }
       const tl = img && cellTile(L, img, i, cls);
@@ -1176,6 +1177,11 @@
       }
     }
     const inScene = r[4][0] === 1;
+    // lieu en image (boutique…) : case du groupe avec une scène, boucle principale du jeu à l'arrêt
+    let stalled = inScene;
+    try { const w = document.getElementById("dos").contentWindow; if (w.lolSceneWindow) stalled = inScene || w.lolSceneWindow() || w.lolMainStalled(); } catch (e) {}
+    sceneNow = stalled && !!(current && current.scenes && current.scenes[block]);
+    if (window.lolSceneUi) window.lolSceneUi(sceneNow);
     const now = performance.now();
     // ScummVM publie le niveau en cours ; sous DOSBox, on le reconnaît à sa grille (identify)
     const engineLevel = ENGINE_SPRITES && r[6] ? levels.find((q) => q.level === r[6][0]) : undefined;
@@ -1229,7 +1235,9 @@
     draw(block, dir);
     // image fixe du lieu dans la vue 3D ; sans image connue, la vue reste visible (avant : écran
     // noir « Lieu »). Version ScummVM : la page recopie l'image du jeu elle-même (tools/scummvm_web.py).
-    sendSceneTo3d(inScene && !ENGINE_SPRITES ? current.scenes[block] || null : null, near ? near.text : "");
+    // image du lieu en plein cadre dans la vue 3D : DOSBox (drapeau de scène) ; ScummVM : scène d'un
+    // lieu affichée par le jeu (boutique…, sceneNow), une fois l'ouverture de la porte jouée
+    sendSceneTo3d((inScene && !ENGINE_SPRITES) || sceneNow ? current.scenes[block] || null : null, near ? near.text : "");
     sendGridTo3d(current.level, hash);
     sendBloodTo3d(current.level);
     sendMonstersTo3d(current);
@@ -1379,6 +1387,7 @@
 
   // Aperçu d'un niveau sans le jeu (tests, console) : LoLMinimap.preview(2, 5, 2, 1)
   let previewing = false;
+  let sceneNow = false;                                      // scène d'un lieu (boutique…) affichée par le jeu
   function preview(level, x = 0, y = 0, dir = 0) {
     previewing = true;
     current = levels.find((l) => l.level === level) || null;
@@ -2930,6 +2939,116 @@
     }
     setInterval(() => { updateFloat().catch(() => {}); }, 250);
     show(on);
+  }
+
+  // --- Boutique : vendre et sortir (version ScummVM) -------------------------------------------
+  // Pendant la scène d'un lieu (_specialSceneFlag, publié en 0x5D6B5), deux boutons en haut de la vue
+  // 3D. « Vendre… » : objets du sac (par type, valeur estimée de la table des objets) ; « Proposer »
+  // fait comme le joueur : l'objet est pris en main puis le marchand est cliqué dans la fenêtre de
+  // scène du jeu (clickedSequenceWindow : script du lieu, qui fait son offre et demande confirmation ;
+  // l'offre s'affiche en bulle, on répond Oui / Non dans le jeu). « Sortir » : un pas en arrière, comme
+  // la touche reculer, qui quitte la scène.
+  if (window.LOL_ENGINE === "scummvm") {
+    const css = document.createElement("style");
+    css.textContent = `
+    #shop-bar { position: absolute; z-index: 4; top: 8px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; zoom: var(--ui-z, 1); }
+    #shop-bar[hidden] { display: none; }
+    #shop-bar button { font: 13px system-ui, sans-serif; padding: 5px 12px; border: 1px solid #c9a227; border-radius: 6px;
+      background: rgba(20,16,10,.9); color: #f0d070; cursor: pointer; }
+    #shop-bar button:hover { background: #3a2c14; }
+    #shop-bar.talk button { opacity: .55; }
+    #shop-bar.talk::after { content: "le marchand parle…"; align-self: center; color: #a39578; font: italic 12px system-ui, sans-serif; }
+    #sell-dlg { width: min(460px, 94vw); max-height: 80vh; padding: 0; border: 1px solid #6d5a3a; border-radius: 10px; color-scheme: dark;
+      background: #110e0a; color: #e8dcc0; font: 14px/1.4 system-ui, sans-serif; box-shadow: 0 20px 60px rgba(0,0,0,.7); }
+    #sell-dlg[open] { display: flex; flex-direction: column; }
+    #sell-dlg::backdrop { background: rgba(0,0,0,.6); }
+    #sell-dlg .sh { display: flex; align-items: center; padding: 12px 14px 8px; border-bottom: 1px solid #3a3226; }
+    #sell-dlg h2 { margin: 0; font-size: 18px; color: #c9a227; flex: 1; }
+    #sell-dlg .sx { font-size: 18px; background: none; border: 0; color: #a39578; cursor: pointer; }
+    #sell-dlg .sn { padding: 6px 14px; color: #8a7f68; font-size: 12px; }
+    #sell-dlg ol { list-style: none; margin: 0; padding: 4px 10px 12px; overflow: auto; }
+    #sell-dlg li { display: grid; grid-template-columns: 30px 1fr auto auto; gap: 8px; align-items: center; padding: 3px 4px; border-radius: 4px; }
+    #sell-dlg li:hover { background: #1d1710; }
+    #sell-dlg li .v { color: #a39578; font-size: 12px; }
+    #sell-dlg li button { font: 12px system-ui, sans-serif; padding: 3px 9px; border: 1px solid #6d5a3a; border-radius: 4px; background: #2a2217; color: #e8dcc0; cursor: pointer; }
+    #sell-dlg li button:hover { border-color: #c9a227; }`;
+    document.head.appendChild(css);
+    const v3d = document.getElementById("v3d");
+    const barEl = document.createElement("div"); barEl.id = "shop-bar"; barEl.hidden = true;
+    barEl.innerHTML = `<button type="button" class="sell" title="Montrer au marchand un objet du sac">💰 Vendre…</button>
+      <button type="button" class="leave" title="Quitter le lieu (un pas en arrière)">↩ Sortir</button>`;
+    if (v3d) v3d.appendChild(barEl);
+    const dlg = document.createElement("dialog"); dlg.id = "sell-dlg"; dlg.setAttribute("aria-label", "Vendre");
+    dlg.innerHTML = `<div class="sh"><h2>Vendre</h2><button type="button" class="sx" title="Fermer (Échap)">✕</button></div>
+      <div class="sn">« Proposer » montre l'objet au marchand ; il fait son offre, à accepter ou refuser dans le jeu.</div><ol></ol>`;
+    document.body.appendChild(dlg);
+    window.lolSceneUi = (on) => { barEl.hidden = !on; if (!on && dlg.open) dlg.close(); };
+    // clic dans l'écran du jeu (coordonnées 320 × 200), comme le joueur
+    async function gameClick(gx, gy) {
+      const f = document.getElementById("dos");
+      let w, cv; try { w = f.contentWindow; cv = w.document.getElementById("canvas"); } catch (e) { return; }
+      if (!cv) return;
+      const r = cv.getBoundingClientRect(), R = 4 / 3;
+      const aw = r.width / r.height > R ? r.height * R : r.width, ah = aw / R;
+      const x = r.left + (r.width - aw) / 2 + gx / 320 * aw, y = r.top + (r.height - ah) / 2 + gy / 200 * ah;
+      // étapes espacées : le jeu lit la souris une fois par image (appui et relâchement dans la même
+      // image : bouton survolé mais pas cliqué)
+      for (const type of ["mousemove", "mousedown", "mouseup"]) {
+        cv.dispatchEvent(new w.MouseEvent(type, { clientX: x, clientY: y, button: 0, buttons: type === "mousedown" ? 1 : 0, bubbles: true, cancelable: true, view: w }));
+        await new Promise((ok) => setTimeout(ok, 120));
+      }
+    }
+    function renderSell() {
+      const ol = dlg.querySelector("ol");
+      const bag = new Map();
+      (lastInvData ? lastInvData.barTypes : []).forEach((t, loc) => { if (t < 0) return; const e = bag.get(t); if (e) e.n++; else bag.set(t, { loc, n: 1 }); });
+      ol.replaceChildren(...[...bag].map(([t, e]) => {
+        const it = itemInfo[t] || { name: `objet ${t}`, icon: -1 };
+        const li = document.createElement("li");
+        const ic = document.createElement("div"); ic.className = "slot full"; setIcon(ic, it.icon); ic.dataset.type = t;
+        const nm = document.createElement("span"); nm.textContent = it.name + (e.n > 1 ? ` (×${e.n})` : "");
+        const v = document.createElement("span"); v.className = "v"; v.textContent = it.value ? `valeur ${it.value}` : "";
+        const b = document.createElement("button"); b.type = "button"; b.textContent = "Proposer";
+        b.addEventListener("click", async () => {
+          dlg.close();
+          await untilQuiet(false);                     // le marchand finit de parler
+          const held = lastInvData ? lastInvData.handType : -1;
+          if (held >= 0 && held !== t) { const free = lastInvData.barTypes.indexOf(-1); if (free >= 0) await mem.cmd({ op: "move", a: LOC_HAND, b: free }, 4000); }
+          if (held !== t) await mem.cmd({ op: "move", a: e.loc, b: LOC_HAND }, 4000);
+          setTimeout(() => gameClick(200, 60), 250);   // le marchand, au centre de la fenêtre de scène
+          lastInv = ""; setTimeout(() => updateInventory().catch(() => {}), 800);
+        });
+        li.append(ic, nm, v, b);
+        return li;
+      }));
+      if (!bag.size) { const li = document.createElement("li"); li.textContent = "Le sac est vide."; ol.appendChild(li); }
+    }
+    barEl.querySelector(".sell").addEventListener("click", () => { renderSell(); dlg.showModal(); });
+    // Dialogue en cours (accueil du marchand : réplique parlée, zone 0x7F000D00 + 2) : le jeu n'accepte
+    // ni vente ni sortie avant sa fin. « Vendre » attend la fin ; « Sortir » passe la réplique (Espace)
+    // puis attend la fin avant de cliquer SORTIR (bouton de la scène, en bas à droite).
+    const speaking = async () => { const r = await mem.read([[0x7F000D00, 3]]); return !!(r && r[0][2]); };
+    async function untilQuiet(skip) {
+      for (let k = 0; k < 60 && await speaking(); k++) {
+        if (skip && k % 5 === 0 && window.LoLKeys) LoLKeys.pressGame("SKIP");
+        await new Promise((ok) => setTimeout(ok, 250));
+      }
+      await new Promise((ok) => setTimeout(ok, 300));
+    }
+    setInterval(async () => {
+      if (barEl.hidden) return;
+      const talk = await speaking();
+      barEl.classList.toggle("talk", talk);
+      barEl.title = talk ? "Le marchand parle : la vente et la sortie attendent la fin du dialogue" : "";
+    }, 400);
+    barEl.querySelector(".leave").addEventListener("click", async () => {
+      const g = document.getElementById("dos"); if (g && g.focus) g.focus();
+      await untilQuiet(true);
+      gameClick(270, 113);
+    });
+    dlg.querySelector(".sx").addEventListener("click", () => dlg.close());
+    dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
+    for (const ev of ["keydown", "keyup", "keypress"]) dlg.addEventListener(ev, (e) => e.stopPropagation());
   }
 
   // --- Répliques des dialogues en bulle (version ScummVM) --------------------------------------
