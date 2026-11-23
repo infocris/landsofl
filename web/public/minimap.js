@@ -1599,18 +1599,21 @@
   async function updateInventory() {
     if (!itemInfo || previewing) return;
     const r = await mem.read([[INV.bar, INV.barSlots * 2], [INV.hand, 2], [INV.items, INV.itemSize * INV.maxItems],
-      PARTY_RANGE()]);
+      PARTY_RANGE(), ...(MANAGE ? [[0x7F000C00, 8]] : [])]);
     if (!r) return;
-    const [bar, hand, table, ch] = r;
+    const [bar, hand, table, ch, use] = r;
+    // emplacements d'équipement que la race de chaque personnage a (moteur ScummVM ; tous sinon)
+    const usable = (slot) => (use ? use[slot * 2] | use[slot * 2 + 1] << 8 : 0x7FF) || 0x7FF;
     const typeOf = (id) => (id > 0 && id < INV.maxItems ? table[id * INV.itemSize] | table[id * INV.itemSize + 1] << 8 : -1);
     const barTypes = [];
     for (let k = 0; k < INV.barSlots; k++) barTypes.push(typeOf(bar[k * 2] | bar[k * 2 + 1] << 8));
     const handType = typeOf(hand[0] | hand[1] << 8);
-    const party = partyChars(ch).map((c) => ({ name: c.name, slot: c.slot,
+    const party = partyChars(ch).map((c) => ({ name: c.name, slot: c.slot, usable: usable(c.slot),
       eq: Array.from({ length: INV.equipSlots }, (_, k) => typeOf(c.at(INV.equipOffset + 2 * k) | c.at(INV.equipOffset + 2 * k + 1) << 8)) }));
     owned = new Set([...barTypes, handType, ...party.flatMap((c) => c.eq)].filter((t) => t >= 0));
     const key = JSON.stringify([barTypes, handType, party]);
     lastInvData = { barTypes, handType, party };
+    window.lolInvData = () => lastInvData;   // débogage
     if (key === lastInv) return;          // on ne reconstruit la grille que si elle a changé
     lastInv = key;
 
@@ -1634,7 +1637,11 @@
     for (const c of party) {
       const b = document.createElement("div"); b.className = "inv-sub"; b.textContent = `${c.name} — équipement`;
       const row = document.createElement("div"); row.className = "inv-grid";
-      row.append(...c.eq.map((t, k) => slot(t, `${c.name}, ${EQUIP_NAMES[k] || "emplacement " + (k + 1)}`, LOC_EQ(c.slot, k))));
+      row.append(...c.eq.map((t, k) => {
+        const d = slot(t, `${c.name}, ${EQUIP_NAMES[k] || "emplacement " + (k + 1)}`, LOC_EQ(c.slot, k));
+        if (!(c.usable >> k & 1)) { d.classList.add("nouse"); d.title = `${c.name} : emplacement absent pour sa race (utilisable seulement avec les triches)`; }
+        return d;
+      }));
       invChars.append(b, row);
     }
     // objet pris en main dans le jeu : sélectionné comme si on avait cliqué dessus ;
@@ -1686,14 +1693,17 @@
   const LOC_HAND = 100, LOC_EQ = (c, k) => 200 + c * 11 + k;
   const hintEl = document.getElementById("inv-hint");
   if (MANAGE && hintEl) hintEl.textContent = "Glisser une case sur une autre pour déplacer ou échanger ; cliquer un objet pour d'autres actions.";
-  const CMD_ERR = { 1: "Impossible : cet objet ne va pas à cet emplacement.", 2: "Le sac est plein.", 3: "Cet emplacement est vide." };
+  const CMD_ERR = { 1: "Impossible : cet objet ne va pas à cet emplacement (ou la race du personnage ne l'a pas).", 2: "Le sac est plein.", 3: "Cet emplacement est vide." };
   function invMessage(t) {
     if (!hintEl) return;
     hintEl.textContent = t;
     clearTimeout(invMessage.t);
     invMessage.t = setTimeout(() => { hintEl.textContent = MANAGE ? "Glisser une case sur une autre pour déplacer ou échanger ; cliquer un objet pour d'autres actions." : ""; }, 4000);
   }
+  // sans triches (Options) : équipement limité aux emplacements que la race du personnage a, comme le jeu
+  const strictEquip = () => !!(window.lolCheatsShown && !window.lolCheatsShown());
   async function invCmd(c) {
+    if (c.op === "move" && strictEquip()) c = { ...c, a: c.a | 0x4000 };
     const r = await mem.cmd(c);
     if (!r) { invMessage("Le jeu ne répond pas (menu ouvert ?) : réessaie en exploration."); return false; }
     if (r.code) { invMessage(CMD_ERR[r.code] || `Refusé (code ${r.code}).`); return false; }
@@ -1740,7 +1750,9 @@
     const allowed = (it.slots || []).filter((k) => k >= 0 && k < INV.equipSlots);
     if (allowed.length && lastInvData)
       for (const c of lastInvData.party) {
-        const k = allowed.find((s) => c.eq[s] < 0) ?? allowed[0];
+        const ok = strictEquip() ? allowed.filter((s) => c.usable >> s & 1) : allowed;
+        if (!ok.length) continue;                       // race sans cet emplacement (sans triches)
+        const k = ok.find((s) => c.eq[s] < 0) ?? ok[0];
         const to = LOC_EQ(c.slot, k);
         if (to === loc) continue;
         btn(`Équiper : ${c.name}`, `${c.name}, ${EQUIP_NAMES[k] || "emplacement " + (k + 1)}` + (c.eq[k] >= 0 ? " (échange avec l'objet porté)" : ""), () => move(to));

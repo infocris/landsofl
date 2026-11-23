@@ -298,6 +298,7 @@
   /* emplacement d'équipement vide : silhouette du jeu (slot_shapes.png) */
   .slot.ph { background-image: url("viewer/data/slot_shapes.png?v=20261114b"); background-repeat: no-repeat; image-rendering: pixelated; }
   .slot.sel { outline: 2px solid #c9a227; outline-offset: -1px; }
+  body.no-cheats .slot.nouse { opacity: .25; filter: grayscale(1); }
   .slot { position: relative; }
   .slot .cnt { position: absolute; right: 1px; bottom: 0; font: bold 10px/1 system-ui, sans-serif; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000; }
   #inv-stacks.on { border-color: #c9a227; color: #c9a227; }
@@ -433,7 +434,7 @@
 </head>
 <body>
 <div id="left">
-  <iframe id="dos" src="lol-game.html?v=1795459536-13267426#lol-fr" title="Lands of Lore (ScummVM)" allow="autoplay; fullscreen"></iframe>
+  <iframe id="dos" src="lol-game.html?v=1795463902-13268293#lol-fr" title="Lands of Lore (ScummVM)" allow="autoplay; fullscreen"></iframe>
   <div id="split" role="separator" aria-orientation="horizontal" title="Glisser pour redimensionner le jeu et la vue 3D (double-clic : répartition d'origine)"></div>
   <div id="v3d"><div id="v3d-free"><div id="v3d-free-grip" title="Glisser pour régler la bande libre sous la vue 3D (double-clic : hauteur par défaut)"></div></div><iframe id="v3d-frame" src="viewer/?embed=1&v=20261124a" title="Vue 3D synchronisée"></iframe></div>
 </div>
@@ -664,9 +665,9 @@ window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes
   });
 })();
 </script>
-<script src="minimap.js?v=20261124b"></script>
+<script src="minimap.js?v=20261124d"></script>
 <script src="engine.js?v=20261113a"></script>
 <script src="classic.js?v=20261123e"></script>
-<script src="options.js?v=20261124b"></script>
+<script src="options.js?v=20261124d"></script>
 </body>
 </html>

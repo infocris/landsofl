@@ -300,6 +300,7 @@
   /* emplacement d'équipement vide : silhouette du jeu (slot_shapes.png) */
   .slot.ph { background-image: url("viewer/data/slot_shapes.png?v=20261114b"); background-repeat: no-repeat; image-rendering: pixelated; }
   .slot.sel { outline: 2px solid #c9a227; outline-offset: -1px; }
+  body.no-cheats .slot.nouse { opacity: .25; filter: grayscale(1); }
   .slot { position: relative; }
   .slot .cnt { position: absolute; right: 1px; bottom: 0; font: bold 10px/1 system-ui, sans-serif; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000; }
   #inv-stacks.on { border-color: #c9a227; color: #c9a227; }
@@ -858,9 +859,9 @@
   });
 })();
 </script>
-<script src="minimap.js?v=20261124b"></script>
+<script src="minimap.js?v=20261124d"></script>
 <script src="engine.js?v=20261113a"></script>
 <script src="classic.js?v=20261123e"></script>
-<script src="options.js?v=20261124b"></script>
+<script src="options.js?v=20261124d"></script>
 </body>
 </html>

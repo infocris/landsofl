@@ -28,6 +28,9 @@
   #mm, dialog, #mm-tip, #mmtoggle, #v3dtoggle, #persp, #vol, #engine, #sv-open, #qload, #zqsd, #keys-open, #ui-mode, #opt-open,
   #party-float, #action-bar, #say, #ab-tip, #ab-menu { zoom: var(--ui-z, 1); }
   dialog #ab-menu, body.ui-classic #action-bar { zoom: 1; }
+  /* grande carte : son canevas est déjà dimensionné sur la fenêtre ; seuls l'en-tête et la légende sont agrandis */
+  #bm-dlg { zoom: 1; }
+  #bm-dlg .cat-head, #bm-legend { zoom: var(--ui-z, 1); }
   #mm { height: calc(100vh / var(--ui-z, 1)); }
   /* interface agrandie : les boutons de la page rangés en barre d'outils en haut du panneau */
   #tools { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
