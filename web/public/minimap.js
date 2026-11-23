@@ -1993,6 +1993,7 @@
     const r = await mem.cmd({ op: "cast", a, b: s.type | level << 8 | (target + 1) << 12 }, 20000);
     spMsg.textContent = !r ? "Le jeu ne répond pas (menu ou dialogue ouvert ?) : réessaie en exploration."
       : r.code ? SPELL_ERR[r.code] || `Refusé (code ${r.code}).` : `${s.name} niveau ${level + 1} lancé.`;
+    if (r && !r.code && window.lolLastSpell) window.lolLastSpell(a, s.type, level);
     spellKey = ""; lastStats = "";
     setTimeout(() => { updateSpells().catch(() => {}); updateStats().catch(() => {}); }, 300);
   }
@@ -2659,9 +2660,12 @@
       font: 12px/1.2 system-ui, sans-serif; color: #e8dcc0; user-select: none; touch-action: none; cursor: grab; }
     #party-float[hidden] { display: none; }
     #party-float.drag { cursor: grabbing; }
-    #party-float .pm { display: grid; grid-template-columns: 52px 128px 26px; gap: 0 7px; align-items: center; padding: 4px 6px 4px 4px;
+    #party-float .pm { display: grid; grid-template-columns: 52px 128px auto; gap: 0 7px; align-items: center; padding: 4px 6px 4px 4px;
       background: rgba(12, 10, 7, .78); border: 1px solid #6d5a3a; border-radius: 7px; box-shadow: 0 2px 10px rgba(0,0,0,.6); }
-    #party-float .pa { grid-column: 3; grid-row: 1 / span 3; display: flex; flex-direction: column; gap: 4px; }
+    #party-float .pa { grid-column: 3; grid-row: 1 / span 3; display: grid; grid-template-columns: 26px auto; gap: 4px; align-content: center; }
+    #party-float .pa .atk { grid-column: 1; }
+    #party-float .pa .book { grid-column: 1; }
+    #party-float .pa .last { grid-column: 2; grid-row: 2; width: auto; min-width: 30px; padding: 0 5px; font-size: 11px; color: #b8d0ff; white-space: nowrap; }
     #party-float .pa button { width: 26px; height: 24px; padding: 0; border: 1px solid #6d5a3a; border-radius: 4px; background: #241c12;
       color: #f0d070; font-size: 14px; line-height: 1; cursor: pointer; }
     #party-float .pa button:hover { border-color: #c9a227; }
@@ -2735,6 +2739,7 @@
       const d = drag; drag = null; pf.classList.remove("drag");
       if (d.moved) { try { localStorage.setItem("partyFloatPos", JSON.stringify(pos)); } catch (e) {} }
       else if (d.target.closest(".rest")) { if (window.LoLKeys) LoLKeys.pressGame("RST"); }
+      else if (d.target.closest(".pa .last")) castLast(+d.target.closest(".pm").dataset.slot);
       else if (d.target.closest(".pa .atk")) attackFrom(+d.target.closest(".pm").dataset.slot);
       else if (d.target.closest(".pa .book")) toggleSpells(+d.target.closest(".pm").dataset.slot);
       else if (d.target.closest(".pf") && typeof openStats === "function") openStats();
@@ -2796,6 +2801,36 @@
       pop.style.left = Math.min(innerWidth - pop.offsetWidth * z - 4, r.right + 6) / z + "px";
       pop.style.top = Math.max(4, Math.min(innerHeight - pop.offsetHeight * z - 4, r.top)) / z + "px";
     }
+    // Dernier sort lancé depuis la page par chaque personnage (livre des portraits, barre d'actions,
+    // panneau Magie ; localStorage « lastSpell:nom ») : bouton à droite du livre pour le relancer.
+    const lastKey = (name) => "lastSpell:" + name;
+    const lastOf = (name) => { try { return JSON.parse(localStorage.getItem(lastKey(name)) || "null"); } catch (e) { return null; } };
+    window.lolLastSpell = (slot, type, level) => {
+      const c = floatParty.find((p) => p.slot === slot);
+      if (!c) return;
+      try { localStorage.setItem(lastKey(c.name), JSON.stringify({ type, level })); } catch (e) {}
+      lastFloat = ""; updateFloat().catch(() => {});
+    };
+    function lastSpellBtn(c) {
+      const ls = lastOf(c.name), sp = ls && (knownSpells || []).find((q) => q.type === ls.type);
+      if (!sp) return "";
+      const ok = !c.busy && sp.mp[ls.level] <= c.mp && sp.hp[ls.level] < c.hp;
+      const short = (sp.name || "sort").replace(/^(.{4}).+$/, "$1.");
+      return `<button type="button" class="last${ok ? "" : " busy"}" data-mp="${sp.mp[ls.level]}" data-hp="${sp.hp[ls.level]}"
+        title="Relancer : ${escHtml(sp.name)} niveau ${ls.level + 1}">${escHtml(short)} ${ls.level + 1}</button>`;
+    }
+    function castLast(slot) {
+      const c = floatParty.find((p) => p.slot === slot), ls = c && lastOf(c.name);
+      const sp = ls && (knownSpells || []).find((q) => q.type === ls.type);
+      if (!sp || c.busy || sp.mp[ls.level] > c.mp) return;
+      showCost(null);
+      castFrom(slot, sp, ls.level);
+    }
+    pf.addEventListener("mouseover", (e) => {
+      const b = e.target.closest && e.target.closest(".pa .last");
+      if (b) showCost(+b.closest(".pm").dataset.slot, +b.dataset.mp, +b.dataset.hp);
+    });
+    pf.addEventListener("mouseout", (e) => { if (e.target.closest && e.target.closest(".pa .last")) showCost(null); });
     // coût d'un niveau survolé, en hachures sur la barre de magie (et de vie) du portrait ; rouge si
     // le personnage n'a pas de quoi le payer. Réappliqué après chaque redessin des portraits.
     let costHint = null;
@@ -2827,6 +2862,7 @@
       spellMsg = "…"; renderSpellPop();
       const r = await mem.cmd({ op: "cast", a: slot, b: sp.type | l << 8 | (target + 1) << 12 }, 20000);
       spellMsg = !r ? "Le jeu ne répond pas." : r.code ? ({ 1: "Impossible maintenant.", 4: "Pas assez de magie.", 5: "Le sort ne peut pas partir d'ici." }[r.code] || `Refusé (${r.code}).`) : "";
+      if (r && !r.code) window.lolLastSpell(slot, sp.type, l);
       if (!r || !r.code) { spellFor = null; lastFloat = ""; pop.hidden = true; updateFloat().catch(() => {}); return; }
       renderSpellPop();
     }
@@ -2878,7 +2914,7 @@
           <div class="pf" style="background-position:-${c.f * 48}px -${(Math.min(9, Math.max(1, c.id)) - 1) * 48}px"></div>
           <div class="pn"></div>${bar("hp", c.hp, c.hpMax)}${c.mpMax > 0 ? bar("mp", c.mp, c.mpMax) : "<div></div>"}
           ${window.LOL_ENGINE === "scummvm" ? `<div class="pa"><button type="button" class="atk${c.busy ? " busy" : ""}" title="Attaque (arme en main)">⚔</button>
-          <button type="button" class="book${spellFor === c.slot ? " on" : ""}${c.busy ? " busy" : ""}" title="Livre de sorts">📖</button></div>` : ""}</div>`).join("");
+          <button type="button" class="book${spellFor === c.slot ? " on" : ""}${c.busy ? " busy" : ""}" title="Livre de sorts">📖</button>${lastSpellBtn(c)}</div>` : ""}</div>`).join("");
         floatParty = list;
         if (spellFor !== null) renderSpellPop();
         applyCost();
@@ -3175,7 +3211,7 @@
           const r = await mem.cmd({ op: "cast", a: caster, b: a.s | a.l << 8 | (target + 1) << 12 }, 20000);
           if (!r) flash(i, false, "Le jeu ne répond pas (menu ouvert ?)");
           else if (r.code) flash(i, false, { 1: "impossible maintenant", 4: "pas assez de magie", 5: "le sort ne peut pas partir d'ici" }[r.code] || `refusé (code ${r.code})`);
-          else flash(i, true);
+          else { flash(i, true); if (window.lolLastSpell) window.lolLastSpell(caster, a.s, a.l); }
         } finally { busyUse = false; }
         return;
       }
