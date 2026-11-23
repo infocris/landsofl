@@ -4,6 +4,9 @@
 // Adresses physiques trouvées par recherche mémoire (voir docs/reverse-engineering.md, § 12).
 (() => {
   "use strict";
+  // taille de l'interface (Options : zoom CSS --ui-z) : les éléments placés en pixels par la page
+  // reçoivent des coordonnées d'écran divisées par le zoom ; leurs tailles mesurées sont multipliées
+  const UZ = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-z")) || 1;
   const ADDR = {
     block: 0x3E4E0,   // u16 : case du groupe = y*32 + x
     dir: 0x3E4EF,     // u16 : 0 N, 1 E, 2 S, 3 O
@@ -950,7 +953,7 @@
     let left = cx + 14, top = cy + 14;
     if (left + w > innerWidth - 4) left = cx - w - 14;
     if (top + h > innerHeight - 4) top = cy - h - 14;
-    tipEl.style.left = Math.max(4, left) + "px"; tipEl.style.top = Math.max(4, top) + "px";
+    tipEl.style.left = Math.max(4, left) / UZ() + "px"; tipEl.style.top = Math.max(4, top) / UZ() + "px";
   }
 
   // Illustration d'un lieu : image du jeu (fonction 0x29, § 8) si une case de l'entrée en a une,
@@ -2446,7 +2449,7 @@
       if (pos) { x = pos.x; y = pos.y; }
       else { const g = document.getElementById("dos"), gr = g ? g.getBoundingClientRect() : { left: 0, top: 0 }; x = gr.left + 8; y = gr.top + 8; }
       x = Math.max(0, Math.min(innerWidth - w, x)); y = Math.max(0, Math.min(innerHeight - h, y));
-      pf.style.left = x + "px"; pf.style.top = y + "px";
+      pf.style.left = x / UZ() + "px"; pf.style.top = y / UZ() + "px";
     };
     const show = (v) => { on = v; pf.hidden = !on || !pf.childElementCount; try { localStorage.setItem("partyFloat", on ? "on" : "off"); } catch (e) {} if (on) place(); };
     addEventListener("resize", place);
@@ -2565,13 +2568,15 @@
       if (card) {
         const c = card.getBoundingClientRect();
         say.classList.remove("top");
-        say.style.left = Math.min(innerWidth - say.offsetWidth - 8, c.right + 10) + "px";
-        say.style.top = Math.max(4, Math.min(innerHeight - say.offsetHeight - 4, c.top)) + "px";
+        const z = UZ();
+        say.style.left = Math.min(innerWidth - say.offsetWidth * z - 8, c.right + 10) / z + "px";
+        say.style.top = Math.max(4, Math.min(innerHeight - say.offsetHeight * z - 4, c.top)) / z + "px";
       } else {
         const v = (document.getElementById("v3d") || document.body).getBoundingClientRect();
         say.classList.add("top");
-        say.style.left = Math.max(4, v.left + v.width / 2 - say.offsetWidth / 2) + "px";
-        say.style.top = (v.top + 10) + "px";
+        const z = UZ();
+        say.style.left = Math.max(4, v.left + v.width / 2 - say.offsetWidth * z / 2) / z + "px";
+        say.style.top = (v.top + 10) / z + "px";
       }
       clearTimeout(hideT);
       hideT = setTimeout(() => { say.style.opacity = 0; setTimeout(() => { say.hidden = true; }, 260); }, 2500 + 55 * text.length);
@@ -2858,8 +2863,9 @@
       if (!d || !text) { tip.hidden = true; return; }
       const r = d.getBoundingClientRect();
       tip.textContent = text; tip.hidden = false;
-      tip.style.left = Math.max(4, Math.min(innerWidth - tip.offsetWidth - 4, r.left + r.width / 2 - tip.offsetWidth / 2)) + "px";
-      tip.style.top = Math.max(4, r.top - tip.offsetHeight - 6) + "px";
+      const z = UZ(), tw = tip.offsetWidth * z, th = tip.offsetHeight * z;
+      tip.style.left = Math.max(4, Math.min(innerWidth - tw - 4, r.left + r.width / 2 - tw / 2)) / z + "px";
+      tip.style.top = Math.max(4, r.top - th - 6) / z + "px";
       clearTimeout(showTip.t); if (ms) showTip.t = setTimeout(() => { tip.hidden = true; }, ms);
     }
     el.addEventListener("mouseover", (e) => { const d = e.target.closest(".ab"); if (d) showTip(d, d.dataset.tip); });
@@ -2913,8 +2919,9 @@
       if (a) add("Vider la case", () => { bar[i] = null; saveBar(); });
       if (!partyNow().length && !a) head(`Glisser un objet depuis l'inventaire (${invKey() || "Gérer…"})`);
       menu.hidden = false;
-      menu.style.left = Math.min(innerWidth - menu.offsetWidth - 4, x) + "px";
-      menu.style.top = Math.max(4, y - menu.offsetHeight) + "px";
+      const z = menu.closest("dialog") ? 1 : UZ(), zd = menu.closest("dialog") ? UZ() : 1;   // dans une fenêtre zoomée : ses coordonnées
+      menu.style.left = Math.min(innerWidth - menu.offsetWidth * z * zd - 4, x) / (z * zd) + "px";
+      menu.style.top = Math.max(4, y - menu.offsetHeight * z * zd) / (z * zd) + "px";
     }
     const ctx = (e) => { const d = e.target.closest(".ab"); if (!d) return; e.preventDefault(); openMenu(+d.dataset.i, e.clientX, e.clientY); };
     el.addEventListener("contextmenu", ctx);
@@ -2940,7 +2947,7 @@
         const free = document.getElementById("v3d-free"), fr = free && free.offsetHeight >= h ? free.getBoundingClientRect() : null;
         x = gr.left + gr.width / 2 - w / 2;
         y = fr ? fr.top + (fr.height - h) / 2 : gr.top + gr.height + 6 + h <= innerHeight ? gr.top + gr.height + 6 : innerHeight - h - 8; }
-      el.style.left = Math.max(0, Math.min(innerWidth - w, x)) + "px"; el.style.top = Math.max(0, Math.min(innerHeight - h, y)) + "px";
+      el.style.left = Math.max(0, Math.min(innerWidth - w, x)) / UZ() + "px"; el.style.top = Math.max(0, Math.min(innerHeight - h, y)) / UZ() + "px";
     }
     // cachée tant que la partie n'a pas commencé (introduction, menu principal : boutons du jeu dessous)
     const started = () => { try { const w = document.getElementById("dos").contentWindow; return !!(w.lolStarted && w.lolStarted()); } catch (e) { return false; } };
