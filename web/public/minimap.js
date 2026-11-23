@@ -235,7 +235,7 @@
   // +5 case, +7 x, +9 y (case*256 + décalage), +12 type.
   const ITEMS = { base: INV.items - 12, size: 16 };
   function readLiveItems(grid, table) {
-    if (!itemInfo) return null;
+    if (!itemInfo || !current) return null;
     const out = [];
     const w = (o) => table[o] | table[o + 1] << 8;
     for (let c = 0; c < 1024; c++) {
@@ -1167,7 +1167,6 @@
       }
     }
     const inScene = r[4][0] === 1;
-    const liveItems = readLiveItems(r[2], r[5]);
     const now = performance.now();
     // ScummVM publie le niveau en cours ; sous DOSBox, on le reconnaît à sa grille (identify)
     const engineLevel = ENGINE_SPRITES && r[6] ? levels.find((q) => q.level === r[6][0]) : undefined;
@@ -1179,6 +1178,9 @@
       if (found !== current) { renderItemList(found); if (found) found.spriteOf = null; }
       current = found; lastHash = hash; lastIdentify = now;
     }
+    // objets lus une fois le niveau connu (cases de mur, coffres : d'après ses données) ; une partie
+    // chargée au lancement (save_slot) en a déjà avant que le niveau soit reconnu
+    const liveItems = current ? readLiveItems(r[2], r[5]) : null;
     if (current && liveItems) {
       const groups = groupItems(liveItems), key = JSON.stringify(groups);
       if (key !== current.liveKey) {
