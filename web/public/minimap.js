@@ -2515,6 +2515,60 @@
     show(on);
   }
 
+  // --- Répliques des dialogues en bulle (version ScummVM) --------------------------------------
+  // Le moteur publie la dernière réplique (zone 0x7F000B00 : numéro u16, locuteur s8, longueur u16,
+  // texte ; TextDisplayer_LoL::printDialogueText2 et playCharacterScriptChat). Bulle à côté du
+  // portrait flottant de celui qui parle (place 0-3 du groupe) ; sinon (personnage hors du groupe,
+  // texte sans locuteur, portraits masqués) en haut de la vue 3D. Durée selon la longueur du texte.
+  if (window.LOL_ENGINE === "scummvm") {
+    const css = document.createElement("style");
+    css.textContent = `
+    #say { position: fixed; z-index: 1003; max-width: 340px; padding: 7px 10px; border: 1px solid #c9a227; border-radius: 8px;
+      background: rgba(20, 16, 10, .94); color: #f1e6c8; font: 13px/1.35 Georgia, serif; box-shadow: 0 4px 16px rgba(0,0,0,.7);
+      pointer-events: none; white-space: pre-wrap; transition: opacity .25s; }
+    #say[hidden] { display: none; }
+    #say b { display: block; font: 600 11px system-ui, sans-serif; color: #c9a227; margin-bottom: 2px; }
+    #say::before { content: ""; position: absolute; width: 10px; height: 10px; background: inherit; border: inherit; border-width: 0 0 1px 1px;
+      left: -6px; top: 16px; transform: rotate(45deg); }
+    #say.top::before { display: none; }`;
+    document.head.appendChild(css);
+    const say = document.createElement("div"); say.id = "say"; say.hidden = true;
+    document.body.appendChild(say);
+    let lastSeq = -1, hideT = 0;
+    const clean = (bytes) => cp850(bytes).replace(/\r/g, "\n").replace(/[\x00-\x09\x0b-\x1f]/g, "").replace(/\n{3,}/g, "\n\n").trim();
+    async function poll() {
+      const r = await mem.read([[0x7F000B00, 5 + 400], PARTY_RANGE()]);
+      if (!r) return;
+      const b = r[0], seq = b[0] | b[1] << 8, sp = (b[2] << 24) >> 24, n = b[3] | b[4] << 8;
+      if (lastSeq < 0) { lastSeq = seq; return; }              // pas de bulle pour la réplique déjà là au chargement
+      if (seq === lastSeq || !n) return;
+      lastSeq = seq;
+      const text = clean(b.subarray(5, 5 + n));
+      if (!text) return;
+      const who = sp >= 0 ? partyChars(r[1]).find((c) => c.slot === sp) : null;
+      say.innerHTML = "";
+      if (who) { const nb = document.createElement("b"); nb.textContent = who.name; say.appendChild(nb); }
+      say.appendChild(document.createTextNode(text));
+      say.hidden = false; say.style.opacity = 1;
+      const card = who ? document.querySelector(`#party-float:not([hidden]) .pm[data-slot="${sp}"]`) : null;
+      if (card) {
+        const c = card.getBoundingClientRect();
+        say.classList.remove("top");
+        say.style.left = Math.min(innerWidth - say.offsetWidth - 8, c.right + 10) + "px";
+        say.style.top = Math.max(4, Math.min(innerHeight - say.offsetHeight - 4, c.top)) + "px";
+      } else {
+        const v = (document.getElementById("v3d") || document.body).getBoundingClientRect();
+        say.classList.add("top");
+        say.style.left = Math.max(4, v.left + v.width / 2 - say.offsetWidth / 2) + "px";
+        say.style.top = (v.top + 10) + "px";
+      }
+      clearTimeout(hideT);
+      hideT = setTimeout(() => { say.style.opacity = 0; setTimeout(() => { say.hidden = true; }, 260); }, 2500 + 55 * text.length);
+    }
+    setInterval(() => { poll().catch(() => {}); }, 250);
+    window.lolSay = () => ({ seq: lastSeq, text: say.textContent, hidden: say.hidden });   // débogage
+  }
+
   // --- Barre d'actions (version ScummVM) ---------------------------------------------------------
   // 9 cases, touches 1 à 9 (réglables, keys.js). Une case contient un type d'objet (pile : nombre
   // d'exemplaires dans le sac) ou l'attaque d'un personnage. Objet : la commande « use » (op 21)

@@ -1684,6 +1684,26 @@ The meaning of the functions, however, can be read directly. Comparison with our
   - **Drawn by the page**: the faces and bars of the portraits, and the docked action bar.
   - **Verified**: rebuilt interface around the 3D render, and the "forward" arrow still moves the
     party (13,17 → 13,16).
+- **Dialogue lines in the 3D view** (ScummVM version, 2026-11-23).
+  - **Paths of a line**:
+    - party members speak through `playCharacterScriptChat`, which finds their party slot;
+    - NPCs speak through `olol_playDialogueTalkText` (talk scenes such as the Gladstone guard);
+    - narration goes through `olol_playDialogueText`.
+    - All of them format the text in `TextDisplayer_LoL::printDialogueText2` (`preprocessString`,
+      script parameters), but only when subtitles are on (`textEnabled()`). With the voice only,
+      the text was never formatted.
+  - **Engine**:
+    - `webDialogue()` keeps the formatted line, its speaker and a counter;
+    - a public `webFormat()` formats a line without drawing it, used when the game does not show
+      the text;
+    - zone `0x7F000B00`: counter u16, speaker s8 (0–3 party slot, −1 NPC, −2 no speaker), length
+      u16, text (game encoding, 400 bytes max).
+  - **Page**: it reads the zone every 250 ms. A new line appears in a bubble next to the speaker's
+    floating portrait. Otherwise (NPC, narration, portraits hidden) it appears at the top of the 3D
+    view. It stays 2.5 s plus 55 ms per character.
+  - **Verified**: turning to the Gladstone guard at 13,18 → bubble at the top of the 3D view: «
+    Michael, n'avez-vous pas été mandé par le Roi? Retournez vers la salle du trône, au nord. »
+    (voice only, speaker −1). The party-member case was not tried (Michael alone).
 - **Unavailable actions greyed out** (2026-11-23). `clickedAttackButton` refuses an attack while
   the character's flags & 0x314C (0x4: weapon recovering after a hit; 0x8: unconscious…). The bar
   reads the party records every 200 ms. An attack slot is greyed while those flags are set or
@@ -2434,3 +2454,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: monster and NPC shadows. Colour 255 in their sprites is not painted: `drawShapePlotType37` darkens the background instead (`_dsBackgroundFadingTable`, level overlay 4, set by `drawItemOrMonster`). The export drew it as an opaque palette colour; it is now black at 50 % opacity (near-black 2,1,0 so colour variants leave it alone), for body and equipment frames. Verified: 2181 shadow pixels in `level01_spr.png` (GUARD), visible under the guard at 13,16.
 - **2026-11-23**: thrown items fly in the 3D view. A launched item keeps its place in its cell's object chain, with `flyingHeight` (item entry +4) set to 12 until it lands (0). The game raises it by (height − 1) × 6 sprite pixels (`drawBlockObjects`). The page now sends the height and the item number. The view raises the item the same way, and slides each item from its last position to the new one over 200 ms (the page reads memory every 200 ms), height included. Flying or moving items cannot be picked up. Verified: an aloe thrown at the closed door is drawn in mid-air, then falls to 13.75,16.25.
 - **2026-11-23**: items in niches and open chests shown in the 3D view. Niche items lie in the wall cell against the face turned to the party (offset 0x00 or 0xFF), at height 8 (`clickedNiche`, and the initial placement). They were dropped as "in a wall". They are now shown when that face is a niche (special type 6), or a chest face in an open state (1–3). They are moved 24/256 cell out of the wall so the face does not hide them, and raised by the height rule. Roland's manor, cell 4,8 face N: wall type 1 (plain) until a script turns it into type 64 (niche). The two oil flasks and the aloe there (height 8) stay hidden while it is closed (verified). The open case was not reproduced in the test.
+- **2026-11-23**: dialogue lines published by the engine (zone 0x7F000B00, also with voice only) and shown in a bubble by the speaker's portrait or at the top of the 3D view (§ 10a).
