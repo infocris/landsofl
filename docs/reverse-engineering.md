@@ -2494,3 +2494,4 @@ spells, on the in-game automap) remains **unknown**.
     - the window opened or closed on the page opens or closes the game's sheet;
     - clicking a member's small portrait in the Équipement section shows that member's sheet in the game.
   - **Verified**: all four transitions (open and close, from the game and from the page).
+- **2026-11-24**: portrait spellbook redone: one row per known spell with its levels 1–4 directly (unaffordable ones greyed), no costs written. Hovering a level hatches its cost on the portrait's magic bar (and life bar when it costs life), red when it cannot be paid. Verified: Étincelle level 1 hatches 5 of Michael's 6 magic points.

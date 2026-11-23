@@ -2667,8 +2667,12 @@
       font: 12px/1.2 system-ui, sans-serif; color: #e8dcc0; box-shadow: 0 4px 14px rgba(0,0,0,.6); zoom: var(--ui-z, 1); min-width: 150px; }
     #spell-pop[hidden] { display: none; }
     #spell-pop .sh { color: #a39578; margin-bottom: 4px; }
-    #spell-pop .types, #spell-pop .lv { display: flex; flex-wrap: wrap; gap: 4px; }
-    #spell-pop .lv { margin-top: 6px; }
+    #spell-pop .row { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+    #spell-pop .row .nm { flex: 1; min-width: 80px; padding-right: 6px; }
+    #spell-pop .row button { min-width: 24px; }
+    #party-float .pb .cost { position: absolute; top: 0; bottom: 0; pointer-events: none;
+      background: repeating-linear-gradient(45deg, rgba(255,240,160,.9) 0 3px, rgba(255,240,160,.35) 3px 6px); }
+    #party-float .pb .cost.over { left: 0 !important; width: 100% !important; background: rgba(239,90,58,.75); }
     #spell-pop button { font: inherit; padding: 3px 7px; border: 1px solid #555; border-radius: 4px; background: #1b1610; color: #e8dcc0; cursor: pointer; }
     #spell-pop button.on { border-color: #c9a227; color: #f0d070; }
     #spell-pop button:disabled { opacity: .35; cursor: default; }
@@ -2741,7 +2745,7 @@
       LoLKeys.pressGame("AT" + (slot + 1));
     }
     function toggleSpells(slot) {
-      spellFor = spellFor === slot ? null : slot; spellType = null; spellMsg = "";
+      spellFor = spellFor === slot ? null : slot; spellType = null; spellMsg = ""; costHint = null;
       lastFloat = "";                                   // bouton enfoncé redessiné
       updateFloat().catch(() => {});
       renderSpellPop();
@@ -2758,27 +2762,22 @@
       pop.dataset.key = key;
       pop.innerHTML = "";
       const h = document.createElement("div"); h.className = "sh"; h.textContent = spells.length ? `${c.name} : sort à lancer` : "Aucun sort connu";
-      const types = document.createElement("div"); types.className = "types";
+      pop.appendChild(h);
+      // une ligne par sort, ses niveaux à la suite ; survol : coût montré sur les barres du portrait
       for (const sp of spells) {
-        const b = document.createElement("button"); b.type = "button"; b.textContent = sp.name || `sort ${sp.type}`;
-        if (sp.type === spellType) b.className = "on";
-        b.addEventListener("click", () => { spellType = sp.type === spellType ? null : sp.type; spellMsg = ""; renderSpellPop(); });
-        types.appendChild(b);
-      }
-      pop.append(h, types);
-      const sp = spells.find((q) => q.type === spellType);
-      if (sp) {
-        const lv = document.createElement("div"); lv.className = "lv";
+        const row = document.createElement("div"); row.className = "row";
+        const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = sp.name || `sort ${sp.type}`;
+        row.appendChild(nm);
         for (let l = 0; l < 4; l++) {
-          const b = document.createElement("button"); b.type = "button";
-          b.innerHTML = `Niv. ${l + 1}<small>${sp.mp[l]}</small>`;
-          const ok = !c.busy && sp.mp[l] <= c.mp && sp.hp[l] < c.hp;
-          b.disabled = !ok;
-          b.title = `${sp.name} niveau ${l + 1} : ${sp.mp[l]} points de magie${sp.hp[l] ? `, ${sp.hp[l]} points de vie` : ""}` + (sp.type === 1 ? (l < 3 ? " — soigne le plus blessé" : " — soigne tout le groupe") : "");
-          b.addEventListener("click", () => castFrom(c.slot, sp, l));
-          lv.appendChild(b);
+          const b = document.createElement("button"); b.type = "button"; b.textContent = l + 1;
+          b.disabled = c.busy || sp.mp[l] > c.mp || sp.hp[l] >= c.hp;
+          b.title = `${sp.name} niveau ${l + 1}` + (sp.type === 1 ? (l < 3 ? " — soigne le plus blessé" : " — soigne tout le groupe") : "");
+          b.addEventListener("mouseenter", () => showCost(c.slot, sp.mp[l], sp.hp[l]));
+          b.addEventListener("mouseleave", () => showCost(null));
+          b.addEventListener("click", () => { showCost(null); castFrom(c.slot, sp, l); });
+          row.appendChild(b);
         }
-        pop.appendChild(lv);
+        pop.appendChild(row);
       }
       const m = document.createElement("div"); m.className = "msg"; m.textContent = spellMsg; pop.appendChild(m);
       pop.hidden = false;
@@ -2788,6 +2787,28 @@
       const r = card.getBoundingClientRect(), z = UZ();
       pop.style.left = Math.min(innerWidth - pop.offsetWidth * z - 4, r.right + 6) / z + "px";
       pop.style.top = Math.max(4, Math.min(innerHeight - pop.offsetHeight * z - 4, r.top)) / z + "px";
+    }
+    // coût d'un niveau survolé, en hachures sur la barre de magie (et de vie) du portrait ; rouge si
+    // le personnage n'a pas de quoi le payer. Réappliqué après chaque redessin des portraits.
+    let costHint = null;
+    function showCost(slot, mpCost, hpCost) {
+      costHint = slot === null || slot === undefined ? null : { slot, mpCost, hpCost };
+      applyCost();
+    }
+    function applyCost() {
+      pf.querySelectorAll(".pb .cost").forEach((e) => e.remove());
+      if (!costHint) return;
+      const c = floatParty.find((p) => p.slot === costHint.slot), card = pf.querySelector(`.pm[data-slot="${costHint.slot}"]`);
+      if (!c || !card) return;
+      for (const [cls, cost, cur, max] of [["mp", costHint.mpCost, c.mp, c.mpMax], ["hp", costHint.hpCost, c.hp, c.hpMax]]) {
+        const bar = card.querySelector(`.pb.${cls}`);
+        if (!bar || !cost || !max) continue;
+        const o = document.createElement("b"); o.className = "cost";
+        if (cost > cur || (cls === "hp" && cost >= cur)) o.classList.add("over");
+        o.style.left = Math.max(0, (cur - cost) / max * 100) + "%";
+        o.style.width = Math.min(cur, cost) / max * 100 + "%";
+        bar.insertBefore(o, bar.querySelector("span"));
+      }
     }
     async function castFrom(slot, sp, l) {
       let target = -1;
@@ -2852,6 +2873,7 @@
           <button type="button" class="book${spellFor === c.slot ? " on" : ""}${c.busy ? " busy" : ""}" title="Livre de sorts">📖</button></div>` : ""}</div>`).join("");
         floatParty = list;
         if (spellFor !== null) renderSpellPop();
+        applyCost();
         pf.querySelectorAll(".pn").forEach((el, i) => { el.textContent = list[i].name; });
         pf.hidden = !on || !list.length;
         if (pf.childElementCount !== count) place();
