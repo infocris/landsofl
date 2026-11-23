@@ -734,6 +734,15 @@ are paved with a visible repeating pattern: `KEEP` (level 1, octagons) and `TOWE
   drawing is aligned on the folded motif by the circular shift that best matches its
   luminance, so the joints keep the measured phase.
 
+- **Glossy floor (KEEP, 2026-11-23)**: the painted floor carries vertical light streaks at
+  fixed columns (rows 60–120): reflections of the wall pieces, painted once in the static
+  background. The 3D view renders a **planar reflection** instead: right after each wall
+  column, the same column is drawn mirrored about the wall's foot, over 0.45 of the wall
+  height, in 4 bands of decreasing opacity (peak 0.32 for KEEP, `GLOSS` in `viewer.js`;
+  `?gloss=N` sets it, 0 disables it). Items are drawn far to near, so nearer walls and
+  sprites cover the reflections behind them. Monsters, items and door panels are not
+  reflected.
+
 ### 9.3d Wall pieces and the forest's upper part — verified in ScummVM (2026-11-22)
 
 `KyraRpgEngine::drawVcnBlocks` (`scene_rpg.cpp`) builds the view, 22×15 tiles, from the
@@ -2445,6 +2454,7 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: sharper Gladstone textures: the floor pattern takes its depth detail from its transpose (diagonal symmetry of the octagons, § 9.3c); beamed ceilings are folded without row interpolation, with cubic resolution weights, at 96×96 (§ 9.3f).
 - **2026-11-23**: Gladstone's ceiling (KEEP) generated as an isometric coffer in relief: beams, two mitred bevels lit by orientation, recessed planked panel, tones from the folded coffer (§ 9.3f).
 - **2026-11-23**: Gladstone's floor (KEEP) redrawn in pixel art with the 10 colours of the painted floor: checkerboard octagons, diamonds, 1 px rims, aligned on the folded motif (§ 9.3c).
+- **2026-11-23**: glossy Gladstone floor in the 3D view: planar reflection of the walls, faded over 0.45 wall height, `?gloss=N` (§ 9.3c).
 - **2026-11-22**: switches in the 3D view: door buttons attached by the level script (`assignLevelDecorationShape` + `resetBlockShapeAssignment`) now drawn; walls' switch type and clickable area exported; engine command op 20 (`clickwall`) clicks the wall in front like the game (`clickedWall`); the 3D view outlines the switch in front and clicks it; engine files versioned in URLs and served `no-cache` (§ 9.6).
 - **2026-11-22**: doors of the script-opened series (walls 8–12, 18–22: shape 0, e.g. Gladstone's locked library door) now drawn closed with their leaf; they looked open in the 3D view (§ 9.6).
 - **2026-11-23**: objects in the party's own cell (dropped in front of it) drawn as the engine does, full size at the bottom of the view (`_monsterScaleY`/`_monsterScaleX` tables); the 3D view projected them below the image (§ 9.3h).

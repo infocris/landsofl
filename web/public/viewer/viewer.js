@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261124f";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261124g";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -92,6 +92,13 @@
   // au-dessus, tout se fond dans la brume, sur FOG_FADE hauteur de mur.
   const OUTDOOR = { YVEL1: { storeys: 3, fogCeil: 1 + 65 / 96 }, FOREST1: { storeys: 2, crown: true } };
   const FOG_FADE = 0.3;
+  // Sol brillant (carrelage de Gladstone) : le fond du jeu peint des reflets verticaux des murs
+  // sur le dallage. Ici, reflet plan : chaque colonne de mur est redessinée à l'envers sous son
+  // pied, en GLOSS_BANDS bandes dont l'opacité décroît (fondu sur GLOSS_LEN de la hauteur du
+  // mur). Opacité réglable par ?gloss=0.3 (0 : pas de reflet).
+  const GLOSS = { KEEP: 0.32 };
+  const GLOSS_LEN = 0.45, GLOSS_BANDS = 4;
+  const GLOSS_Q = new URLSearchParams(location.search).get("gloss");
   const FOOT = 12;              // lignes du bas de la face (soubassement) non répétées aux étages
   const SHADES = 8;
   const shadeFor = (d) => Math.min(SHADES - 1, Math.floor(Math.max(0, d - 0.6) / 1.4));
@@ -377,6 +384,7 @@
     V.wallInfo = [];
     for (const [id, w] of Object.entries(V.walls)) V.wallInfo[+id] = w;
     V.outdoor = OUTDOOR[V.tileset] || null;
+    V.gloss = GLOSS_Q !== null ? Math.max(0, Math.min(1, +GLOSS_Q || 0)) : (GLOSS[V.tileset] || 0);
     if (V.outdoor) {                                     // buildForest lit le niveau dans L (appel synchrone)
       const prevL = L; L = V;
       try { setupOutdoor(V, walls, bg); } finally { L = prevL; }
@@ -729,6 +737,7 @@
           const ty = Math.floor(it.tex / cols) * fh;
           if (L.outdoor) drawUpper(it.tex, it.u, dist, x, top, colH, it.pos, it.line);
           ctx.drawImage(L.wallImgs[shadeFor(dist)], tx, ty, 1, fh, x, top, 1, colH);
+          drawReflection(L.wallImgs[shadeFor(dist)], tx, ty, fh, x, top, colH);
           if (it.door) drawPanel(it, dist, x, top, colH);
         }
       }
@@ -820,6 +829,25 @@
   }
 
   // Panneau d'une porte en cours d'ouverture : remonté de q × hauteur de l'ouverture.
+  // Reflet d'une colonne de mur (tx, ty, fh : colonne source dans l'atlas) sous son pied.
+  function drawReflection(img, tx, ty, fh, x, top, colH) {
+    const a0 = L.gloss;
+    if (!a0) return;
+    const bottom = top + colH, len = colH * GLOSS_LEN;
+    if (bottom >= H) return;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, -1, 0, 2 * bottom);           // miroir autour du pied du mur
+    for (let k = 0; k < GLOSS_BANDS; k++) {
+      // bande k : de k·len/n à (k+1)·len/n sous le pied, soit les mêmes hauteurs au-dessus
+      const f0 = k / GLOSS_BANDS, f1 = (k + 1) / GLOSS_BANDS;
+      const y0 = bottom - len * f1, y1 = bottom - len * f0;   // hauteurs dans le mur
+      if (2 * bottom - y1 >= H) break;
+      const s0 = (y0 - top) / colH * fh, s1 = (y1 - top) / colH * fh;
+      ctx.globalAlpha = a0 * (1 - (k + 0.5) / GLOSS_BANDS);
+      ctx.drawImage(img, tx, ty + s0, 1, s1 - s0, x, y0, 1, y1 - y0);
+    }
+    ctx.restore();
+  }
   function drawPanel(it, dist, x, top, colH) {
     const { panel, panelTex, q } = it.door, fw = L.faceW, fh = L.faceH, cols = L.atlasCols;
     const h = panel.y1 - panel.y0, sh = q * h, vis = h - sh;
@@ -1040,6 +1068,7 @@
           const ty = Math.floor(it.tex / cols) * fh;
           if (L.outdoor) drawUpper(it.tex, it.u, dist, x, top, colH, it.pos, it.line);
           ctx.drawImage(L.wallImgs[shadeFor(dist)], tx, ty, 1, fh, x, top, 1, colH);
+          drawReflection(L.wallImgs[shadeFor(dist)], tx, ty, fh, x, top, colH);
           if (it.door) drawPanel(it, dist, x, top, colH);
         }
       }
