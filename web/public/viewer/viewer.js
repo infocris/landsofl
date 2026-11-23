@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261123e";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261123f";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -189,9 +189,11 @@
   // le mieux la précédente, avec une couture par colonne à la ligne de moindre écart. Les
   // colonnes gardent leur x : les troncs et branches restent alignés. CANOPY.n variantes par
   // texture ; image de hauteur CANOPY.h (fond = haut du mur).
-  const CANOPY = { src: 48, strip: 10, ov: 4, h: 140, n: 3 };
+  // Les capRows lignes du haut ne puisent que dans les lignes 0 à cap (feuillage le plus dense) :
+  // l'arbre se termine toujours par du feuillage.
+  const CANOPY = { src: 48, cap: 20, capRows: 45, strip: 10, ov: 4, h: 150, n: 3 };
   function buildCanopy(px, W2, texs) {
-    const fw = L.faceW, fh = L.faceH, cols = L.atlasCols, { src, strip, ov, h, n } = CANOPY;
+    const fw = L.faceW, fh = L.faceH, cols = L.atlasCols, { src, cap, capRows, strip, ov, h, n } = CANOPY;
     if (!texs.length) return null;
     const c = document.createElement("canvas");
     c.width = fw * texs.length * n; c.height = h;
@@ -210,7 +212,8 @@
         while (rows.length < h + ov) {
           const base = rows.length - ov;              // les ov dernières lignes posées (rows[base..])
           const cand = [];
-          for (let y = 0; y + strip + ov <= src; y++) {
+          const lim = base >= h - capRows ? cap : src;
+          for (let y = 0; y + strip + ov <= lim; y++) {
             // bande y..y+strip+ov-1 (haut en y) ; ses ov lignes du bas recouvrent rows[base..]
             let e = 0;
             for (let k = 0; k < ov; k++) {
@@ -249,7 +252,8 @@
   // donne la hauteur des troncs au-dessus du mur (TRUNK, en étages) et celle de la cime
   // (CROWN_K) ; la cime est lue en continu dans le bandeau, en aller-retour (pas de raccord),
   // à partir d'un point propre à la rangée. Lisière irrégulière, sans marche entre deux faces.
-  const TRUNK = [0.3, 1.5], CROWN_K = [0.8, 1.35];
+  const TRUNK = [0.3, 1.5], CROWN_K = [0.8, 1.35];   // sans arbre synthétisé (bandeau du fond)
+  const TREE_K = [0.6, 1], EDGE_ROWS = 40;            // arbre synthétisé : échelle, découpe du sommet
   const hash01 = (i, seed) => {
     let h = Math.imul(i ^ Math.imul(seed, 0x27d4eb2d), 0x9e3779b1);
     h ^= h >>> 15; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13;
@@ -278,11 +282,16 @@
       const tr = TRUNK[0] + (TRUNK[1] - TRUNK[0]) * forestNoise(pos, line, 0);
       const ck = CROWN_K[0] + (CROWN_K[1] - CROWN_K[0]) * forestNoise(pos, line, 101.5);
       const cp = L.canopy, ti = cp && cp.index.get(ut);
-      if (ti !== undefined) {                         // étage synthétisé (buildCanopy)
+      if (ti !== undefined) {                         // arbre entier synthétisé (buildCanopy), sans bandeau
         const v = Math.floor(hash01(line, 11) * CANOPY.n) % CANOPY.n;
-        const rowsH = Math.min(CANOPY.h, tr * sh);
         const cx = (ti * CANOPY.n + v) * fw + Math.min(fw - 1, Math.floor(u * fw));
-        part(cp.imgs[shadeFor(dist)], cx, CANOPY.h - rowsH, rowsH, top - rowsH / sh * h, rowsH / sh * h);
+        // hauteur : 60 à 100 % de l'image (bas toujours raccordé au mur, haut toujours feuillu) ;
+        // silhouette : lignes retirées en haut, bruit à 3 fréquences (touffes de feuillage)
+        const k = TREE_K[0] + (TREE_K[1] - TREE_K[0]) * forestNoise(pos, line, 0);
+        const e = 0.5 * vnoise(pos * 7, line + 1) + 0.3 * vnoise(pos * 17, line + 2) + 0.2 * vnoise(pos * 41, line + 3);
+        const cut = Math.floor(e * EDGE_ROWS), rowsH = CANOPY.h - cut, hh = rowsH / sh * h * k;
+        part(cp.imgs[shadeFor(dist)], cx, cut, rowsH, top - hh, hh);
+        return;
       } else for (let k = 0, rest = tr; rest > 0 && top - k * h > 0; k++, rest--) {
         const f = Math.min(1, rest);
         part(img, tx, ty + sh * (1 - f), sh * f, top - k * h - f * h, f * h);

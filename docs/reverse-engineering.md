@@ -745,7 +745,19 @@ rows by vertical quilting (`buildCanopy`):
   the row of least difference;
 - columns keep their x, so trunks and branches stay aligned.
 There are 3 variants per plain texture (140 rows, enough for the 1.5 storeys of `TRUNK`); each
-row of faces picks one from its hash. `viewer.js`: `forestNoise`, `drawUpper` (`?p=` in the URL raises the gaze, for
+row of faces picks one from its hash.
+
+**Whole tree generated, no background band (2026-11-23).** Lowering the background crown band
+onto the walls was tried: stretched over most of a wall height, its 24 rows became large dark
+blocks, with a hard edge against the trunks. Instead, the 3D view now generates the whole
+tree above the wall at the wall's own pixel scale:
+- **Image**: the quilted image is 150 rows; its top 45 rows only draw from rows 0–19 of the
+  texture, the densest foliage, so every tree ends in leaves.
+- **Height**: the image is drawn at 60–100 % of its height (`TREE_K`, smoothed noise along
+  the row of faces). Its bottom always joins the wall.
+- **Silhouette**: per column, up to 40 top rows are removed (`EDGE_ROWS`, value noise at 7,
+  17 and 41 per cell), which gives a jagged, leafy skyline.
+The background band (`TRUNK`/`CROWN_K`) is only used if no canopy can be built. `viewer.js`: `forestNoise`, `drawUpper` (`?p=` in the URL raises the gaze, for
 screenshots).
 
 ### 9.3e Generating floors from the floor images (2026-11-22)
@@ -2151,3 +2163,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: blood pools (cell flag 0x80, `ICE.SHP` frame 3, floor halved plus red through `_grayOverlay`) read from the live grid and drawn in the 3D view (§ 9.3i).
 - **2026-11-23**: forest storey above the walls synthesized from the branches-and-foliage rows of the wall texture (vertical quilting, 3 variants), instead of repeating the whole texture with its roots (§ 9.3d).
 - **2026-11-23**: movement keys work while the built-in 3D view has focus: focus handed back to the game after a click, stray keys replayed in the game window (§ 9.3a).
+- **2026-11-23**: forest trees above the walls fully generated at wall resolution (foliage-only top rows, height 60–100 %, noisy leafy silhouette); the stretched background crown band is no longer used (§ 9.3d).
