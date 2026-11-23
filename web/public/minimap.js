@@ -1920,6 +1920,41 @@
       }
       return saves;
     }
+    // Avant le début de la partie (introduction, menu principal), le moteur n'exécute pas les
+    // commandes : la liste est lue dans les fichiers de sauvegarde (IndexedDB d'Emscripten,
+    // /home/web_user/saves/lol-fr.###, en-tête « WWSV », id du jeu u8, version u32, nom en UTF-8
+    // terminé par 0), et « Charger » relance le jeu sur la sauvegarde (save_slot, lol-game.html).
+    const gameStarted = () => { try { const w = document.getElementById("dos").contentWindow; return !!(w.lolStarted && w.lolStarted()); } catch (e) { return false; } };
+    function readSaveFiles() {
+      return new Promise((ok) => {
+        let req;
+        try { req = indexedDB.open("/home/web_user"); } catch (e) { return ok(null); }
+        req.onupgradeneeded = () => req.transaction.abort();      // base absente : aucune sauvegarde
+        req.onerror = () => ok([]);
+        req.onsuccess = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains("FILE_DATA")) { db.close(); return ok([]); }
+          const st = db.transaction("FILE_DATA").objectStore("FILE_DATA"), out = [];
+          const all = st.openCursor();
+          all.onsuccess = () => {
+            const c = all.result;
+            if (!c) { db.close(); return ok(out.sort((a, b) => a.slot - b.slot)); }
+            const m = /^\/home\/web_user\/saves\/lol-fr\.(\d{3})$/.exec(c.key), b = c.value && c.value.contents;
+            if (m && b && b.length > 9 && b[0] === 0x57 && b[1] === 0x57 && b[2] === 0x53 && b[3] === 0x56) {
+              const z = b.indexOf(0, 9);
+              out.push({ slot: +m[1], name: utf8.decode(b.subarray(9, z < 0 ? Math.min(b.length, 90) : z)).trim() });
+            }
+            c.continue();
+          };
+          all.onerror = () => { db.close(); ok(null); };
+        };
+      });
+    }
+    function loadAtStart(s) {
+      try { sessionStorage.setItem("lol-load-slot", String(s.slot)); } catch (e) { svMsg.textContent = "Impossible de relancer le jeu."; return; }
+      svMsg.textContent = `Lancement de la partie « ${s.name} »…`;
+      setTimeout(() => { svDlg.close(); document.getElementById("dos").contentWindow.location.reload(); }, 400);
+    }
     const resetConfirms = () => svList.querySelectorAll("button.confirm").forEach((x) => { x.classList.remove("confirm"); x.textContent = x.dataset.label; });
     const twoStep = (btn) => {                         // deuxième clic pour confirmer
       if (btn.classList.contains("confirm")) return true;
@@ -1933,9 +1968,11 @@
         const ow = document.createElement("button"); ow.type = "button"; ow.className = "ow"; ow.dataset.label = ow.textContent = "Écraser";
         ow.title = "Remplacer cette sauvegarde par la partie en cours (nom : celui du champ, sinon le sien)";
         ow.addEventListener("click", () => { if (twoStep(ow)) save(s.slot, svName.value.trim() || s.name).catch(() => {}); });
+        ow.hidden = !gameStarted();
         const go = document.createElement("button"); go.type = "button"; go.dataset.label = go.textContent = "Charger";
         go.title = "Charger cette sauvegarde (la partie en cours non sauvegardée est perdue)";
         go.addEventListener("click", async () => {
+          if (!gameStarted()) { loadAtStart(s); return; }   // introduction, menu principal : pas besoin de confirmer
           if (!twoStep(go)) return;
           const res = await mem.cmd({ op: "load", a: s.slot }, 5000);
           if (!res || res.code) { svMsg.textContent = !res ? "Le jeu ne répond pas (menu ou dialogue ouvert ?)." : "Sauvegarde illisible."; return; }
@@ -1949,6 +1986,14 @@
     }
     async function listSaves() {
       svMsg.textContent = "Lecture des sauvegardes…";
+      document.getElementById("sv-save").disabled = svName.disabled = !gameStarted();
+      if (!gameStarted()) {
+        const files = await readSaveFiles();
+        if (!files) { svMsg.textContent = "Sauvegardes illisibles dans ce navigateur."; return; }
+        renderSaves(files);
+        svMsg.textContent += " La partie n'est pas encore lancée : « Charger » la démarre sur la sauvegarde.";
+        return;
+      }
       const c = await mem.cmd({ op: "listsaves" }, 8000);
       if (!c || c.code) { svMsg.textContent = "Le jeu ne répond pas (menu ou dialogue ouvert ?) : réessaie en exploration."; return; }
       const saves = await readSaves();

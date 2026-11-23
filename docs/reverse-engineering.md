@@ -1578,6 +1578,21 @@ The meaning of the functions, however, can be read directly. Comparison with our
     the next turn.
   - **Verified**: save "test web" made from the game menu, in cell 13,17; teleport
     to 12,12; loading from the page → back to 13,17.
+- **Saves before the game has started** (ScummVM version, 2026-11-23). During the intro and the
+  main menu, the engine does not run the page's commands (they are executed in `runLoop`), so the
+  dialog stayed empty.
+  - **Started**: the game frame exposes `lolStarted()` (state zones published and the game loop has
+    run at least once).
+  - **List**: before that, the page reads the save files itself from Emscripten's IndexedDB
+    (database `/home/web_user`, store `FILE_DATA`, keys `/home/web_user/saves/lol-fr.###`). A save
+    is written there uncompressed and immediately. Header (`openSaveForWriting`): `WWSV`, game id
+    (u8, 4 = LoL), version (u32 BE, 25), name in UTF-8 ending with 0.
+  - **Loading**: "Charger" stores the slot in `sessionStorage` and reloads the game frame. The
+    launcher adds `save_slot=N` to the `[lol-fr]` section, which `KyraEngine_v1::init` reads into
+    `_gameToLoad`, so the game skips the intro and menu and loads the save. Any other launch
+    removes the key. Saving and overwriting are disabled until the game has started.
+  - **Verified**: at the intro, the dialog lists "Essai démarrage" (slot 0). "Charger" starts the
+    game in cell 13,17. A later normal launch shows the intro again, with no `save_slot` left.
 - **Teleportation** (ScummVM version, 2026-11-13).
   - **Within the level**: command op 13 (a = cell, b = direction or -1). It does the same as
     `olol_setGlobalVar(0, …)`, used by the scripts' teleporters: `_currentBlock`,
@@ -2273,3 +2288,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: free-standing decorations (all four faces, no wall set) drawn as one centered sprite in the real perspective (§ 9.4).
 - **2026-11-23**: 3D view: Q / D sidestep while the mouse button is held (§ 9.3a); Space operates the switch in front of the party (§ 9.6).
 - **2026-11-23**: configurable keyboard keys (« Touches… » window), translated by the page into the game's fixed keys (§ 10a).
+- **2026-11-23**: saves dialog usable before the game starts: list read from IndexedDB, loading through `save_slot` at launch (§ 10a).

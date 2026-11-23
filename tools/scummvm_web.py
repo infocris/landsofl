@@ -167,8 +167,13 @@ LAUNCH_JS = r"""<script src="volume.js"></script>
   Module.locateFile = (p, dir) => dir + p + (p.endsWith(".wasm") ? "?v=__BUILD_V__" : "");
   const start = () => { const s = document.createElement("script"); s.src = "scummvm.js?v=__BUILD_V__"; document.body.appendChild(s); };
   const section = (t) => { const i = t.indexOf(SEC); if (i < 0) return ""; const j = t.indexOf("\n[", i + 1); return j < 0 ? t.slice(i) : t.slice(i, j + 1); };
+  // sauvegarde à charger dès le lancement (fenêtre « Sauvegardes… » avant le début de la partie,
+  // minimap.js) : clé save_slot de la section, lue par KyraEngine_v1::init ; retirée sinon
+  let loadSlot = null;
+  try { loadSlot = sessionStorage.getItem("lol-load-slot"); sessionStorage.removeItem("lol-load-slot"); } catch (e) {}
   fetch("scummvm.ini", { cache: "no-store" }).then((r) => r.text()).then((ini) => new Promise((done) => {
-    const ours = section(ini);
+    let ours = section(ini);
+    if (ours && /^\d+$/.test(loadSlot || "")) ours = ours.replace(/\n*$/, "\n") + `save_slot=${loadSlot}\n`;
     const req = indexedDB.open(DB);
     req.onupgradeneeded = () => req.transaction.abort();          // pas encore de réglages : ScummVM téléchargera le fichier
     req.onerror = () => done();
@@ -185,7 +190,7 @@ LAUNCH_JS = r"""<script src="volume.js"></script>
           // fusion : les clés du serveur (chemin, langue, touches…) remplacent les leurs ; les autres
           // (sous-titres, volumes, réglages du jeu enregistrés par ScummVM) sont gardées
           const merged = () => {
-            const lines = cur.replace(/\n+$/, "").split("\n"), idx = new Map();
+            const lines = cur.replace(/\n+$/, "").split("\n").filter((l) => !l.startsWith("save_slot=")), idx = new Map();
             lines.forEach((l, i) => { const k = l.split("=")[0]; if (i && l.includes("=")) idx.set(k, i); });
             for (const l of ours.replace(/\n+$/, "").split("\n").slice(1)) {
               if (!l.includes("=")) continue;
@@ -218,6 +223,7 @@ LAUNCH_JS = r"""<script src="volume.js"></script>
   const view = { loops: -1, at: 0, scene: false, upd: 0, seq: [0, 0, 0, 0], menu: false, loading: false, casting: false };
   const SCENE = [112, 0, 176, 120];
   window.lolMenuOpen = () => !!(zones && view.menu);   // keys.js : pas de traduction des touches dans le menu
+  window.lolStarted = () => !!zones && view.loops > 0;   // partie lancée (boucle du jeu) : commandes possibles
   window.lolView = () => {
     if (!zones || view.loops <= 0) return { mirror: true, crop: [0, 0, 320, 200] };   // avant la partie (introduction)
     if (view.menu || view.loading) return { mirror: false };
