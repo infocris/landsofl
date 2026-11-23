@@ -12,7 +12,7 @@ Pour chaque niveau :
   levelNN_floor_wang.png   sol peint : 16 tuiles de Wang (4 × 4), pour un sol sans répétition
   levelNN_spr.png    atlas des sprites de monstres (face, profil, dos)
 """
-import json, math, os, struct, sys
+import json, math, os, re, struct, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pak import read_pak, read_strings
@@ -1318,6 +1318,21 @@ def main(game_dir, maps_dir, out_dir):
         if f:
             sheet.blit(frame_image(f, pal), (k % 16) * 20, (k // 16) * 20)
     sheet.save(os.path.join(out_dir, "item_icons.png"))
+
+    # portraits des personnages (FACEnn.SHP de GENERAL.PAK, n = id du personnage, 28 images de
+    # 32 × 32 : expressions 0-13, mêmes visages blessés en 14-27 ; gui_drawCharFaceShape) en
+    # planche : ligne n − 1, colonne = image. Même palette que les icônes (interface).
+    general = read_pak(os.path.join(game_dir, "GENERAL.PAK"))
+    faces = sorted(k for k in general if re.fullmatch(r"FACE\d\d\.SHP", k))
+    fsheet = Image(28 * 32, 9 * 32)
+    for name in faces:
+        row = int(name[4:6]) - 1
+        if not 0 <= row < 9:
+            continue
+        for k, f in enumerate(lolgfx.shp_frames(general[name])[:28]):
+            if f:
+                fsheet.blit(frame_image(f, pal), k * 32, row * 32)
+    fsheet.save(os.path.join(out_dir, "faces.png"))
 
     # objets posés au sol (vue 3D) : image du jeu pour chaque type d'objet (LoLEngine::drawObjects).
     # Drapeau 0x40 du type : image shpIndex de GAMESHP.SHP ; sinon ITEMSHP.SHP, image

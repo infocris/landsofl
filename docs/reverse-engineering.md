@@ -1600,6 +1600,19 @@ The meaning of the functions, however, can be read directly. Comparison with our
     removes the key. Saving and overwriting are disabled until the game has started.
   - **Verified**: at the intro, the dialog lists "Essai démarrage" (slot 0). "Charger" starts the
     game in cell 13,17. A later normal launch shows the intro again, with no `save_slot` left.
+- **Floating party portraits** (2026-11-23, both versions). One frame per character, like an MMORPG
+  party frame, floating over the page: portrait, name, life and magic bars. It can be dragged, the
+  position is kept, a click on a portrait opens the character sheets, and F7 shows or hides it (a
+  configurable key).
+  - **Images**: `FACEnn.SHP` in `GENERAL.PAK`, n = character id (fields relative to the name: id
+    s16 at +12). Each holds 28 frames of 32 × 32: expressions 0–13, then the same faces wounded in
+    14–27. The export puts them in `viewer/data/faces.png` (row n − 1), with the interface palette.
+  - **Frame shown**: as in `gui_drawCharFaceShape`. Take `curFaceFrame` (+14), replaced by
+    `tempFaceFrame` (+15) during an animation. Use frame 1 if flags & 0x1108 and the frame is below
+    7. Add 14 when life is at half or less. Read every 250 ms, so blinking and speech show.
+  - **Verified with ScummVM**: Michael's frame at the start (20 / 20, 6 / 6), moved by dragging,
+    position kept, F7 hides and shows it. The wounded face was not checked, because the test
+    profile has the infinite-life cheat.
 - **Teleportation** (ScummVM version, 2026-11-13).
   - **Within the level**: command op 13 (a = cell, b = direction or -1). It does the same as
     `olol_setGlobalVar(0, …)`, used by the scripts' teleporters: `_currentBlock`,
@@ -2298,3 +2311,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: saves dialog usable before the game starts: list read from IndexedDB, loading through `save_slot` at launch (§ 10a).
 - **2026-11-23**: keys window: actions can be left without a key; a key taken from another action leaves it unbound (§ 10a). Verified: switch on E, sidestep right unbound, Space no longer opens the door, E does.
 - **2026-11-23**: 3D view: a drag starting on a switch looks around instead of being ignored (§ 9.6).
+- **2026-11-23**: floating party portraits (FACEnn.SHP, frame chosen like gui_drawCharFaceShape) (§ 10a).

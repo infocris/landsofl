@@ -28,6 +28,7 @@
     { id: "switch", group: "page", label: "Actionner l'interrupteur devant le groupe", def: "Space", scumm: true },
     { id: "minimap", group: "page", label: "Afficher/masquer le panneau", def: "F9" },
     { id: "view3d", group: "page", label: "Afficher/masquer la vue 3D", def: "F10" },
+    { id: "party", group: "page", label: "Afficher/masquer les portraits", def: "F7" },
     { id: "zqsd", group: "page", label: "Activer/désactiver les touches du jeu", def: "F8", dosbox: true },
   ].filter((a) => !(a.scumm && !SCUMM) && !(a.dosbox && SCUMM));
   // touches fixes du jeu sous ScummVM (keymap de scummvm.ini, tools/scummvm_web.py)

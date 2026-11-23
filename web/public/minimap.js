@@ -2317,6 +2317,119 @@
   }
   setInterval(() => { updateStats().catch(() => {}); }, 1000);
 
+  // --- Portraits flottants (comme les cadres de groupe d'un MMORPG) ------------------------------
+  // Un cadre par personnage : portrait du jeu (viewer/data/faces.png, FACEnn.SHP), nom, vie, magie.
+  // Image du portrait comme gui_drawCharFaceShape : expression courante (curFaceFrame, ou
+  // tempFaceFrame pendant une animation), 1 si le personnage est hors de combat (drapeaux 0x1108),
+  // + 14 (visage blessé) à la moitié de sa vie ou moins. Déplaçable à la souris (position gardée),
+  // clic sur un portrait : fiches ; touche réglable (F7 par défaut) pour afficher ou masquer.
+  {
+    const css = document.createElement("style");
+    css.textContent = `
+    #party-float { position: fixed; z-index: 1002; display: flex; flex-direction: column; gap: 4px; padding: 4px;
+      font: 12px/1.2 system-ui, sans-serif; color: #e8dcc0; user-select: none; touch-action: none; cursor: grab; }
+    #party-float[hidden] { display: none; }
+    #party-float.drag { cursor: grabbing; }
+    #party-float .pm { display: grid; grid-template-columns: 52px 128px; gap: 0 7px; align-items: center; padding: 4px 6px 4px 4px;
+      background: rgba(12, 10, 7, .78); border: 1px solid #6d5a3a; border-radius: 7px; box-shadow: 0 2px 10px rgba(0,0,0,.6); }
+    #party-float .pf { grid-row: span 3; width: 48px; height: 48px; border: 2px solid #3a3226; border-radius: 5px;
+      background-image: url("viewer/data/faces.png?v=20261123a"); background-size: ${28 * 48}px ${9 * 48}px;
+      image-rendering: pixelated; cursor: pointer; }
+    #party-float .pm.ko { opacity: .55; }
+    #party-float .pm.ko .pf { filter: grayscale(1); }
+    #party-float .pn { font-weight: 600; color: #c9a227; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #party-float .pb { position: relative; height: 12px; background: #2a2218; border-radius: 3px; overflow: hidden; }
+    #party-float .pb i { position: absolute; inset: 0 auto 0 0; transition: width .25s; }
+    #party-float .pb.hp i { background: linear-gradient(#4fcf5a, #2f8f38); }
+    #party-float .pb.hp.mid i { background: linear-gradient(#e8c440, #b08a1a); }
+    #party-float .pb.hp.low i { background: linear-gradient(#ef5a3a, #a8301c); }
+    #party-float .pb.mp i { background: linear-gradient(#5a8cef, #2c55b0); }
+    #party-float .pb span { position: absolute; inset: 0; text-align: center; font-size: 10px; line-height: 12px; color: #fff;
+      text-shadow: 0 1px 1px #000; }`;
+    document.head.appendChild(css);
+    const pf = document.createElement("div");
+    pf.id = "party-float"; pf.title = "Glisser pour déplacer · clic sur un portrait : fiches";
+    document.body.appendChild(pf);
+    let on = true, pos = null;
+    try { on = localStorage.getItem("partyFloat") !== "off"; pos = JSON.parse(localStorage.getItem("partyFloatPos") || "null"); } catch (e) {}
+    const place = () => {
+      const r = pf.getBoundingClientRect(), w = r.width || 200, h = r.height || 60;
+      let x, y;
+      if (pos) { x = pos.x; y = pos.y; }
+      else { const g = document.getElementById("dos"), gr = g ? g.getBoundingClientRect() : { left: 0, top: 0 }; x = gr.left + 8; y = gr.top + 8; }
+      x = Math.max(0, Math.min(innerWidth - w, x)); y = Math.max(0, Math.min(innerHeight - h, y));
+      pf.style.left = x + "px"; pf.style.top = y + "px";
+    };
+    const show = (v) => { on = v; pf.hidden = !on || !pf.childElementCount; try { localStorage.setItem("partyFloat", on ? "on" : "off"); } catch (e) {} if (on) place(); };
+    addEventListener("resize", place);
+    // déplacement : au-delà de 4 px, sinon clic (portrait -> fiches)
+    let drag = null;
+    pf.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      const r = pf.getBoundingClientRect();
+      drag = { x0: e.clientX, y0: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, moved: false, target: e.target };
+      pf.setPointerCapture(e.pointerId); e.preventDefault();
+    });
+    pf.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) <= 4) return;
+      drag.moved = true; pf.classList.add("drag");
+      pos = { x: e.clientX - drag.dx, y: e.clientY - drag.dy }; place();
+    });
+    pf.addEventListener("pointerup", () => {
+      if (!drag) return;
+      const d = drag; drag = null; pf.classList.remove("drag");
+      if (d.moved) { try { localStorage.setItem("partyFloatPos", JSON.stringify(pos)); } catch (e) {} }
+      else if (d.target.closest(".pf") && typeof openStats === "function") openStats();
+      const g = document.getElementById("dos"); if (g && g.focus) g.focus();
+    });
+    const toggleKey = (e) => {
+      if (!window.LoLKeys || !LoLKeys.is(e, "party") || LoLKeys.typing(e.target) || document.querySelector("dialog[open]")) return;
+      e.preventDefault(); e.stopImmediatePropagation(); show(!on);
+    };
+    addEventListener("keydown", toggleKey, true);
+    const hookP = () => { const f = document.querySelector("iframe#dos"); try { if (f && f.contentWindow) f.contentWindow.addEventListener("keydown", toggleKey, true); } catch (e) {} };
+    hookP();
+    { const f = document.querySelector("iframe#dos"); if (f) f.addEventListener("load", hookP); }
+
+    let lastFloat = "", busy = false;
+    async function updateFloat() {
+      if (!on || busy || previewing) return;
+      busy = true;
+      try {
+        const r = await mem.read([PARTY_RANGE()]);
+        if (!r) return;
+        const block = r[0];
+        const list = partyChars(block).map((c) => {
+          const u16 = (k) => c.at(k) | c.at(k + 1) << 8, s16 = (k) => (u16(k) << 16) >> 16;
+          const o = c.slot * INV.charSize, flags = block[o] | block[o + 1] << 8;
+          const id = Math.abs(s16(12)), cur = c.at(14), temp = c.at(15);
+          const hp = s16(55), hpMax = u16(57), mp = s16(59), mpMax = u16(61);
+          let f = cur < 7 && temp ? temp : temp === 0 && cur > 1 && cur < 7 ? 0 : cur;
+          if (flags & 0x1108 && f < 7) f = 1;
+          if (hp <= hpMax >> 1) f += 14;
+          return { name: c.name, id, f: Math.max(0, Math.min(27, f)), hp, hpMax, mp, mpMax, ko: !!(flags & 8) || hp <= 0 };
+        });
+        const key = JSON.stringify(list);
+        if (key === lastFloat) return;
+        const count = pf.childElementCount;
+        lastFloat = key;
+        const bar = (cls, cur, max) => {
+          const q = max > 0 ? Math.max(0, Math.min(1, cur / max)) : 0;
+          return `<div class="pb ${cls}${cls === "hp" ? (q <= 0.25 ? " low" : q <= 0.5 ? " mid" : "") : ""}"><i style="width:${q * 100}%"></i><span>${cur} / ${max}</span></div>`;
+        };
+        pf.innerHTML = list.map((c) => `<div class="pm${c.ko ? " ko" : ""}">
+          <div class="pf" style="background-position:-${c.f * 48}px -${(Math.min(9, Math.max(1, c.id)) - 1) * 48}px"></div>
+          <div class="pn"></div>${bar("hp", c.hp, c.hpMax)}${c.mpMax > 0 ? bar("mp", c.mp, c.mpMax) : "<div></div>"}</div>`).join("");
+        pf.querySelectorAll(".pn").forEach((el, i) => { el.textContent = list[i].name; });
+        pf.hidden = !on || !list.length;
+        if (pf.childElementCount !== count) place();
+      } finally { busy = false; }
+    }
+    setInterval(() => { updateFloat().catch(() => {}); }, 250);
+    show(on);
+  }
+
   // --- Triche : monter de niveau ---------------------------------------------------
   // Le jeu ne vérifie le seuil qu'au moment d'un gain d'expérience (MAIN.EXE, § 12.2) : on
   // reproduit donc sa montée de niveau. Seuils = table de mots de 32 bits au début du segment
