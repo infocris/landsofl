@@ -208,6 +208,29 @@
   #st-dlg { width: min(1000px, 94vw); max-height: 90vh; padding: 0; border: 1px solid #6d5a3a; border-radius: 10px;
     color-scheme: dark; background: #110e0a; color: #e8dcc0; font: 15px/1.4 system-ui, sans-serif; box-shadow: 0 20px 60px rgba(0,0,0,.7); }
   #st-dlg::backdrop { background: rgba(0, 0, 0, .65); }
+  /* équipement des personnages (version ScummVM) : emplacements, puis pièces candidates */
+  #st-equip { padding: 8px 16px 14px; border-top: 1px solid #3a3226; }
+  #st-equip .eq-h { color: #c9a227; font-weight: 600; margin-bottom: 4px; }
+  #st-equip .eq-h small { color: #8a7f68; font-weight: 400; margin-left: 6px; }
+  #st-equip .eq-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+  #st-equip .eq-row .who { width: 110px; display: flex; align-items: center; gap: 6px; color: #e8dcc0; }
+  .face-mini { width: 24px; height: 24px; flex: none; border: 1px solid #3a3226; border-radius: 3px; image-rendering: pixelated;
+    background-image: url("viewer/data/faces.png?v=20261123a"); background-size: calc(24px * 28) calc(24px * 9); }
+  #st-equip .eq-row .slot { cursor: pointer; }
+  #st-equip .eq-row .slot.on { outline: 2px solid #c9a227; outline-offset: -1px; }
+  #st-eq-cand { margin-top: 8px; padding: 8px; border: 1px solid #554a36; border-radius: 6px; background: #17130e; }
+  #st-eq-cand .ch { color: #a39578; margin-bottom: 6px; }
+  #st-eq-cand .cand { display: grid; grid-template-columns: 30px 1fr auto; gap: 2px 8px; align-items: center; padding: 4px 6px;
+    border-radius: 4px; cursor: pointer; }
+  #st-eq-cand .cand:hover { background: #2a2217; }
+  #st-eq-cand .cand .slot { grid-row: span 2; }
+  #st-eq-cand .cand .n { color: #e8dcc0; }
+  #st-eq-cand .cand .d { font-size: 12px; }
+  #st-eq-cand .cand .src { grid-row: span 2; display: flex; align-items: center; gap: 4px; color: #8a7f68; font-size: 11px; }
+  #st-eq-cand .up { color: #5fd16a; } #st-eq-cand .down { color: #ef6a4a; } #st-eq-cand .eq0 { color: #a39578; }
+  #st-eq-cand .none { color: #8a7f68; font-style: italic; }
+  #st-eq-cand .msg { color: #ffb4a0; margin-top: 4px; }
+  #inv-equip-open { margin-top: 6px; }
   #st-dlg .cat-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px 10px; border-bottom: 1px solid #3a3226; }
   #st-dlg h2 { margin: 0; font-size: 20px; color: #c9a227; }
   #st-money2 { margin-left: auto; color: #e8dcc0; }
@@ -529,6 +552,8 @@
     <label>Place 3 <select id="st-slot2"></select></label>
     <span id="st-party-msg"></span></div>
   <div id="st-chars"></div>
+  <div id="st-equip" hidden><div class="eq-h">Équipement <small>cliquer un emplacement : pièces qui peuvent y aller</small></div>
+    <div id="st-eq-rows"></div><div id="st-eq-cand" hidden></div></div>
 </dialog>
 <dialog id="cat-dlg" aria-labelledby="cat-h">
   <div class="cat-head"><h2 id="cat-h">Annuaire des objets</h2>
@@ -665,7 +690,7 @@ window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes
   });
 })();
 </script>
-<script src="minimap.js?v=20261124d"></script>
+<script src="minimap.js?v=20261124e"></script>
 <script src="engine.js?v=20261113a"></script>
 <script src="classic.js?v=20261123e"></script>
 <script src="options.js?v=20261124d"></script>

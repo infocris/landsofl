@@ -1609,6 +1609,7 @@
     for (let k = 0; k < INV.barSlots; k++) barTypes.push(typeOf(bar[k * 2] | bar[k * 2 + 1] << 8));
     const handType = typeOf(hand[0] | hand[1] << 8);
     const party = partyChars(ch).map((c) => ({ name: c.name, slot: c.slot, usable: usable(c.slot),
+      id: Math.abs(((c.at(12) | c.at(13) << 8) << 16) >> 16),
       eq: Array.from({ length: INV.equipSlots }, (_, k) => typeOf(c.at(INV.equipOffset + 2 * k) | c.at(INV.equipOffset + 2 * k + 1) << 8)) }));
     owned = new Set([...barTypes, handType, ...party.flatMap((c) => c.eq)].filter((t) => t >= 0));
     const key = JSON.stringify([barTypes, handType, party]);
@@ -1630,11 +1631,18 @@
     } else invBar.replaceChildren(...barTypes.map((t, k) => slot(t, `case ${k + 1}`, k)));
     invCount.textContent = `${barTypes.filter((t) => t >= 0).length} / ${INV.barSlots} cases occupées`;
     if (window.lolActionBarRefresh) window.lolActionBarRefresh();
+    if (window.lolEquipRefresh) window.lolEquipRefresh();
     document.getElementById("inv-mini-count").textContent = invCount.textContent;
     invHand.replaceChildren(slot(handType, "en main", LOC_HAND));
     document.querySelectorAll("#inv .slot.sel").forEach((e) => e.classList.remove("sel"));
     invChars.replaceChildren();
-    for (const c of party) {
+    if (MANAGE) {
+      // l'équipement se change dans la fenêtre des personnages (liste des pièces possibles et écarts)
+      const b = document.createElement("button"); b.type = "button"; b.id = "inv-equip-open"; b.textContent = "Équipement des personnages…";
+      b.addEventListener("click", () => { document.getElementById("inv-dlg").close(); openStats(); });
+      invChars.appendChild(b);
+    }
+    for (const c of MANAGE ? [] : party) {
       const b = document.createElement("div"); b.className = "inv-sub"; b.textContent = `${c.name} — équipement`;
       const row = document.createElement("div"); row.className = "inv-grid";
       row.append(...c.eq.map((t, k) => {
@@ -1746,17 +1754,13 @@
         const k = firstFreeBag();
         if (k < 0) invMessage(CMD_ERR[2]); else move(k);
       });
-    // équiper : premier emplacement permis et libre du personnage, sinon échange avec l'objet porté
+    // équiper : dans la fenêtre des personnages (pièces possibles, écarts de force et de protection)
     const allowed = (it.slots || []).filter((k) => k >= 0 && k < INV.equipSlots);
-    if (allowed.length && lastInvData)
-      for (const c of lastInvData.party) {
-        const ok = strictEquip() ? allowed.filter((s) => c.usable >> s & 1) : allowed;
-        if (!ok.length) continue;                       // race sans cet emplacement (sans triches)
-        const k = ok.find((s) => c.eq[s] < 0) ?? ok[0];
-        const to = LOC_EQ(c.slot, k);
-        if (to === loc) continue;
-        btn(`Équiper : ${c.name}`, `${c.name}, ${EQUIP_NAMES[k] || "emplacement " + (k + 1)}` + (c.eq[k] >= 0 ? " (échange avec l'objet porté)" : ""), () => move(to));
-      }
+    const who = lastInvData && allowed.length ? lastInvData.party.find((p) => !strictEquip() || allowed.some((k) => p.usable >> k & 1)) : null;
+    if (who) {
+      const k = allowed.find((x) => !strictEquip() || who.usable >> x & 1);
+      btn("Équiper…", "Choisir le personnage et comparer, dans la fenêtre des personnages", () => { document.getElementById("inv-dlg").close(); openStats(k, who.slot); });
+    }
     btn("Supprimer", "Détruire l'objet (deuxième clic pour confirmer)", (b) => {
       if (!b.classList.contains("confirm")) { b.classList.add("confirm"); b.textContent = "Confirmer la suppression"; return; }
       hideDetail(); invCmd({ op: "delete", a: loc });
@@ -2391,7 +2395,114 @@
   const stMini = document.getElementById("st-mini"), stMoney2 = document.getElementById("st-money2");
   const stDlg = document.getElementById("st-dlg");
   let lastStats = "";
-  const openStats = () => { lastStats = ""; stDlg.showModal(); updateStats().catch(() => {}); updateParty(true).catch(() => {}); };
+  // --- Équipement dans la fenêtre des personnages (version ScummVM) ----------------------------
+  // Emplacements de chaque personnage (sans triches : seulement ceux de sa race) ; clic : pièces qui
+  // peuvent y aller (sac, main, portées par un autre, avec son portrait), écarts de force et de
+  // protection avec la pièce en place (vert : mieux, rouge : moins bien). Clic sur une pièce : équipée
+  // (commande « move » ; pièce d'un autre personnage qui ne peut pas reprendre la pièce en place :
+  // celle-ci passe d'abord par le sac). « Retirer » : pièce en place rangée dans le sac.
+  if (MANAGE) {
+    const eqBox = document.getElementById("st-equip"), eqRows = document.getElementById("st-eq-rows"), eqCand = document.getElementById("st-eq-cand");
+    let pick = null, eqMsg = "";
+    const faceMini = (id) => { const f = document.createElement("span"); f.className = "face-mini"; f.style.backgroundPosition = `0 -${(Math.min(9, Math.max(1, id)) - 1) * 24}px`; return f; };
+    const fitsSlot = (t, k) => t >= 0 && itemInfo && itemInfo[t] && (itemInfo[t].slots || []).includes(k);
+    const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+    const slotName = (k) => EQUIP_NAMES[k] || `emplacement ${k + 1}`;
+    function renderEquip() {
+      if (!stDlg.open || !lastInvData || !itemInfo) return;
+      const party = lastInvData.party;
+      eqBox.hidden = !party.length;
+      if (pick && !party.some((p) => p.slot === pick.c)) pick = null;
+      eqRows.replaceChildren(...party.map((c) => {
+        const row = mk("div", "eq-row"), who = mk("span", "who");
+        who.append(faceMini(c.id), mk("span", null, c.name));
+        row.appendChild(who);
+        for (let k = 0; k < INV.equipSlots; k++) {
+          if (strictEquip() && !(c.usable >> k & 1)) continue;          // emplacement absent pour sa race
+          const t = c.eq[k], d = mk("div", "slot");
+          if (t >= 0) { d.classList.add("full"); setIcon(d, (itemInfo[t] || {}).icon ?? -1); d.dataset.type = t; }
+          else slotPlaceholder(d, LOC_EQ(c.slot, k));
+          d.title = `${c.name}, ${slotName(k)}`;
+          if (pick && pick.c === c.slot && pick.k === k) d.classList.add("on");
+          d.addEventListener("click", () => { pick = pick && pick.c === c.slot && pick.k === k ? null : { c: c.slot, k }; eqMsg = ""; renderEquip(); });
+          row.appendChild(d);
+        }
+        return row;
+      }));
+      renderCand();
+    }
+    function diffs(t, cur) {
+      const a = itemInfo[t] || {}, b = cur >= 0 ? itemInfo[cur] || {} : {};
+      const out = [];
+      for (const [key, label] of [["might", "Force"], ["prot", "Protection"]]) {
+        const d = (a[key] || 0) - (b[key] || 0);
+        if (d) out.push([`${label} ${d > 0 ? "+" : "−"}${Math.abs(d)}`, d > 0 ? "up" : "down"]);
+      }
+      if (!out.length) out.push(["Force et protection inchangées", "eq0"]);
+      return out;
+    }
+    function renderCand() {
+      if (!pick || !lastInvData) { eqCand.hidden = true; return; }
+      const party = lastInvData.party, me = party.find((p) => p.slot === pick.c);
+      const dst = LOC_EQ(pick.c, pick.k), cur = me.eq[pick.k];
+      const list = [];
+      const bag = new Map();
+      lastInvData.barTypes.forEach((t, loc) => { if (fitsSlot(t, pick.k)) { const e = bag.get(t); if (e) e.n++; else bag.set(t, { loc, n: 1 }); } });
+      for (const [t, e] of bag) list.push({ t, loc: e.loc, src: e.n > 1 ? `sac (×${e.n})` : "sac" });
+      if (fitsSlot(lastInvData.handType, pick.k)) list.push({ t: lastInvData.handType, loc: LOC_HAND, src: "en main" });
+      for (const p of party) p.eq.forEach((t, k) => {
+        if ((p.slot === pick.c && k === pick.k) || !fitsSlot(t, pick.k)) return;
+        list.push({ t, loc: LOC_EQ(p.slot, k), who: p, src: `${p.name}, ${slotName(k)}` });
+      });
+      eqCand.replaceChildren(mk("div", "ch", `${me.name}, ${slotName(pick.k)} : ` + (cur >= 0 ? `porte « ${(itemInfo[cur] || {}).name} »` : "vide")));
+      if (cur >= 0) {
+        const r = mk("div", "cand"), ic = mk("div", "slot"), src = mk("span", "src", "vers le sac");
+        r.append(ic, mk("span", "n", "Retirer"), src, mk("span", "d eq0", `ranger « ${(itemInfo[cur] || {}).name} » dans le sac`));
+        r.addEventListener("click", () => equip(dst, -1));
+        eqCand.appendChild(r);
+      }
+      if (!list.length) eqCand.appendChild(mk("div", "none", "Aucune autre pièce ne peut aller à cet emplacement."));
+      for (const c of list) {
+        const it = itemInfo[c.t] || { name: `objet ${c.t}` };
+        const r = mk("div", "cand"), ic = mk("div", "slot full"); setIcon(ic, it.icon ?? -1); ic.dataset.type = c.t;
+        const src = mk("span", "src"); if (c.who) src.appendChild(faceMini(c.who.id)); src.appendChild(mk("span", null, c.src));
+        const d = mk("span", "d");
+        for (const [text, cls] of diffs(c.t, cur)) { if (d.childNodes.length) d.appendChild(document.createTextNode(" · ")); d.appendChild(mk("span", cls, text)); }
+        const fx = (it.effects || []).filter((x) => !/^(Force|Protection) [+−-]/.test(x));
+        if (fx.length) d.appendChild(mk("span", "eq0", " · " + fx.join(" · ")));
+        r.append(ic, mk("span", "n", it.name), src, d);
+        r.addEventListener("click", () => equip(c.loc, dst));
+        eqCand.appendChild(r);
+      }
+      if (eqMsg) eqCand.appendChild(mk("div", "msg", eqMsg));
+      eqCand.hidden = false;
+    }
+    const move = (a, b) => mem.cmd({ op: "move", a: a | (strictEquip() ? 0x4000 : 0), b }, 5000);
+    async function equip(src, dst) {
+      eqMsg = "";
+      let r;
+      if (dst < 0) {                                        // retirer : pièce en place -> sac
+        const free = lastInvData.barTypes.indexOf(-1);
+        r = free < 0 ? { code: 2 } : await move(src, free);
+      } else {
+        r = await move(src, dst);
+        if (r && r.code === 1 && src >= 200) {              // l'autre personnage ne peut pas reprendre la pièce en place
+          const free = lastInvData.barTypes.indexOf(-1);
+          if (free >= 0 && (await move(dst, free) || {}).code === 0) r = await move(src, dst);
+        }
+      }
+      eqMsg = !r ? "Le jeu ne répond pas (menu ouvert ?)." : r.code === 2 ? "Le sac est plein." : r.code ? "Impossible : la pièce ne va pas là (ou la race du personnage ne le permet pas)." : "";
+      lastInv = ""; await updateInventory().catch(() => {}); renderEquip();
+      lastStats = ""; updateStats().catch(() => {});
+    }
+    window.lolEquipRefresh = renderEquip;
+    window.lolEquipPick = (c, k) => { pick = { c, k }; eqMsg = ""; renderEquip(); };
+    stDlg.addEventListener("close", () => { pick = null; eqCand.hidden = true; });
+  }
+  const openStats = (eqSlot, eqChar) => {
+    lastStats = ""; stDlg.showModal(); updateStats().catch(() => {}); updateParty(true).catch(() => {});
+    if (MANAGE) { lastInv = ""; updateInventory().catch(() => {}); if (eqSlot !== undefined && typeof eqChar === "number") setTimeout(() => window.lolEquipPick && window.lolEquipPick(eqChar, eqSlot), 400); }
+  };
   document.getElementById("st-open").addEventListener("click", (e) => { e.currentTarget.blur(); openStats(); });
   stMini.addEventListener("click", openStats);
   document.getElementById("st-close").addEventListener("click", () => stDlg.close());
