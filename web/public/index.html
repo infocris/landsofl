@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lands of Lore</title>
 <script src="volume.js?v=20261110a"></script>
+<script src="keys.js?v=20261123a"></script>
 <link rel="stylesheet" href="js-dos.css">
 <script src="js-dos.js"></script>
 <!-- ?v= : à changer à chaque modification des scripts (évite les copies en cache) -->
@@ -406,7 +407,7 @@
 <body>
 <div id="left">
   <div id="dos"></div>
-  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261123l" title="Vue 3D synchronisée"></iframe></div>
+  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261123m" title="Vue 3D synchronisée"></iframe></div>
 </div>
 <aside id="mm" aria-label="Mini-carte">
   <div id="mm-title"><span>Mini-carte</span><button id="mm-tex" type="button" title="Cases illustrées avec les textures du lieu / couleurs simples">▦</button><button id="mm-fog" type="button" title="Exploration progressive : n'afficher que les cases déjà vues / toute la carte">◐</button><button id="mm-forget" type="button" title="Oublier l'exploration de ce niveau (nouvelle partie)" disabled>↺</button><button id="mm-center" type="button" title="Centrer automatiquement la carte sur le groupe / carte fixe">⌖</button><span class="mm-grp" title="Taille de la carte à l'écran">Taille</span><button id="mm-smaller" type="button" title="Réduire la mini-carte">−</button><button id="mm-bigger" type="button" title="Agrandir la mini-carte">+</button><span class="mm-grp" title="Zoom (aussi : molette sur la carte)">Zoom</span><button id="mm-zout" type="button" title="Dézoomer (molette)">−</button><button id="mm-zin" type="button" title="Zoomer (molette)">+</button></div>
@@ -518,17 +519,18 @@
   //   Z = avancer      S = reculer
   //   Q = pas à gauche D = pas à droite   (pavé 7/9 : pas de côté, vérifié en jeu)
   //   A = tourner à g. E = tourner à d.   (pavé 4/6)
-  const KEY_MAP = {
-    KeyW: 265, // Z -> flèche haut (avancer)
-    KeyS: 264, // S -> flèche bas (reculer)
-    KeyA: 327, // Q -> pavé num. 7 (pas de côté à gauche)
-    KeyD: 329, // D -> pavé num. 9 (pas de côté à droite)
-    KeyQ: 324, // A -> pavé num. 4 (tourner à gauche)
-    KeyE: 326, // E -> pavé num. 6 (tourner à droite)
+  // Touches réglables (keys.js, fenêtre « Touches… ») : action -> code js-dos envoyé.
+  const DOS_KEY = {
+    MVF: 265, // flèche haut (avancer)
+    MVB: 264, // flèche bas (reculer)
+    SLL: 327, // pavé num. 7 (pas de côté à gauche)
+    SLR: 329, // pavé num. 9 (pas de côté à droite)
+    TL: 324,  // pavé num. 4 (tourner à gauche)
+    TR: 326,  // pavé num. 6 (tourner à droite)
   };
-  // Attaque : 1, 2, 3 (rangée du haut) -> F1, F2, F3 (personnage 1 à 3), même si ZQSD est désactivé,
+  // Attaque : F1, F2, F3 (personnage 1 à 3), même si ZQSD est désactivé,
   // mais pas en pause (menu disquette : on tape des chiffres dans un nom de sauvegarde).
-  const ATTACK_MAP = { Digit1: 290, Digit2: 291, Digit3: 292 };
+  const ATTACK_KEY = { AT1: 290, AT2: 291, AT3: 292 };
   let emu = null; // interface js-dos, prête après "ci-ready"
   let remapOn = true;
   try { remapOn = localStorage.getItem("zqsd") !== "off"; } catch (e) {}
@@ -569,9 +571,9 @@
   function onKey(e) {
     if (e.target && e.target.closest && e.target.closest("input, textarea, select")) return;   // saisie dans le panneau
     const down = e.type === "keydown";
-    if (down && e.code === "F8") { setRemap(!remapOn); e.preventDefault(); e.stopPropagation(); return; }
-    if (down && e.code === "F9") { toggleMap(); e.preventDefault(); e.stopPropagation(); return; }
-    if (down && e.code === "F10") { toggle3d(); e.preventDefault(); e.stopPropagation(); return; }
+    if (down && LoLKeys.is(e, "zqsd")) { setRemap(!remapOn); e.preventDefault(); e.stopPropagation(); return; }
+    if (down && LoLKeys.is(e, "minimap")) { toggleMap(); e.preventDefault(); e.stopPropagation(); return; }
+    if (down && LoLKeys.is(e, "view3d")) { toggle3d(); e.preventDefault(); e.stopPropagation(); return; }
     // Relâcher toujours une touche remappée, même si on a désactivé entre-temps.
     if (!down && held.has(e.code)) {
       if (emu) emu.sendKeyEvent(held.get(e.code), false);
@@ -580,7 +582,8 @@
       return;
     }
     if (paused || !emu || e.ctrlKey || e.metaKey || e.altKey) return;
-    const dos = ATTACK_MAP[e.code] ?? (remapOn ? KEY_MAP[e.code] : undefined);
+    const act = LoLKeys.actionFor(e.code, "jeu");
+    const dos = ATTACK_KEY[act] ?? (remapOn ? DOS_KEY[act] : undefined);
     if (dos === undefined) return;
     if (down) { emu.sendKeyEvent(dos, true); held.set(e.code, dos); }
     e.preventDefault(); e.stopPropagation();
@@ -749,7 +752,7 @@
   }));
 })();
 </script>
-<script src="minimap.js?v=20261123c"></script>
+<script src="minimap.js?v=20261123d"></script>
 <script src="engine.js?v=20261113a"></script>
 </body>
 </html>

@@ -918,7 +918,7 @@
   bigDlg.addEventListener("click", (e) => { if (e.target === bigDlg) closeBig(); });
   // Tab : ouvrir / fermer, depuis la page ou depuis le jeu (cadre ScummVM : écouteur dans sa fenêtre)
   const onTab = (e) => {
-    if (e.code !== "Tab" || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (!LoLKeys.is(e, "map")) return;
     const t = e.target, typing = t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA");
     if (typing && !bigOpen) return;
     const other = document.querySelector("dialog[open]:not(#bm-dlg)");
@@ -931,7 +931,7 @@
   hookFrame();
   { const f = document.querySelector("iframe#dos"); if (f) f.addEventListener("load", hookFrame); }
   for (const ev of ["keyup", "keypress"]) bigDlg.addEventListener(ev, (e) => e.stopPropagation());
-  bigDlg.addEventListener("keydown", (e) => { if (e.code !== "Tab") e.stopPropagation(); });
+  bigDlg.addEventListener("keydown", (e) => { if (!LoLKeys.is(e, "map")) e.stopPropagation(); });
 
   const LOCK_KIND = { porte: "Serrure de porte", passage: "Serrure (ouvre un passage)",
     receptacle: "Réceptacle de clé (mécanisme)", coffre: "Donne un objet (lieu)", inconnu: "Serrure" };
@@ -970,7 +970,7 @@
     if (e.origin === location.origin && e.data && e.data.type === "lol-switch-ahead") switchAhead = !!e.data.on;
   });
   const onSpace = (e) => {
-    if (e.code !== "Space" || e.repeat || !switchAhead || window.LOL_ENGINE !== "scummvm") return;
+    if (!LoLKeys.is(e, "switch") || e.repeat || !switchAhead || window.LOL_ENGINE !== "scummvm" || LoLKeys.typing(e.target)) return;
     if (document.querySelector("dialog[open]")) return;
     mem.cmd({ op: "clickwall" }, 5000).catch((err) => console.warn("clickwall", err));
   };
@@ -2092,11 +2092,11 @@
     invDlg.addEventListener("keydown", (e) => {
       e.stopPropagation();
       const t = e.target;
-      if (e.code === "KeyI" && !(t && (t.tagName === "INPUT" || t.tagName === "SELECT"))) { e.preventDefault(); invDlg.close(); }
+      if (LoLKeys.is(e, "inv") && !(t && (t.tagName === "INPUT" || t.tagName === "SELECT"))) { e.preventDefault(); invDlg.close(); }
     });
     // touche I : depuis la page ou depuis le jeu (cadre ScummVM), hors saisie
     const onI = (e) => {
-      if (e.code !== "KeyI" || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (!LoLKeys.is(e, "inv")) return;
       const t = e.target;
       if (t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA")) return;
       if (document.querySelector("dialog[open]")) return;

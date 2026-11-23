@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261123l";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261123m";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -1221,34 +1221,42 @@
       } catch (err) { return null; }
     };
     function giveKeysToGame() { const t = gameTarget(); if (t) t.focus(); }
-    const KEY_CODES = { Home: 36, PageUp: 33 };
+    // touches fixes du jeu, envoyées telles quelles (lolMapped : la page ne les retraduit pas, keys.js)
+    const KEY_CODES = { Home: 36, PageUp: 33, ArrowLeft: 37, ArrowRight: 39 };
+    function sendFixed(type, code) {
+      const t = gameTarget();
+      if (!t) return;
+      const View = t.el.ownerDocument ? t.el.ownerDocument.defaultView : parent;
+      const ev = new View.KeyboardEvent(type, { key: code, code, keyCode: KEY_CODES[code], which: KEY_CODES[code], bubbles: true, cancelable: true });
+      ev.lolMapped = true;
+      t.el.dispatchEvent(ev);
+    }
     function pressGameKey(code) {
       const t = gameTarget();
       if (!t) return;
       t.focus();
-      const View = t.el.ownerDocument ? t.el.ownerDocument.defaultView : parent;
-      const init = { key: code, code, keyCode: KEY_CODES[code], which: KEY_CODES[code], bubbles: true, cancelable: true };
-      t.el.dispatchEvent(new View.KeyboardEvent("keydown", init));
-      setTimeout(() => t.el.dispatchEvent(new View.KeyboardEvent("keyup", init)), 60);
+      sendFixed("keydown", code);
+      setTimeout(() => sendFixed("keyup", code), 60);
     }
-    // Bouton de la souris tenu (on regarde autour) : Q / D (touches physiques A / D, qui tournent
-    // le groupe) font un pas de côté, envoyés au jeu comme les flèches gauche / droite.
-    const STRAFE = { KeyA: ["ArrowLeft", 37], KeyD: ["ArrowRight", 39] };
-    const strafeHeld = new Set();
-    function sendArrow(type, code) {
-      const t = gameTarget();
-      if (!t) return;
-      const [key, keyCode] = STRAFE[code];
-      const View = t.el.ownerDocument ? t.el.ownerDocument.defaultView : parent;
-      t.el.dispatchEvent(new View.KeyboardEvent(type, { key, code: key, keyCode, which: keyCode, bubbles: true, cancelable: true }));
-    }
-    function releaseStrafe() { for (const c of strafeHeld) sendArrow("keyup", c); strafeHeld.clear(); }
+    // Bouton de la souris tenu (on regarde autour) : les touches qui tournent le groupe (réglables,
+    // keys.js de la page ; Q / D par défaut) font un pas de côté, envoyées au jeu comme les flèches
+    // gauche / droite.
+    const strafeSide = (code) => {
+      let K = null; try { K = parent.LoLKeys; } catch (e) {}
+      const tl = K ? K.codeOf("TL") : "KeyA", tr = K ? K.codeOf("TR") : "KeyD";
+      return code && code === tl ? "ArrowLeft" : code && code === tr ? "ArrowRight" : null;
+    };
+    const strafeHeld = new Map();                       // code physique -> flèche envoyée
+    function releaseStrafe() { for (const a of strafeHeld.values()) sendFixed("keyup", a); strafeHeld.clear(); }
     for (const type of ["keydown", "keyup"]) addEventListener(type, (e) => {
-      if (STRAFE[e.code] && (type === "keydown" ? looking : strafeHeld.has(e.code))) {
-        if (type === "keydown") strafeHeld.add(e.code); else strafeHeld.delete(e.code);
-        sendArrow(type, e.code);
-        e.preventDefault();
-        return;
+      if (type === "keyup" && strafeHeld.has(e.code)) {
+        sendFixed("keyup", strafeHeld.get(e.code)); strafeHeld.delete(e.code);
+        e.preventDefault(); return;
+      }
+      const side = type === "keydown" && looking ? strafeSide(e.code) : null;
+      if (side) {
+        if (!strafeHeld.has(e.code)) { strafeHeld.set(e.code, side); sendFixed("keydown", side); }
+        e.preventDefault(); return;
       }
       const t = gameTarget();
       if (!t) return;

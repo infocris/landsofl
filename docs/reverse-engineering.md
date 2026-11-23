@@ -1275,6 +1275,23 @@ The meaning of the functions, however, can be read directly. Comparison with our
   - Example: `keymap_lolkeyb_MVF=UP w`.
   - Turning and sidestepping are swapped compared with the DOSBox version, at the
     user's request.
+- **Configurable keys** (2026-11-23, `web/public/keys.js`). A « Touches… » window on the page
+  binds one key per action: move, turn, sidestep, attack 1–3, plus the page shortcuts (big map, inventory,
+  switch, panel, 3D view; F8 ZQSD toggle under DOSBox). Keys are physical positions (`event.code`)
+  shown with the user's layout (Chrome's `navigator.keyboard.getLayoutMap`, AZERTY fallback). A
+  key already in use is swapped with the action that had it. Settings live in `localStorage`
+  (`lol-keys`), one set per version since DOSBox and ScummVM are served on two ports.
+  - **ScummVM**: `scummvm.ini` now binds only the fixed keys (arrows, Home, Page Up, F1–F3), and
+    the launcher's merge replaces the old letter bindings. The page listens in the game frame
+    (capture phase) and replays the chosen key as the action's fixed key, so changes apply at once
+    without restarting the engine. Translated events carry `lolMapped` so they are not translated
+    again, as do the fixed keys the 3D view sends. Translation stops while the game menu is open
+    (`_webInMenu`, exposed as `lolMenuOpen()`), so a save name can be typed.
+  - **DOSBox**: the page's js-dos key table is now indexed by action instead of by key.
+  - The 3D view's sidestep while looking follows the keys bound to turning.
+  - Verified with ScummVM: Z moves forward, Q / D turn. After binding Avancer to T, then Reculer to T
+    (swap), then Avancer to T again: Z does nothing, S moves back, T moves forward. After resetting,
+    Z moves forward again and T does nothing.
   - The game disables this keyboard while a save name is being typed (`gui_lol.cpp`), which
     replaces the pause detection of the DOSBox version.
   - Test with a simulated AZERTY keyboard (physical code + AZERTY letter): Z moves forward, Q turns,
@@ -2255,3 +2272,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: decoration flag bit 1 mirrors the image; the Gladstone fountain is animated by alternating two mirrored decorations, now animated in the 3D view (§ 9.4).
 - **2026-11-23**: free-standing decorations (all four faces, no wall set) drawn as one centered sprite in the real perspective (§ 9.4).
 - **2026-11-23**: 3D view: Q / D sidestep while the mouse button is held (§ 9.3a); Space operates the switch in front of the party (§ 9.6).
+- **2026-11-23**: configurable keyboard keys (« Touches… » window), translated by the page into the game's fixed keys (§ 10a).

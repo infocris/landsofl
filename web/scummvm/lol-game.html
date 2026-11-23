@@ -56,8 +56,8 @@
   if (!location.hash) history.replaceState(null, "", "#lol-fr");
   const DB = "/home/web_user", KEY = DB + "/scummvm.ini", SEC = "[lol-fr]";
   // version du moteur dans les adresses : un navigateur qui a gardé l'ancien moteur en cache le recharge
-  Module.locateFile = (p, dir) => dir + p + (p.endsWith(".wasm") ? "?v=1795385888-13263800" : "");
-  const start = () => { const s = document.createElement("script"); s.src = "scummvm.js?v=1795385888-13263800"; document.body.appendChild(s); };
+  Module.locateFile = (p, dir) => dir + p + (p.endsWith(".wasm") ? "?v=1795396975-13264141" : "");
+  const start = () => { const s = document.createElement("script"); s.src = "scummvm.js?v=1795396975-13264141"; document.body.appendChild(s); };
   const section = (t) => { const i = t.indexOf(SEC); if (i < 0) return ""; const j = t.indexOf("\n[", i + 1); return j < 0 ? t.slice(i) : t.slice(i, j + 1); };
   fetch("scummvm.ini", { cache: "no-store" }).then((r) => r.text()).then((ini) => new Promise((done) => {
     const ours = section(ini);
@@ -109,6 +109,7 @@
   // - rien : exploration, menu, changement de niveau.
   const view = { loops: -1, at: 0, scene: false, upd: 0, seq: [0, 0, 0, 0], menu: false, loading: false, casting: false };
   const SCENE = [112, 0, 176, 120];
+  window.lolMenuOpen = () => !!(zones && view.menu);   // keys.js : pas de traduction des touches dans le menu
   window.lolView = () => {
     if (!zones || view.loops <= 0) return { mirror: true, crop: [0, 0, 320, 200] };   // avant la partie (introduction)
     if (view.menu || view.loading) return { mirror: false };

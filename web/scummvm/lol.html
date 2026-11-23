@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lands of Lore (ScummVM)</title>
 <script src="volume.js?v=20261110a"></script>
+<script src="keys.js?v=20261123a"></script>
 <!-- ?v= : à changer à chaque modification des scripts (évite les copies en cache) -->
 <script src="memscan.js?v=20261110a"></script>
 <style>
@@ -409,7 +410,7 @@
 <body>
 <div id="left">
   <iframe id="dos" src="lol-game.html?v=1795396975-13264141#lol-fr" title="Lands of Lore (ScummVM)" allow="autoplay; fullscreen"></iframe>
-  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261123l" title="Vue 3D synchronisée"></iframe></div>
+  <div id="v3d"><iframe id="v3d-frame" src="viewer/?embed=1&v=20261123m" title="Vue 3D synchronisée"></iframe></div>
 </div>
 <aside id="mm" aria-label="Mini-carte">
   <div id="mm-title"><span>Mini-carte</span><button id="mm-tex" type="button" title="Cases illustrées avec les textures du lieu / couleurs simples">▦</button><button id="mm-fog" type="button" title="Exploration progressive : n'afficher que les cases déjà vues / toute la carte">◐</button><button id="mm-forget" type="button" title="Oublier l'exploration de ce niveau (nouvelle partie)" disabled>↺</button><button id="mm-center" type="button" title="Centrer automatiquement la carte sur le groupe / carte fixe">⌖</button><span class="mm-grp" title="Taille de la carte à l'écran">Taille</span><button id="mm-smaller" type="button" title="Réduire la mini-carte">−</button><button id="mm-bigger" type="button" title="Agrandir la mini-carte">+</button><span class="mm-grp" title="Zoom (aussi : molette sur la carte)">Zoom</span><button id="mm-zout" type="button" title="Dézoomer (molette)">−</button><button id="mm-zin" type="button" title="Zoomer (molette)">+</button></div>
@@ -534,8 +535,8 @@ window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes
   document.getElementById("v3dtoggle").addEventListener("click", (e) => { toggle3d(); back(e); });
   // F9 / F10 aussi depuis le jeu (le cadre a le clavier) : écouteur ajouté dans sa fenêtre
   const keys = (e) => {
-    if (e.code === "F9") { toggleMap(); e.preventDefault(); e.stopPropagation(); }
-    if (e.code === "F10") { toggle3d(); e.preventDefault(); e.stopPropagation(); }
+    if (LoLKeys.is(e, "minimap")) { toggleMap(); e.preventDefault(); e.stopPropagation(); }
+    if (LoLKeys.is(e, "view3d")) { toggle3d(); e.preventDefault(); e.stopPropagation(); }
   };
   addEventListener("keydown", keys, true);
   game.addEventListener("load", () => { try { game.contentWindow.addEventListener("keydown", keys, true); } catch (e) {} game.focus(); });
@@ -557,7 +558,7 @@ window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes
   sendPersp();
 })();
 </script>
-<script src="minimap.js?v=20261123c"></script>
+<script src="minimap.js?v=20261123d"></script>
 <script src="engine.js?v=20261113a"></script>
 </body>
 </html>

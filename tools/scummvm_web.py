@@ -87,10 +87,12 @@ def write_pak(path, files):
 # Z arrive comme « w », Q comme « a », A comme « q ». On nomme donc les touches en QWERTY pour
 # garder les positions ZQSD (comme la version DOSBox, qui se fonde sur event.code).
 # Q / D (AZERTY) tournent, A / E font un pas de côté (choix de l'utilisateur, 2026-11-09).
-ZQSD = {"MVF": "UP w", "MVB": "DOWN s", "TL": "HOME a", "TR": "PAGEUP d", "SLL": "LEFT q", "SLR": "RIGHT e"}
+# Depuis le 2026-11-23, les touches choisies (ZQSD par défaut) sont réglables dans la page (web/public/keys.js),
+# qui les traduit en ces touches fixes : scummvm.ini ne lie plus de lettre.
+ZQSD = {"MVF": "UP", "MVB": "DOWN", "TL": "HOME", "TR": "PAGEUP", "SLL": "LEFT", "SLR": "RIGHT"}
 # Attaque des personnages 1 à 3 : touches 1, 2, 3 (rangée du haut, position physique) en plus de F1-F3.
 # Le jeu désactive ce clavier pendant la saisie d'un nom de sauvegarde : on y tape toujours des chiffres.
-ATTACK = {"AT1": "F1 1", "AT2": "F2 2", "AT3": "F3 3"}
+ATTACK = {"AT1": "F1", "AT2": "F2", "AT3": "F3"}
 TARGET = "lol-fr"
 
 
@@ -215,6 +217,7 @@ LAUNCH_JS = r"""<script src="volume.js"></script>
   // - rien : exploration, menu, changement de niveau.
   const view = { loops: -1, at: 0, scene: false, upd: 0, seq: [0, 0, 0, 0], menu: false, loading: false, casting: false };
   const SCENE = [112, 0, 176, 120];
+  window.lolMenuOpen = () => !!(zones && view.menu);   // keys.js : pas de traduction des touches dans le menu
   window.lolView = () => {
     if (!zones || view.loops <= 0) return { mirror: true, crop: [0, 0, 320, 200] };   // avant la partie (introduction)
     if (view.menu || view.loading) return { mirror: false };
@@ -295,8 +298,8 @@ window.LOL_ENGINE = "scummvm";   // minimap.js : inventaire géré par commandes
   document.getElementById("v3dtoggle").addEventListener("click", (e) => { toggle3d(); back(e); });
   // F9 / F10 aussi depuis le jeu (le cadre a le clavier) : écouteur ajouté dans sa fenêtre
   const keys = (e) => {
-    if (e.code === "F9") { toggleMap(); e.preventDefault(); e.stopPropagation(); }
-    if (e.code === "F10") { toggle3d(); e.preventDefault(); e.stopPropagation(); }
+    if (LoLKeys.is(e, "minimap")) { toggleMap(); e.preventDefault(); e.stopPropagation(); }
+    if (LoLKeys.is(e, "view3d")) { toggle3d(); e.preventDefault(); e.stopPropagation(); }
   };
   addEventListener("keydown", keys, true);
   game.addEventListener("load", () => { try { game.contentWindow.addEventListener("keydown", keys, true); } catch (e) {} game.focus(); });
