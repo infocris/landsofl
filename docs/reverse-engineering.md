@@ -576,6 +576,13 @@ large as in true perspective.
 grid (§ 12.2), hence the actual state of doors. So that these identifiers have a
 texture, the export produces a texture for every wall type of the level.
 
+**Keyboard (2026-11-23).** The built-in view has no controls of its own, but clicking it (looking
+around, switches) gave it the keyboard, so movement keys no longer reached the game. After each
+click it now hands focus back to the game (ScummVM: the `#dos` frame; DOSBox: the page and
+js-dos' canvas). A key it still receives is replayed as a synthetic `KeyboardEvent` in the game's
+window, so no press is lost. Checked with ScummVM: after a click in the 3D view, and with focus
+forced into it, A/D turn and W moves the party.
+
 **Pixel aspect — verified (2026-11-22).** The game's 320×200 screen is shown at 4:3 (ScummVM
 aspect correction, DOSBox), so its pixels are 1.2 times taller than wide. The game view (176×120)
 is thus displayed at 1.22:1, and a near wall (128×96 pixels) at 1.11:1. The 3D view was drawn
@@ -2143,3 +2150,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: forest treetops in the 3D view generated pseudo-randomly per row of faces (trunk and crown heights from a smoothed noise, crown read across the whole background band); the skyline was flat and repeated every cell (§ 9.3d).
 - **2026-11-23**: blood pools (cell flag 0x80, `ICE.SHP` frame 3, floor halved plus red through `_grayOverlay`) read from the live grid and drawn in the 3D view (§ 9.3i).
 - **2026-11-23**: forest storey above the walls synthesized from the branches-and-foliage rows of the wall texture (vertical quilting, 3 variants), instead of repeating the whole texture with its roots (§ 9.3d).
+- **2026-11-23**: movement keys work while the built-in 3D view has focus: focus handed back to the game after a click, stray keys replayed in the game window (§ 9.3a).
