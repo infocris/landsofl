@@ -1980,7 +1980,11 @@
         chip.addEventListener("dragstart", (e) => { e.dataTransfer.effectAllowed = "copy"; e.dataTransfer.setData("application/x-lol-action", JSON.stringify({ k: "atk", c: c.slot })); });
         return chip;
       }));
-      atk.title = "Glisser un niveau de sort ou une attaque sur une case de la barre d'actions";
+      const rest = document.createElement("span"); rest.className = "chip"; rest.textContent = "💤 Dormir"; rest.draggable = true;
+      rest.title = "Glisser dans la barre d'actions : faire dormir le groupe";
+      rest.addEventListener("dragstart", (e) => { e.dataTransfer.effectAllowed = "copy"; e.dataTransfer.setData("application/x-lol-action", JSON.stringify({ k: "rest" })); });
+      atk.appendChild(rest);
+      atk.title = "Glisser un niveau de sort, une attaque ou le repos sur une case de la barre d'actions";
     }
   }
   async function cast(s, level) {
@@ -2661,6 +2665,9 @@
     #party-float .pa button { width: 26px; height: 24px; padding: 0; border: 1px solid #6d5a3a; border-radius: 4px; background: #241c12;
       color: #f0d070; font-size: 14px; line-height: 1; cursor: pointer; }
     #party-float .pa button:hover { border-color: #c9a227; }
+    #party-float .rest { align-self: flex-start; padding: 3px 10px; border: 1px solid #6d5a3a; border-radius: 6px; background: rgba(12,10,7,.85);
+      color: #e8dcc0; font: 12px system-ui, sans-serif; cursor: pointer; }
+    #party-float .rest:hover { border-color: #c9a227; }
     #party-float .pa button.busy { filter: grayscale(1) brightness(.5); cursor: default; }
     #party-float .pa button.on { background: #5a4520; border-color: #f0d070; }
     #spell-pop { position: fixed; z-index: 1003; padding: 6px; border: 1px solid #6d5a3a; border-radius: 7px; background: rgba(12,10,7,.95);
@@ -2727,6 +2734,7 @@
       if (!drag) return;
       const d = drag; drag = null; pf.classList.remove("drag");
       if (d.moved) { try { localStorage.setItem("partyFloatPos", JSON.stringify(pos)); } catch (e) {} }
+      else if (d.target.closest(".rest")) { if (window.LoLKeys) LoLKeys.pressGame("RST"); }
       else if (d.target.closest(".pa .atk")) attackFrom(+d.target.closest(".pm").dataset.slot);
       else if (d.target.closest(".pa .book")) toggleSpells(+d.target.closest(".pm").dataset.slot);
       else if (d.target.closest(".pf") && typeof openStats === "function") openStats();
@@ -2875,6 +2883,11 @@
         if (spellFor !== null) renderSpellPop();
         applyCost();
         pf.querySelectorAll(".pn").forEach((el, i) => { el.textContent = list[i].name; });
+        if (window.LOL_ENGINE === "scummvm" && list.length) {
+          const z = document.createElement("button"); z.type = "button"; z.className = "rest"; z.textContent = "💤 Dormir";
+          z.title = "Faire dormir le groupe (repos du jeu, touche R)";
+          pf.appendChild(z);
+        }
         pf.hidden = !on || !list.length;
         if (pf.childElementCount !== count) place();
       } finally { busy = false; }
@@ -3022,6 +3035,10 @@
         d.appendChild(box);
         const healWho = a.s === HEAL_SPELL && a.l < 3 ? ` · soigne : ${a.for === undefined || a.for === "auto" ? "le plus blessé" : (partyNow().find((q) => q.slot === a.for) || {}).name || "?"}` : "";
         d.dataset.tip = `${a.n || "Sort"} niveau ${a.l + 1} · lanceur : ${p ? p.name : "?"}${healWho}`;
+      } else if (a && a.k === "rest") {
+        const box = document.createElement("div"); box.className = "atk"; box.innerHTML = "<b>💤</b><span>Dormir</span>";
+        d.appendChild(box);
+        d.dataset.tip = "Dormir : repos du groupe";
       } else if (a && a.k === "atk") {
         const p = partyNow().find((q) => q.slot === a.c);
         const box = document.createElement("div"); box.className = "atk"; box.innerHTML = "<b>⚔</b><span></span>";
@@ -3065,7 +3082,7 @@
           const f = data.from; if (f !== i) { [bar[f], bar[i]] = [bar[i], bar[f]]; }
           dragSlot = -1; saveBar(); return;
         }
-        if (data && (data.k === "atk" || data.k === "spell")) { bar[i] = data.k === "spell" ? { ...data, for: "auto" } : data; saveBar(); return; }
+        if (data && (data.k === "atk" || data.k === "spell" || data.k === "rest")) { bar[i] = data.k === "spell" ? { ...data, for: "auto" } : data; saveBar(); return; }
         const t = typeAtLoc(dragFrom); dragFrom = -1;
         if (t >= 0) { bar[i] = { k: "item", t, for: "auto", mode: "hand" }; saveBar(); }
       });
@@ -3148,6 +3165,7 @@
       const a = bar[i];
       if (!a) { flash(i, false, "Case vide"); return; }
       if (a.k === "atk") { LoLKeys.pressGame("AT" + (a.c + 1)); flash(i, true); return; }
+      if (a.k === "rest") { LoLKeys.pressGame("RST"); flash(i, true); return; }
       if (a.k === "spell") {
         if (busyUse) return;
         busyUse = true;

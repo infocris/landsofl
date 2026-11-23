@@ -36,7 +36,8 @@
   ].filter((a) => !(a.scumm && !SCUMM) && !(a.dosbox && SCUMM));
   // touches fixes du jeu sous ScummVM (keymap de scummvm.ini, tools/scummvm_web.py)
   const FIXED = { MVF: ["ArrowUp", 38], MVB: ["ArrowDown", 40], TL: ["Home", 36], TR: ["PageUp", 33],
-    SLL: ["ArrowLeft", 37], SLR: ["ArrowRight", 39], AT1: ["F1", 112], AT2: ["F2", 113], AT3: ["F3", 114] };
+    SLL: ["ArrowLeft", 37], SLR: ["ArrowRight", 39], AT1: ["F1", 112], AT2: ["F2", 113], AT3: ["F3", 114],
+    RST: ["r", 82, "KeyR"] };                    // repos du groupe (action RST du keymap, touche r par défaut)
   const FIXED_LABEL = { MVF: "↑", MVB: "↓", TL: SCUMM ? "Origine" : "pavé 4", TR: SCUMM ? "Page↑" : "pavé 6",
     SLL: SCUMM ? "←" : "pavé 7", SLR: SCUMM ? "→" : "pavé 9", AT1: "F1", AT2: "F2", AT3: "F3" };
   const STORE = "lol-keys";
@@ -94,7 +95,7 @@
     let win; try { win = f && f.contentWindow; } catch (e) { return; }
     if (!win || !k) return;
     for (const type of ["keydown", "keyup"]) {
-      const ev = new win.KeyboardEvent(type, { key: k[0], code: k[0], keyCode: k[1], which: k[1], bubbles: true, cancelable: true });
+      const ev = new win.KeyboardEvent(type, { key: k[0], code: k[2] || k[0], keyCode: k[1], which: k[1], bubbles: true, cancelable: true });
       ev.lolMapped = true;
       (win.document.body || win.document).dispatchEvent(ev);
     }
