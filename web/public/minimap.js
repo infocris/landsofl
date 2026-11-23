@@ -2617,8 +2617,26 @@
       font: 12px/1.2 system-ui, sans-serif; color: #e8dcc0; user-select: none; touch-action: none; cursor: grab; }
     #party-float[hidden] { display: none; }
     #party-float.drag { cursor: grabbing; }
-    #party-float .pm { display: grid; grid-template-columns: 52px 128px; gap: 0 7px; align-items: center; padding: 4px 6px 4px 4px;
+    #party-float .pm { display: grid; grid-template-columns: 52px 128px 26px; gap: 0 7px; align-items: center; padding: 4px 6px 4px 4px;
       background: rgba(12, 10, 7, .78); border: 1px solid #6d5a3a; border-radius: 7px; box-shadow: 0 2px 10px rgba(0,0,0,.6); }
+    #party-float .pa { grid-column: 3; grid-row: 1 / span 3; display: flex; flex-direction: column; gap: 4px; }
+    #party-float .pa button { width: 26px; height: 24px; padding: 0; border: 1px solid #6d5a3a; border-radius: 4px; background: #241c12;
+      color: #f0d070; font-size: 14px; line-height: 1; cursor: pointer; }
+    #party-float .pa button:hover { border-color: #c9a227; }
+    #party-float .pa button.busy { filter: grayscale(1) brightness(.5); cursor: default; }
+    #party-float .pa button.on { background: #5a4520; border-color: #f0d070; }
+    #spell-pop { position: fixed; z-index: 1003; padding: 6px; border: 1px solid #6d5a3a; border-radius: 7px; background: rgba(12,10,7,.95);
+      font: 12px/1.2 system-ui, sans-serif; color: #e8dcc0; box-shadow: 0 4px 14px rgba(0,0,0,.6); zoom: var(--ui-z, 1); min-width: 150px; }
+    #spell-pop[hidden] { display: none; }
+    #spell-pop .sh { color: #a39578; margin-bottom: 4px; }
+    #spell-pop .types, #spell-pop .lv { display: flex; flex-wrap: wrap; gap: 4px; }
+    #spell-pop .lv { margin-top: 6px; }
+    #spell-pop button { font: inherit; padding: 3px 7px; border: 1px solid #555; border-radius: 4px; background: #1b1610; color: #e8dcc0; cursor: pointer; }
+    #spell-pop button.on { border-color: #c9a227; color: #f0d070; }
+    #spell-pop button:disabled { opacity: .35; cursor: default; }
+    #spell-pop button small { color: #8fb0ff; margin-left: 3px; }
+    #spell-pop .msg { margin-top: 4px; color: #ffb4a0; }
+    #spell-pop .msg:empty { display: none; }
     #party-float .pf { grid-row: span 3; width: 48px; height: 48px; border: 2px solid #3a3226; border-radius: 5px;
       background-image: url("viewer/data/faces.png?v=20261123a"); background-size: ${28 * 48}px ${9 * 48}px;
       image-rendering: pixelated; cursor: pointer; }
@@ -2667,9 +2685,84 @@
       if (!drag) return;
       const d = drag; drag = null; pf.classList.remove("drag");
       if (d.moved) { try { localStorage.setItem("partyFloatPos", JSON.stringify(pos)); } catch (e) {} }
+      else if (d.target.closest(".pa .atk")) attackFrom(+d.target.closest(".pm").dataset.slot);
+      else if (d.target.closest(".pa .book")) toggleSpells(+d.target.closest(".pm").dataset.slot);
       else if (d.target.closest(".pf") && typeof openStats === "function") openStats();
       const g = document.getElementById("dos"); if (g && g.focus) g.focus();
     });
+    // Boutons à droite de chaque portrait (ScummVM) : ⚔ attaque (touche F1-F3 du jeu ; personnage 4 :
+    // pas de touche, rien), 📖 livre de sorts : bascule une petite fenêtre à côté du portrait, choix du
+    // sort puis du niveau (coût en magie ; grisé si le personnage ne peut pas le payer), lancé par la
+    // commande « cast » (Soin 1-3 : sur le plus blessé). Grisés tant que le personnage ne peut pas agir.
+    let spellFor = null, spellType = null, floatParty = [], spellMsg = "";
+    const pop = document.createElement("div"); pop.id = "spell-pop"; pop.hidden = true;
+    document.body.appendChild(pop);
+    function attackFrom(slot) {
+      const c = floatParty.find((p) => p.slot === slot);
+      if (!c || c.busy || slot > 2 || !window.LoLKeys) return;
+      LoLKeys.pressGame("AT" + (slot + 1));
+    }
+    function toggleSpells(slot) {
+      spellFor = spellFor === slot ? null : slot; spellType = null; spellMsg = "";
+      lastFloat = "";                                   // bouton enfoncé redessiné
+      updateFloat().catch(() => {});
+      renderSpellPop();
+    }
+    function renderSpellPop() {
+      const c = floatParty.find((p) => p.slot === spellFor);
+      const card = pf.querySelector(`.pm[data-slot="${spellFor}"]`);
+      if (spellFor === null || !c || !card || pf.hidden) { pop.hidden = true; pop.dataset.key = ""; return; }
+      const spells = knownSpells || [];
+      if (spellType !== null && !spells.some((q) => q.type === spellType)) spellType = null;
+      // contenu inchangé : seulement replacé (le redessiner entre l'appui et le relâchement perdrait le clic)
+      const key = JSON.stringify([spellFor, spellType, c.mp, c.hp, c.busy, spells.map((q) => [q.type, q.name, q.mp, q.hp]), spellMsg]);
+      if (key === pop.dataset.key && !pop.hidden) { placePop(card); return; }
+      pop.dataset.key = key;
+      pop.innerHTML = "";
+      const h = document.createElement("div"); h.className = "sh"; h.textContent = spells.length ? `${c.name} : sort à lancer` : "Aucun sort connu";
+      const types = document.createElement("div"); types.className = "types";
+      for (const sp of spells) {
+        const b = document.createElement("button"); b.type = "button"; b.textContent = sp.name || `sort ${sp.type}`;
+        if (sp.type === spellType) b.className = "on";
+        b.addEventListener("click", () => { spellType = sp.type === spellType ? null : sp.type; spellMsg = ""; renderSpellPop(); });
+        types.appendChild(b);
+      }
+      pop.append(h, types);
+      const sp = spells.find((q) => q.type === spellType);
+      if (sp) {
+        const lv = document.createElement("div"); lv.className = "lv";
+        for (let l = 0; l < 4; l++) {
+          const b = document.createElement("button"); b.type = "button";
+          b.innerHTML = `Niv. ${l + 1}<small>${sp.mp[l]}</small>`;
+          const ok = !c.busy && sp.mp[l] <= c.mp && sp.hp[l] < c.hp;
+          b.disabled = !ok;
+          b.title = `${sp.name} niveau ${l + 1} : ${sp.mp[l]} points de magie${sp.hp[l] ? `, ${sp.hp[l]} points de vie` : ""}` + (sp.type === 1 ? (l < 3 ? " — soigne le plus blessé" : " — soigne tout le groupe") : "");
+          b.addEventListener("click", () => castFrom(c.slot, sp, l));
+          lv.appendChild(b);
+        }
+        pop.appendChild(lv);
+      }
+      const m = document.createElement("div"); m.className = "msg"; m.textContent = spellMsg; pop.appendChild(m);
+      pop.hidden = false;
+      placePop(card);
+    }
+    function placePop(card) {
+      const r = card.getBoundingClientRect(), z = UZ();
+      pop.style.left = Math.min(innerWidth - pop.offsetWidth * z - 4, r.right + 6) / z + "px";
+      pop.style.top = Math.max(4, Math.min(innerHeight - pop.offsetHeight * z - 4, r.top)) / z + "px";
+    }
+    async function castFrom(slot, sp, l) {
+      let target = -1;
+      if (sp.type === 1 && l < 3) {                     // Soin 1-3 : le plus blessé du groupe
+        let q = 2;
+        for (const p of floatParty) if (!p.ko && p.hpMax && p.hp / p.hpMax < q) { q = p.hp / p.hpMax; target = p.slot; }
+      }
+      spellMsg = "…"; renderSpellPop();
+      const r = await mem.cmd({ op: "cast", a: slot, b: sp.type | l << 8 | (target + 1) << 12 }, 20000);
+      spellMsg = !r ? "Le jeu ne répond pas." : r.code ? ({ 1: "Impossible maintenant.", 4: "Pas assez de magie.", 5: "Le sort ne peut pas partir d'ici." }[r.code] || `Refusé (${r.code}).`) : "";
+      if (!r || !r.code) { spellFor = null; lastFloat = ""; pop.hidden = true; updateFloat().catch(() => {}); return; }
+      renderSpellPop();
+    }
     // clic droit sur un portrait avec un objet en main : utilisé sur ce personnage, comme dans le jeu
     pf.addEventListener("contextmenu", async (e) => {
       const m = e.target.closest(".pm"); if (!m) return;
@@ -2703,7 +2796,8 @@
           let f = cur < 7 && temp ? temp : temp === 0 && cur > 1 && cur < 7 ? 0 : cur;
           if (flags & 0x1108 && f < 7) f = 1;
           if (hp <= hpMax >> 1) f += 14;
-          return { slot: c.slot, name: c.name, id, f: Math.max(0, Math.min(27, f)), hp, hpMax, mp, mpMax, ko: !!(flags & 8) || hp <= 0 };
+          return { slot: c.slot, name: c.name, id, f: Math.max(0, Math.min(27, f)), hp, hpMax, mp, mpMax, ko: !!(flags & 8) || hp <= 0,
+            busy: !!(flags & 0x314C) || hp <= 0 };
         });
         const key = JSON.stringify(list);
         if (key === lastFloat) return;
@@ -2715,7 +2809,11 @@
         };
         pf.innerHTML = list.map((c) => `<div class="pm${c.ko ? " ko" : ""}" data-slot="${c.slot}">
           <div class="pf" style="background-position:-${c.f * 48}px -${(Math.min(9, Math.max(1, c.id)) - 1) * 48}px"></div>
-          <div class="pn"></div>${bar("hp", c.hp, c.hpMax)}${c.mpMax > 0 ? bar("mp", c.mp, c.mpMax) : "<div></div>"}</div>`).join("");
+          <div class="pn"></div>${bar("hp", c.hp, c.hpMax)}${c.mpMax > 0 ? bar("mp", c.mp, c.mpMax) : "<div></div>"}
+          ${window.LOL_ENGINE === "scummvm" ? `<div class="pa"><button type="button" class="atk${c.busy ? " busy" : ""}" title="Attaque (arme en main)">⚔</button>
+          <button type="button" class="book${spellFor === c.slot ? " on" : ""}${c.busy ? " busy" : ""}" title="Livre de sorts">📖</button></div>` : ""}</div>`).join("");
+        floatParty = list;
+        if (spellFor !== null) renderSpellPop();
         pf.querySelectorAll(".pn").forEach((el, i) => { el.textContent = list[i].name; });
         pf.hidden = !on || !list.length;
         if (pf.childElementCount !== count) place();
