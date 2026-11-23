@@ -1208,6 +1208,90 @@ def cave_ceiling(bg):
     return img
 
 
+# Plafond du marécage (SWAMP, niveau 11) d'après le fond d'origine (docs/reverse-engineering.md
+# § 9.3f) : une voûte de feuillage dense (feuilles et lianes vert sombre, quelques branches
+# rouge-brun) qui se fond dans une brume grise. Redessiné en canopée vue de dessous, pixel art
+# aux teintes du fond : deux couches de feuilles allongées orientées au hasard, branches
+# sinueuses dessous, brume dans les trouées. Texture sur CAVE_SPAN × CAVE_SPAN cases (ceilSpan).
+CEIL_CANOPY = {"SWAMP"}
+
+
+def canopy_ramps(bg, rows=40):
+    """(feuilles, écorce, brume) du plafond peint, chacune du plus sombre au plus clair.
+    Feuilles : g − b ≥ 10 ; écorce : r − g ≥ 10 ; brume : le reste ; noir exclu."""
+    from collections import Counter
+    cnt = Counter(tuple(bg.px[(y * bg.w + x) * 4:(y * bg.w + x) * 4 + 3])
+                  for y in range(rows) for x in range(bg.w))
+    cols = [c for c, n in cnt.items() if n > 10 and sum(c) > 0]
+    leaf = sorted((c for c in cols if c[1] - c[2] >= 10 and c[0] - c[1] < 10), key=sum)
+    bark = sorted((c for c in cols if c[0] - c[1] >= 10), key=sum)
+    mist = sorted((c for c in cols if c not in leaf and c not in bark), key=sum)
+    return leaf, bark, mist
+
+
+def canopy_ceiling(bg):
+    """Canopée vue de dessous (CAVE_SPAN cases de côté) : feuilles, branches, brume."""
+    leaf, bark, mist = canopy_ramps(bg)
+    if len(leaf) < 4 or not bark or not mist:
+        return None
+    h, noise, pick, size = _cave_tools(0x7137449B)
+    leaves = []                                      # (couche, pas, germes)
+    for layer, n in ((0, 7 * CAVE_SPAN), (1, 10 * CAVE_SPAN)):
+        step = size / n
+        g = [[None] * n for _ in range(n)]
+        for j in range(n):
+            for i in range(n):
+                cx = (i + h(20 + layer, i, j)) * step
+                cy = (j + h(22 + layer, i, j)) * step
+                a = h(24 + layer, i, j) * math.pi
+                ln = step * (0.75 + 0.5 * h(26 + layer, i, j))
+                g[j][i] = (cx, cy, math.cos(a), math.sin(a), ln, ln * 0.32, h(28 + layer, i, j))
+        leaves.append((layer, step, n, g))
+    # branches : courbes sinueuses périodiques, horizontales et verticales
+    branches = [(o, h(30, k) * size, 4 + 10 * h(31, k), 1 + int(2 * h(32, k)), h(33, k) * 6.283, 1.6 + 1.2 * h(34, k))
+                for k, o in enumerate((0, 0, 1, 1, 0))]
+    img = Image(size, size)
+    for y in range(size):
+        for x in range(size):
+            # fond : sombre, brume dans les trouées
+            m = noise(x, y, 32, 40) * 0.7 + noise(x, y, 8, 41) * 0.3
+            if m > 0.6:
+                c = pick(mist, 0.3 + 1.5 * (m - 0.6) + 0.15 * (h(42, x // 2, y // 2) - 0.5))
+            else:
+                c = leaf[0] if h(43, x // 2, y // 3) < 0.7 else leaf[min(1, len(leaf) - 1)]
+            for o, base, amp, freq, ph, wid in branches:
+                u, v = (x, y) if o == 0 else (y, x)
+                cy = base + amp * math.sin(u / size * 6.283 * freq + ph)
+                dv = abs((v - cy + size / 2) % size - size / 2)
+                if dv < wid:
+                    c = pick(bark, 0.75 - 0.6 * dv / wid)
+            # feuilles : la couche du dessus l'emporte
+            for layer, step, n, g in leaves:
+                gi, gj = int(x / step), int(y / step)
+                hit = None
+                for dj in (-1, 0, 1):
+                    for di in (-1, 0, 1):
+                        i, j = gi + di, gj + dj
+                        cx, cy, ca, sa, ln, wd, tone = g[j % n][i % n]
+                        cx += (i // n) * size; cy += (j // n) * size
+                        dx, dy = x + 0.5 - cx, y + 0.5 - cy
+                        u = dx * ca + dy * sa                 # le long de la feuille
+                        v = -dx * sa + dy * ca                # en travers
+                        r = (u / ln) ** 2 + (v / (wd * (1 - 0.6 * abs(u) / ln))) ** 2 if abs(u) < ln else 9
+                        if r < 1 and (hit is None or tone > hit[0]):
+                            hit = (tone, r, v)
+                if hit:
+                    tone, r, v = hit
+                    t = 0.35 + 0.45 * tone + 0.2 * layer
+                    if abs(v) < 0.6:
+                        t += 0.15                       # nervure claire
+                    elif r > 0.6:
+                        t -= 0.25                       # bord ombré
+                    c = pick(leaf, t)
+            img.put(x, y, bytes(c))
+    return img
+
+
 def floor_cell(motif, repeated):
     """Texture d'une case : le motif répété (3 × 3 motifs ≈ 3,1 unités) pour un sol pavé ;
     pour un sol peint, la demi-case proche en damier 1 2 / 2 1, 2 étant 1 en miroir (le
@@ -1762,6 +1846,10 @@ def main(game_dir, maps_dir, out_dir):
         flags = flagstone_floor(bg) if tsname in FLOOR_FLAGSTONES else None
         floor_span = FLAG_SPAN if flags is not None else 1
         ceil_span = 1
+        if tsname in CEIL_CANOPY:
+            cc = canopy_ceiling(bg)
+            if cc is not None:
+                ceil_img, ceil_span = cc, CAVE_SPAN
         if tsname in CAVE_TILESETS:
             cf, cc = cave_floor(bg), cave_ceiling(bg)
             if cf is not None:

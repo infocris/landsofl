@@ -956,6 +956,21 @@ structure. CIMMERIA's ceiling is black.
   coming from the far end of the view: north face 1.0, east/west 0.72, south 0.42. The
   shading is left-right symmetric, so it survives the mirror applied every other cell, and
   the texture turns with the gaze like the folded one. TOWER1 and URBISH keep the fold.
+- **Swamp canopy (SWAMP, level 11, 2026-11-24)**: the painted ceiling (rows 0–16) is a dense
+  vault of foliage: dark green leaves and vines with a few red-brown branches. It fades into
+  a grey-green haze (rows 18–40, mostly (56,56,52)). The former texture was the near band
+  rectified, which gave converging green streaks. The colours fall into three families:
+  - leaves, `g − b ≥ 10`: 15 tones, (16,16,4) to (69,73,28);
+  - bark, `r − g ≥ 10`: 3 tones, (28,12,12) to (69,36,28);
+  - haze: (52,52,48) and (56,56,52).
+
+  `canopy_ceiling` redraws a canopy seen from below in pixel art:
+  - two layers of elongated leaves (7 × 7 and 10 × 10 per cell), each with a random
+    orientation and length, a light midrib and a shaded edge; the upper layer is lighter;
+  - five sinuous periodic branches below the leaves;
+  - a dark background, with haze in the gaps (smoothed noise).
+
+  The texture covers 2 × 2 cells (`ceilSpan: 2`), without rotation, as in the caves.
 - **Gladstone beams (KEEP, level 1, 2026-11-24)**: the isometric coffer is replaced by a
   redraw of the original ceiling. The painted ceiling (rows 0–33) shows beige beams on the
   cell edges. The near crossbeam (rows 0–3) has a flat light underside with a thin inner
@@ -2544,6 +2559,7 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: Roland's manor floor (MANOR) redrawn in pixel art: irregular flagstones from a periodic Voronoi diagram, 12-colour ramp of the painted floor, texture over 2 × 2 cells (`floorSpan`) (§ 9.3c).
 - **2026-11-24**: cave floor and ceiling (CAVE1, levels 5–9 and 25) redrawn in pixel art on a periodic Voronoi diagram: domed rock blocks with moss in the joints, ceiling bumps under moss and roots; moss/rock split by saturation, so level 25's palette works too; `ceilSpan` in the 3D view (§ 9.3c).
 - **2026-11-24**: Gladstone's ceiling (KEEP) redrawn from the original background in pixel art: framed beige beams with a beaded moulding, angled faces, shadow line, dark recess; the isometric coffer is no longer used (§ 9.3f).
+- **2026-11-24**: swamp ceiling (SWAMP, level 11) redrawn as a pixel-art canopy: two layers of leaves, red-brown branches, haze in the gaps (§ 9.3f). The viewer page now loads `viewer.js` with a new version: the old one stayed cached and hid the `viewer.js` changes since 2026-11-23.
 - **2026-11-23**: mine ceiling (MINE1, levels 13–16) redrawn from the original background in pixel art: round logs on the cell edges, lagging boards, rock where boards are missing (§ 9.3f).
 - **2026-11-22**: switches in the 3D view: door buttons attached by the level script (`assignLevelDecorationShape` + `resetBlockShapeAssignment`) now drawn; walls' switch type and clickable area exported; engine command op 20 (`clickwall`) clicks the wall in front like the game (`clickedWall`); the 3D view outlines the switch in front and clicks it; engine files versioned in URLs and served `no-cache` (§ 9.6).
 - **2026-11-22**: doors of the script-opened series (walls 8–12, 18–22: shape 0, e.g. Gladstone's locked library door) now drawn closed with their leaf; they looked open in the 3D view (§ 9.6).
