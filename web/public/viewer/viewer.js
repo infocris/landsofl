@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261124g";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261124l";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -902,6 +902,7 @@
 
   function castFloorCeiling(dirX, dirY, planeX, planeY) {
     const F = L.floorTex, C = L.ceilTex, mirF = L.floorMirror !== false, cTex = ceilTexel(player.a);
+    const span = L.floorSpan || 1;                         // texture du sol sur span × span cases
     const lx = dirX - planeX, ly = dirY - planeY;          // rayon de gauche
     const stepX = (2 * planeX) / W, stepY = (2 * planeY) / W;
     const hz = H / 2 + pitch;                              // ligne d'horizon (décalée en vue libre)
@@ -919,7 +920,9 @@
       for (let x = 0; x < W; x++, wx += dx, wy += dyw) {
         const cx = Math.floor(wx), cy = Math.floor(wy);
         if (dy < 0) { frame32[fRow + x] = shade(C.px[cTex(wx - cx, wy - cy, (cx + cy) & 1)], k); continue; }
-        let tx = ((wx - cx) * tw) | 0, ty = ((wy - cy) * th) | 0;
+        let tx, ty;
+        if (span > 1) { const sx = wx / span, sy = wy / span; tx = ((sx - Math.floor(sx)) * tw) | 0; ty = ((sy - Math.floor(sy)) * th) | 0; }
+        else { tx = ((wx - cx) * tw) | 0; ty = ((wy - cy) * th) | 0; }
         if (mir && (cx + cy) & 1) tx = tw - 1 - tx;
         frame32[fRow + x] = shade(L.wangTex ? wangPx(wx, wy) : T.px[ty * tw + tx], k);
       }
@@ -944,6 +947,7 @@
     // x − 88 = 0,75 · X · (y − hx), 3,1 unités par case ; décalage c0 choisi pour que le bord de la
     // case suivante (z = 0,5) tombe au pied du mur proche de la vue 3D.
     const F = L.floorTex, mirF = L.floorMirror !== false, cTex = L.outdoor ? null : ceilTexel(player.a);
+    const span = L.floorSpan || 1;                         // texture du sol sur span × span cases
     const G = GAME_FLOOR, gs = 120 / H, xs = 176 / W;
     const c0 = G.ak / ((half + (WALL_H / 2) * proj / 0.5) * gs - G.hk) / G.upc - 0.5;
     for (let y = Math.floor(half) + 1; y < H; y++) {
@@ -956,6 +960,7 @@
         const u = x + 0.5 - W / 2;
         let lat = u * lf, wx = player.x + fx * zf + rx * lat, wy = player.y + fy * zf + ry * lat;
         let cx = Math.floor(wx), cy = Math.floor(wy), odd = (cx + cy) & 1, fu = wx - cx, fv = wy - cy;
+        if (span > 1) { fu = wx / span - Math.floor(wx / span); fv = wy / span - Math.floor(wy / span); }
         let tx = (fu * F.w) | 0;
         if (mirF && odd) tx = F.w - 1 - tx;
         frame32[fRow + x] = shade(L.wangTex ? wangPx(wx, wy) : F.px[((fv * F.h) | 0) * F.w + tx], kf);

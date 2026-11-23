@@ -488,6 +488,7 @@ CEIL_ISO_STEPS = (               # (largeur en fraction de case, nature) depuis 
     (0.045, "bevel"),            # second gradin, plus court
 )
 CEIL_ISO_LIGHT = (1.0, 0.72, 0.42, 0.72)          # faces nord, est, sud, ouest
+CEIL_ISO_DARK = 0.45             # luminance maximale du retrait, en fraction des gradins
 
 
 def ceiling_palette(img):
@@ -497,7 +498,10 @@ def ceiling_palette(img):
     def mean(a, b):
         part = [c for _, c in cols[int(a * len(cols)):max(int(a * len(cols)) + 1, int(b * len(cols)))]]
         return tuple(sum(c[i] for c in part) / len(part) for i in range(3))
-    return mean(0.88, 0.98), mean(0.3, 0.5), mean(0.05, 0.3)
+    bright, mid, dark = mean(0.88, 0.98), mean(0.3, 0.5), mean(0.05, 0.3)
+    # plafond peu contrasté (MANOR) : le retrait doit rester nettement plus sombre que les gradins
+    k = min(1.0, CEIL_ISO_DARK * sum(mid) / max(1.0, sum(dark)))
+    return bright, mid, tuple(v * k for v in dark)
 
 
 def iso_ceiling_cell(folded, size=CEIL_TEX):
@@ -549,6 +553,182 @@ def iso_ceiling_cell(folded, size=CEIL_TEX):
                     plank *= 0.8                 # joint entre planches
                 c = tuple(v * ao * plank for v in dark)
             img.put(x, y, bytes(max(0, min(255, round(v))) for v in c))
+    return img
+
+
+# Plafond de la mine d'après le fond d'origine (docs/reverse-engineering.md § 9.3f) : une
+# charpente de rondins sur les bords des cases (transversaux et longitudinaux, ces derniers
+# fuyant en diagonale à l'écran), et entre eux des planches de coffrage posées dans le sens du
+# couloir, avec de la roche grise là où elles manquent. Pixel art : seulement les teintes du
+# plafond peint (rampe bois, rampe roche), sans anti-crénelage.
+CEIL_MINE = {"MINE1"}
+MINE_LOG = 0.12                  # demi-largeur d'un rondin (fraction de case), centré sur le bord
+MINE_BOARD = 11                  # largeur d'une planche de coffrage (pixels de texture)
+
+
+def ceiling_ramps(bg, rows=32):
+    """Teintes du plafond peint (lignes 0 à rows) : (bois, roche), chacune du plus sombre au
+    plus clair. Bois : teintes nettement colorées (écart max − min ≥ 25), roche : les autres."""
+    from collections import Counter
+    cnt = Counter(tuple(bg.px[(y * bg.w + x) * 4:(y * bg.w + x) * 4 + 3])
+                  for y in range(rows) for x in range(bg.w))
+    cols = [c for c, n in cnt.items() if n > 15 and sum(c) > 0]
+    wood = sorted((c for c in cols if max(c) - min(c) >= 25), key=sum)
+    rock = sorted((c for c in cols if max(c) - min(c) < 25), key=sum)
+    return wood, rock
+
+
+def mine_ceiling_cell(bg, size=CEIL_TEX):
+    """Plafond de mine (size × size, rangée 0 = nord) : rondins sur les bords, coffrage, roche."""
+    wood, rock = ceiling_ramps(bg)
+    if len(wood) < 5 or len(rock) < 3:
+        return None
+    shadow = min(wood + rock, key=sum)
+    def h(*a):
+        x = 0x6A09E667
+        for v in a:
+            x = ((x ^ (v & 0xFFFFFFFF)) * 0x85EBCA6B) & 0xFFFFFFFF
+            x ^= x >> 13
+        return x / 2 ** 32
+    pick = lambda ramp, t: ramp[max(0, min(len(ramp) - 1, int(t * len(ramp))))]
+    def noise(x, y, cell, seed):                     # bruit de valeur lissé, périodique sur la case
+        n = size // cell
+        gx, gy = x / cell, y / cell
+        x0, y0 = int(gx), int(gy)
+        fx, fy = gx - x0, gy - y0
+        fx, fy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+        v = lambda i, j: h(seed, i % n, j % n)
+        a = v(x0, y0) + (v(x0 + 1, y0) - v(x0, y0)) * fx
+        b = v(x0, y0 + 1) + (v(x0 + 1, y0 + 1) - v(x0, y0 + 1)) * fx
+        return a + (b - a) * fy
+    lw = MINE_LOG * size
+    img = Image(size, size)
+    for y in range(size):
+        for x in range(size):
+            dn, ds, dw, de = y + 0.5, size - y - 0.5, x + 0.5, size - x - 0.5
+            mh, mv = min(dn, ds), min(dw, de)      # distances aux bords nord/sud et ouest/est
+            # rondin transversal (bords nord et sud) par-dessus le longitudinal (ouest et est)
+            if mh < lw or mv < lw:
+                cross = mh < lw
+                m = mh if cross else mv
+                along = x if cross else y
+                r = m / lw                           # 0 au centre du rondin, 1 au bord
+                # profil cylindrique, symétrique autour du bord de case (raccord avec la case
+                # voisine, même en miroir) ; le transversal, plus bas, est un peu plus clair
+                t = (1 - r * r) ** 0.5 * (0.95 if cross else 0.8)
+                # écorce : stries le long du rondin, fentes sombres, nœuds
+                t += 0.16 * (h(cross, int(m * 1.5), along // 9) - 0.5)
+                if h(cross, int(m), along // 3) < 0.07:
+                    t -= 0.3
+                if r > 0.86:
+                    t = min(t, 0.18)                  # arête du rondin
+                c = pick(wood, t)
+            elif mh < lw + 2 or mv < lw + 2:
+                c = shadow                           # ombre au pied des rondins
+            else:
+                # coffrage : planches nord-sud entre les rondins, roche où une planche manque
+                bx = x - int(lw + 2)
+                k, j = bx // MINE_BOARD, bx % MINE_BOARD
+                gone = h(7, k) < 0.4                 # planche absente
+                start = int(h(8, k) * size)          # ou cassée sur une partie de sa longueur
+                broken = h(9, k) < 0.35 and abs(y - start) < size * 0.18
+                near = min(mh, mv) - lw - 2          # distance aux rondins : ombre
+                ao = min(1.0, 0.45 + near / 14)
+                if gone or broken:
+                    # roche : blocs arrondis (bruit lissé à deux échelles), fissures sombres
+                    # entre eux, plus sombre près des rondins
+                    n1 = noise(x, y, 12, 10)
+                    t = (0.15 + 0.75 * (0.65 * n1 + 0.35 * noise(x, y, 4, 11))) * ao
+                    if abs(n1 - 0.5) < 0.035:
+                        t = 0.0                      # fissure
+                    c = pick(rock, t)
+                elif j == 0 or j == MINE_BOARD - 1:
+                    c = shadow if j == 0 else pick(wood, 0.15)   # joint, rive sombre
+                else:
+                    t = (0.28 + 0.3 * h(13, k)) * ao + 0.12 * (h(14, k, y // 6, j // 3) - 0.5)
+                    if h(15, k, y // 2) < 0.04:
+                        t = 0.05                     # fente du bois
+                    c = pick(wood, t)
+            img.put(x, y, bytes(c))
+    return img
+
+
+# Plafond du manoir de Roland d'après le fond d'origine (docs/reverse-engineering.md § 9.3f) :
+# poutres équarries sur les bords des cases, dessous plat et clair encadré d'un liseré, faces
+# latérales rouge-brun vues en biais (onglets à 45°, éclairées selon leur orientation comme le
+# caisson isométrique), puis un panneau en retrait brun-olive fait de planches transversales.
+# Pixel art : seulement les teintes du plafond peint (bois rouge, panneau olive).
+CEIL_MANOR = {"MANOR"}
+MANOR_BEAM = 0.10                # demi-largeur du dessous de poutre (fraction de case)
+MANOR_FACE = 0.07                # largeur de la face latérale vue en biais
+MANOR_PLANK = 12                 # largeur d'une planche du panneau (pixels de texture)
+
+
+def manor_ramps(bg, rows=34):
+    """Teintes du plafond peint du manoir : (bois rouge, panneau olive), du plus sombre au plus
+    clair. Olive : r − g < 24 et g − b ≥ 8 ; rouge : les autres ; noir exclu."""
+    from collections import Counter
+    cnt = Counter(tuple(bg.px[(y * bg.w + x) * 4:(y * bg.w + x) * 4 + 3])
+                  for y in range(rows) for x in range(bg.w))
+    cols = [c for c, n in cnt.items() if n > 10 and sum(c) > 0]
+    is_olive = lambda c: c[0] - c[1] < 24 and c[1] - c[2] >= 8
+    red = sorted((c for c in cols if not is_olive(c)), key=sum)
+    olive = sorted((c for c in cols if is_olive(c)), key=sum)
+    return red, olive
+
+
+def manor_ceiling_cell(bg, size=CEIL_TEX):
+    """Plafond à poutres équarries et panneaux de planches (size × size, rangée 0 = nord)."""
+    red, olive = manor_ramps(bg)
+    if len(red) < 5 or len(olive) < 4:
+        return None
+    def h(*a):
+        x = 0x3C6EF372
+        for v in a:
+            x = ((x ^ (v & 0xFFFFFFFF)) * 0x85EBCA6B) & 0xFFFFFFFF
+            x ^= x >> 13
+        return x / 2 ** 32
+    pick = lambda ramp, t: ramp[max(0, min(len(ramp) - 1, int(t * len(ramp))))]
+    groove = min(red + olive, key=sum)
+    b0 = MANOR_BEAM * size
+    b1 = b0 + MANOR_FACE * size
+    img = Image(size, size)
+    for y in range(size):
+        for x in range(size):
+            d = (y + 0.5, size - x - 0.5, size - y - 0.5, x + 0.5)   # N, E, S, O
+            m = min(d)
+            side = d.index(m)
+            along = x if side in (0, 2) else y
+            if m < b0:
+                # dessous de la poutre : clair, veinage le long de la poutre, liseré au bord
+                if b0 - m < 1.5:
+                    c = red[-1]                       # liseré clair (arête chanfreinée)
+                else:
+                    t = 0.72 + 0.22 * (h(side & 1, int(m * 1.3), along // 8) - 0.5)
+                    if h(side & 1, int(m), along // 3) < 0.05:
+                        t -= 0.25                     # fente du bois
+                    c = pick(red, t)
+            elif m < b1:
+                # face latérale vue en biais : nord (tournée vers le joueur) claire, sud sombre
+                lit = CEIL_ISO_LIGHT[side]
+                t = 0.15 + 0.45 * lit + 0.1 * (h(side, int(m), along // 10) - 0.5)
+                c = pick(red, t)
+            elif m < b1 + 1.5:
+                c = groove                            # rainure entre poutre et panneau
+            else:
+                # panneau : planches transversales (est-ouest), plus sombres près des poutres
+                py = int(y - b1 - 1.5)
+                k, j = py // MANOR_PLANK, py % MANOR_PLANK
+                near = m - b1 - 1.5
+                ao = min(1.0, 0.7 + near / 16)
+                if j == 0:
+                    c = olive[1]                      # joint entre planches
+                else:
+                    t = (0.62 + 0.3 * h(20, k)) * ao + 0.16 * (h(21, k, x // 6, j // 4) - 0.5)
+                    if j in (4, 5) and h(22, k, x // 4) < 0.03:
+                        t = 0.3                       # nœud
+                    c = pick(olive, t)
+            img.put(x, y, bytes(c))
     return img
 
 
@@ -750,6 +930,82 @@ def pixel_floor_motif(bg, ref):
         for x in range(n):
             out.put(x, y, bytes(art[(y - a) % n][(x - b) % n]))
     return out
+
+
+# Dallage irrégulier du manoir de Roland, redessiné en pixel art (docs/reverse-engineering.md
+# § 9.3c). Le sol peint n'est qu'une rampe de 12 teintes beiges (de 16,12,4 à 227,203,186) :
+# dalles polygonales claires, joints fins sombres. Dalles = cellules d'un Voronoï périodique
+# (germes sur une grille tremblée), donc sans raccord ; une texture couvre FLAG_SPAN × FLAG_SPAN
+# cases pour que la répétition se voie moins (floorSpan dans le JSON du niveau).
+FLOOR_FLAGSTONES = {"MANOR"}
+FLAG_SPAN = 2                    # cases couvertes par la texture, de côté
+FLAG_PX = 128                    # pixels de texture par case
+FLAG_SITES = 5                   # dalles par case, de côté (≈ 0,6 unité, comme sur le fond)
+
+
+def floor_ramp(bg, y_min=60):
+    """Rampe du sol peint, du plus sombre au plus clair (teintes vues au moins 10 fois)."""
+    from collections import Counter
+    cnt = Counter(tuple(bg.px[(y * bg.w + x) * 4:(y * bg.w + x) * 4 + 3])
+                  for y in range(y_min, bg.h) for x in range(bg.w))
+    return sorted((c for c, n in cnt.items() if n > 10 and sum(c) > 0), key=sum)
+
+
+def flagstone_floor(bg):
+    """Dallage irrégulier (FLAG_SPAN cases de côté), pixel art aux teintes du fond."""
+    ramp = floor_ramp(bg)
+    if len(ramp) < 8:
+        return None
+    top = len(ramp) - 1
+    def h(*a):
+        x = 0x510E527F
+        for v in a:
+            x = ((x ^ (v & 0xFFFFFFFF)) * 0x85EBCA6B) & 0xFFFFFFFF
+            x ^= x >> 13
+        return x / 2 ** 32
+    n = FLAG_SITES * FLAG_SPAN                       # germes par côté de la texture
+    size = FLAG_PX * FLAG_SPAN
+    step = size / n
+    sites = [[((i + 0.5 + 0.7 * (h(1, i, j) - 0.5)) * step, (j + 0.5 + 0.7 * (h(2, i, j) - 0.5)) * step)
+              for i in range(n)] for j in range(n)]
+    img = Image(size, size)
+    for y in range(size):
+        for x in range(size):
+            gi, gj = int(x / step), int(y / step)
+            best = []
+            for dj in (-1, 0, 1):
+                for di in (-1, 0, 1):
+                    i, j = gi + di, gj + dj
+                    sx, sy = sites[j % n][i % n]
+                    sx += (i // n) * size            # germe d'une texture voisine (périodique)
+                    sy += (j // n) * size
+                    best.append(((sx - x - 0.5) ** 2 + (sy - y - 0.5) ** 2, i % n, j % n, sx, sy))
+            best.sort()
+            d1, i1, j1, sx1, sy1 = best[0]
+            d2, _, _, sx2, sy2 = best[1]
+            # distance au joint (médiatrice des deux germes les plus proches)
+            ex, ey = sx2 - sx1, sy2 - sy1
+            el = max(1e-6, (ex * ex + ey * ey) ** 0.5)
+            gap = (d2 - d1) / (2 * el)
+            if gap < 0.45:
+                idx = top - 7                         # cœur du joint
+            elif gap < 1.0:
+                idx = top - 5                         # bord du joint
+            else:
+                base = top - (h(3, i1, j1) < 0.45) - (h(4, i1, j1) < 0.15)   # teinte de la dalle
+                idx = base
+                if gap < 2.0:
+                    # biseau : arête claire si le joint est au nord-ouest, ombrée au sud-est
+                    idx = min(top, base + 1) if ex + ey < 0 else base - 2
+                r = h(5, i1, j1, x // 2, y // 2)
+                if r < 0.12:
+                    idx -= 1                          # grain de la pierre
+                elif r > 0.95:
+                    idx = min(top, idx + 1)
+                if h(6, i1, j1, x // 3, y // 3) < 0.012:
+                    idx = top - 5                     # trou, éclat
+            img.put(x, y, bytes(ramp[max(0, idx)]))
+    return img
 
 
 def floor_cell(motif, repeated):
@@ -1294,13 +1550,19 @@ def main(game_dir, maps_dir, out_dir):
         ceil_img = ceiling_cell(bg, tsname)
         if tsname in CEIL_ISO:
             ceil_img = iso_ceiling_cell(ceil_img)
+        elif tsname in CEIL_MINE:
+            ceil_img = mine_ceiling_cell(bg) or ceil_img
+        elif tsname in CEIL_MANOR:
+            ceil_img = manor_ceiling_cell(bg) or ceil_img
         motif, floor_repeated = floor_motif(bg, tsname)
         if tsname in FLOOR_PIXEL_ART:
             motif = pixel_floor_motif(bg, motif)
-        floor_cell(motif, floor_repeated).save(os.path.join(out_dir, f"level{n:02d}_floor.png"))
+        flags = flagstone_floor(bg) if tsname in FLOOR_FLAGSTONES else None
+        floor_span = FLAG_SPAN if flags is not None else 1
+        (flags or floor_cell(motif, floor_repeated)).save(os.path.join(out_dir, f"level{n:02d}_floor.png"))
         if floor_repeated:
             motif.save(os.path.join(out_dir, f"level{n:02d}_floor_motif.png"))
-        wang = None if floor_repeated else wang_tiles(bg)
+        wang = None if floor_repeated or flags is not None else wang_tiles(bg)
         if wang is not None:
             wang.save(os.path.join(out_dir, f"level{n:02d}_floor_wang.png"))
         ceil_img.save(os.path.join(out_dir, f"level{n:02d}_ceil.png"))
@@ -1450,7 +1712,9 @@ def main(game_dir, maps_dir, out_dir):
                       for it in level.get("items", [])],
             "start": {"x": sx_ + 0.5, "y": sy_ + 0.5, "dir": sa_},
             # sol pavé d'un motif (texture sans raccord) : pas de miroir une case sur deux
-            "floorMirror": not floor_repeated,
+            "floorMirror": not floor_repeated and flags is None,
+            # texture du sol couvrant floorSpan × floorSpan cases (dallage redessiné)
+            "floorSpan": floor_span,
             # sol peint : tuiles de Wang (levelNN_floor_wang.png), une tuile par demi-case
             "floorWang": {"tile": WANG_T, "perCell": 2} if wang is not None else None,
         }

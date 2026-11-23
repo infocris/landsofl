@@ -743,6 +743,20 @@ are paved with a visible repeating pattern: `KEEP` (level 1, octagons) and `TOWE
   sprites cover the reflections behind them. Monsters, items and door panels are not
   reflected.
 
+- **Flagstones (MANOR, 2026-11-23)**: Roland's manor floor is crazy paving: light beige
+  polygonal flagstones with thin dark-brown joints (1–2 px on screen near the bottom),
+  about 0.6 unit wide, darkening with distance. It uses a single ramp of 12 colours, from
+  (16,12,4) to (227,203,186). The Wang tiles (§ 9.3e) left blocks visible, so the floor is
+  redrawn (`flagstone_floor`, `FLOOR_FLAGSTONES`). The flagstones are the cells of a periodic
+  Voronoi diagram, with 5 × 5 jittered sites per cell, so the texture tiles without seams.
+  The texture covers **2 × 2 cells** (256 px, 128 px per cell): `floorSpan: 2` in the level
+  JSON, read by the 3D view in both perspectives. Mirroring and Wang tiles are off. Colours:
+  - joints: two tones, core and edge, under 1 texel on each side of the bisector;
+  - flagstones: the top three tones, one per stone;
+  - a 1-step bevel: lighter when the joint is to the north-west, two steps darker to the
+    south-east;
+  - grain in 2 × 2 blocks and a few chips.
+
 ### 9.3d Wall pieces and the forest's upper part — verified in ScummVM (2026-11-22)
 
 `KyraRpgEngine::drawVcnBlocks` (`scene_rpg.cpp`) builds the view, 22×15 tiles, from the
@@ -855,7 +869,8 @@ Two generators, depending on the floor (§ 9.3c):
     - random at each load with `?floorSeed=random`.
     Two tiles sharing an edge get the same color, hence the same joint.
   - **Result**: good on cobblestones (Yvel), rubble (Urbish), lava, grass and moss. On
-    the manor floor (MANOR), whose near band is less detailed, blocks remain visible.
+    the manor floor (MANOR), whose near band is less detailed, blocks remained visible: it is
+  now redrawn instead (§ 9.3c, flagstones).
   - `levelNN_floor.png` stays the one-cell texture (minimap, fallback).
 
 ### 9.3f Ceiling of the background: projection and coffers — measured (2026-11-22)
@@ -917,7 +932,39 @@ structure. CIMMERIA's ceiling is black.
   45° mitres, as on a coffer seen from below. Each face is lit by its orientation, the light
   coming from the far end of the view: north face 1.0, east/west 0.72, south 0.42. The
   shading is left-right symmetric, so it survives the mirror applied every other cell, and
-  the texture turns with the gaze like the folded one. Other beamed tilesets keep the fold.
+  the texture turns with the gaze like the folded one. TOWER1 and URBISH keep the fold.
+- **Manor beams (MANOR, level 4, 2026-11-23)**: Roland's manor first used the isometric coffer,
+  with the recess capped at 0.45 of the mid tone (`CEIL_ISO_DARK`, still in the code). It is now
+  redrawn from its own background. The painted ceiling (rows 0–33) shows **squared beams**
+  on the cell edges. Each has a flat, light underside framed by a lighter arris: rows 0–3
+  near, with chamfered ends where the longitudinal beams meet it. Its reddish side faces are
+  seen at an angle, and between the beams sits a recessed panel of another hue, olive brown
+  with a fine grain. Two ramps: red wood, 7 tones (28,12,12) to (142,97,69), and olive panel,
+  5 tones (16,12,4) to (85,65,48), split by `r − g < 24 and g − b ≥ 8`. `manor_ceiling_cell`
+  redraws one cell in pixel art:
+  - beam underside 0.10 cell on each side of the edge, grain along the beam, 1 px light arris.
+  - side face 0.07 cell, mitred at 45°, lit by orientation as for the coffer (north 1.0,
+    east/west 0.72, south 0.42).
+  - a 1 px dark groove.
+  - a panel of crosswise planks (12 px) with joints and a few knots, slightly darker near
+    the beams.
+- **Mine timbering (MINE1, levels 13–16, 2026-11-23)**: the four levels share one
+  background. Its ceiling is not a coffer: it shows **round logs** on the cell edges, the
+  crossbeams across the view and the longitudinal ones running diagonally on screen (at
+  X = ±0.5, `x = 88 ± 2 · (39 − y)`, e.g. x ≈ 26/150 at row 8 and 50/126 at row 20). Between
+  them, there is grey rock and longitudinal lagging boards (vertical strokes at rows 20–25).
+  The painted ceiling (rows 0–31) uses two ramps: wood, 6 tones (48,24,20) to (142,97,69), and
+  rock, 9 greyish tones (28,12,12) to (101,89,85). `mine_ceiling_cell` redraws one cell in
+  pixel art with these colours only:
+  - logs 0.12 cell on each side of the edge, with a cylindrical profile symmetric about the
+    edge, so they join across cells even mirrored. Bark streaks, dark cracks and a dark arris.
+    The crossbeam lies over the longitudinal log and is slightly lighter.
+  - a 2 px shadow at the foot of the logs.
+  - north-south lagging boards (11 px) with joints, darker near the logs. About 40 % of
+    the boards are missing and some are broken, showing rock: rounded blocks from two-scale
+    smoothed value noise, with dark cracks between the blocks.
+  The texture turns with the gaze, as for the other ceilings, so the boards always run along
+  the corridor and the crossbeams across it, as in the game.
 - **Use in the 3D view**: the game draws the same background whichever way the party
   faces, so the ceiling texture is turned to the cardinal direction nearest to the gaze,
   while staying aligned on the cells. Crossbeams therefore always run across the view, as
@@ -2455,6 +2502,10 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: Gladstone's ceiling (KEEP) generated as an isometric coffer in relief: beams, two mitred bevels lit by orientation, recessed planked panel, tones from the folded coffer (§ 9.3f).
 - **2026-11-23**: Gladstone's floor (KEEP) redrawn in pixel art with the 10 colours of the painted floor: checkerboard octagons, diamonds, 1 px rims, aligned on the folded motif (§ 9.3c).
 - **2026-11-23**: glossy Gladstone floor in the 3D view: planar reflection of the walls, faded over 0.45 wall height, `?gloss=N` (§ 9.3c).
+- **2026-11-23**: isometric coffered ceiling also in Roland's manor (MANOR), with a minimum contrast for the recess (§ 9.3f).
+- **2026-11-23**: Roland's manor ceiling (MANOR) redrawn from the original background in pixel art: squared beams with a light underside and angled side faces, recessed olive plank panels (§ 9.3f).
+- **2026-11-23**: Roland's manor floor (MANOR) redrawn in pixel art: irregular flagstones from a periodic Voronoi diagram, 12-colour ramp of the painted floor, texture over 2 × 2 cells (`floorSpan`) (§ 9.3c).
+- **2026-11-23**: mine ceiling (MINE1, levels 13–16) redrawn from the original background in pixel art: round logs on the cell edges, lagging boards, rock where boards are missing (§ 9.3f).
 - **2026-11-22**: switches in the 3D view: door buttons attached by the level script (`assignLevelDecorationShape` + `resetBlockShapeAssignment`) now drawn; walls' switch type and clickable area exported; engine command op 20 (`clickwall`) clicks the wall in front like the game (`clickedWall`); the 3D view outlines the switch in front and clicks it; engine files versioned in URLs and served `no-cache` (§ 9.6).
 - **2026-11-22**: doors of the script-opened series (walls 8–12, 18–22: shape 0, e.g. Gladstone's locked library door) now drawn closed with their leaf; they looked open in the 3D view (§ 9.6).
 - **2026-11-23**: objects in the party's own cell (dropped in front of it) drawn as the engine does, full size at the bottom of the view (`_monsterScaleY`/`_monsterScaleX` tables); the 3D view projected them below the image (§ 9.3h).
