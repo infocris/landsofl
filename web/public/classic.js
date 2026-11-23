@@ -24,8 +24,62 @@
   body.ui-classic #v3d-classic { display: block; }
   body.ui-classic #v3d-frame { position: absolute; z-index: 1; }
   body.ui-classic #v3d-frame.off { visibility: hidden; }
-  body.ui-classic #party-float, body.ui-classic #action-bar { display: none !important; }`;
+  body.ui-classic #party-float { display: none !important; }
+  /* barre d'actions ancrée sur la rangée d'objets du jeu (9 cases : x = 106 + 21 i, y = 179) */
+  body.ui-classic #action-bar { position: absolute; z-index: 2; padding: 0; gap: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+  body.ui-classic #action-bar .grip { display: none; }
+  body.ui-classic #action-bar .ab { border-radius: 1px; border-color: #5a4a30; font-size: 9px; }
+  body.ui-classic #action-bar .ab .k { font-size: 9px; }
+  body.ui-classic #action-bar .ab .atk { font-size: 7px; gap: 0; overflow: hidden; }
+  body.ui-classic #action-bar .ab .atk b { font-size: 11px; }`;
   document.head.appendChild(css);
+
+  // portraits du groupe redessinés (comme gui_drawCharPortraitWithStats) : visage (faces.png,
+  // image choisie comme gui_drawCharFaceShape), barres verticales de magie (M) et de vie (V)
+  const faces = new Image();
+  faces.src = "viewer/data/faces.png?v=20261123a";
+  let party = [];
+  const mem = window.LoLMem ? new LoLMem.RemoteMemory() : null;
+  setInterval(async () => {
+    if (mode !== "originale" || !mem) return;
+    const r = await mem.read([[0x3389F - 2, 4 * 130]]);
+    if (!r) return;
+    const b = r[0], out = [];
+    for (let i = 0; i < 4; i++) {
+      const o = i * 130, u16 = (k) => b[o + k] | b[o + k + 1] << 8, s16 = (k) => (u16(k) << 16) >> 16;
+      const flags = u16(0);
+      if (!(flags & 1)) continue;
+      const id = Math.abs(s16(14)), cur = b[o + 16], temp = b[o + 17];
+      const hp = s16(57), hpMax = u16(59), mp = s16(61), mpMax = u16(63);
+      let f = cur < 7 && temp ? temp : temp === 0 && cur > 1 && cur < 7 ? 0 : cur;
+      if (flags & 0x1108 && f < 7) f = 1;
+      if (hp <= hpMax >> 1) f += 14;
+      out.push({ id, f: Math.max(0, Math.min(27, f)), hp, hpMax, mp, mpMax, ko: !!(flags & 8) });
+    }
+    party = out;
+  }, 200);
+  function drawPortraits(g, L, dpr) {
+    const n = party.length;
+    if (!n || !faces.complete || !faces.naturalWidth) return;
+    const kx = L.w / 320 * dpr, ky = L.h / 200 * dpr, ox = L.x * dpr, oy = L.y * dpr;
+    const t = Math.floor((235 - n * 66) / (n + 1));
+    const R = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(ox + x * kx, oy + y * ky, w * kx, h * ky); };
+    party.forEach((c, i) => {
+      const x = i * 66 + t * (i + 1) + 83, y = 143;
+      g.drawImage(faces, c.f * 32, (Math.min(9, Math.max(1, c.id)) - 1) * 32, 32, 32, ox + x * kx, oy + (y + 1) * ky, 32 * kx, 32 * ky);
+      if (c.ko) R(x, y + 1, 32, 32, "rgba(40,40,40,.55)");
+      const bar = (bx, cur, max, col) => {
+        R(x + bx - 1, y + 1, 6, 32, "#000");
+        const q = max > 0 ? Math.max(0, Math.min(1, cur / max)) : 0, hh = Math.max(q > 0 ? 1 : 0, Math.round(31 * q));
+        if (hh) R(x + bx, y + 32 - hh, 5, hh, col);
+      };
+      bar(33, c.mp, c.mpMax, "#3c5cd8");
+      const q = c.hpMax > 0 ? c.hp / c.hpMax : 0;
+      bar(39, c.hp, c.hpMax, q < 0.25 ? "#d83c2c" : q < 0.5 ? "#e0c030" : "#3cb83c");
+      g.fillStyle = "#fff"; g.font = `bold ${Math.round(6 * ky)}px system-ui, sans-serif`; g.textBaseline = "top";
+      g.fillText("M", ox + (x + 33) * kx, oy + (y + 1.5) * ky); g.fillText("V", ox + (x + 39) * kx, oy + (y + 1.5) * ky);
+    });
+  }
 
   const cv = document.createElement("canvas");
   cv.id = "v3d-classic";
@@ -42,11 +96,10 @@
     try { localStorage.setItem("uiMode", m); } catch (e) {}
     btn.textContent = "Interface : " + m;
     document.body.classList.toggle("ui-classic", m === "originale");
-    if (m !== "originale") { frame.style.left = frame.style.top = frame.style.width = frame.style.height = ""; frame.classList.remove("off"); }
+    if (m !== "originale") { frame.style.left = frame.style.top = frame.style.width = frame.style.height = ""; frame.classList.remove("off"); if (typeof undock === "function") undock(); }
     dispatchEvent(new Event("resize"));
   }
   btn.addEventListener("click", () => { setMode(mode === "moderne" ? "originale" : "moderne"); btn.blur(); if (game.focus) game.focus(); });
-  setMode(mode);
 
   // flux vidéo du canevas du jeu
   const video = document.createElement("video");
@@ -90,6 +143,32 @@
     g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
     const V = fit(video.videoWidth, video.videoHeight);
     g.drawImage(video, V.x, V.y, V.w, V.h, L.x * dpr, L.y * dpr, L.w * dpr, L.h * dpr);
+    if (!showGameScene) drawPortraits(g, L, dpr);
+    dockBar(L);
+  }
+  // barre d'actions sur la rangée d'objets du jeu (cachée pendant les scènes : celle du jeu reste visible)
+  let dockKey = "";
+  function dockBar(L) {
+    const bar = document.getElementById("action-bar");
+    if (!bar) return;
+    if (bar.parentNode !== box) box.appendChild(bar);
+    const step = 21 / 320 * L.w, size = Math.floor(step - 1), x = L.x + 106 / 320 * L.w, y = L.y + 179 / 200 * L.h;
+    const key = [Math.round(x), Math.round(y), size].join();
+    if (key === dockKey) return;
+    dockKey = key;
+    bar.style.left = Math.round(x) + "px"; bar.style.top = Math.round(y) + "px";
+    bar.style.gap = (step - size) + "px";
+    bar.style.setProperty("--ab-size", size + "px");
+    if (window.lolActionBarRefresh) window.lolActionBarRefresh();
+  }
+  function undock() {
+    const bar = document.getElementById("action-bar");
+    if (!bar) return;
+    dockKey = "";
+    bar.style.removeProperty("--ab-size"); bar.style.gap = "";
+    if (bar.parentNode !== document.body) document.body.appendChild(bar);
+    if (window.lolActionBarRefresh) window.lolActionBarRefresh();
+    dispatchEvent(new Event("resize"));
   }
   requestAnimationFrame(tick);
 
@@ -109,5 +188,6 @@
   cv.addEventListener("mousedown", (e) => { e.preventDefault(); forward("mousedown", e); });
   cv.addEventListener("mouseup", (e) => { forward("mouseup", e); if (game.focus) game.focus(); });
   cv.addEventListener("contextmenu", (e) => e.preventDefault());
+  setMode(mode);
   window.lolClassic = () => ({ mode, layout, video: [video.videoWidth, video.videoHeight], frame: frame.getBoundingClientRect() });   // débogage
 })();

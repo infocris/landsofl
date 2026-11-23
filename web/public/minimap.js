@@ -2515,9 +2515,9 @@
       font: 11px/1 system-ui, sans-serif; color: #e8dcc0; user-select: none; touch-action: none; }
     #action-bar[hidden] { display: none; }
     #action-bar .grip { width: 14px; align-self: stretch; display: flex; align-items: center; justify-content: center; color: #6d5a3a; cursor: grab; font-size: 14px; }
-    .ab { position: relative; width: 40px; height: 40px; box-sizing: border-box; border: 1px solid #3a3226; border-radius: 4px;
+    .ab { position: relative; width: var(--ab-size, 40px); height: var(--ab-size, 40px); box-sizing: border-box; border: 1px solid #3a3226; border-radius: 4px;
       background-color: #17130e; image-rendering: pixelated; cursor: pointer; }
-    .ab.full { border-color: #6d5a3a; background-image: url("viewer/data/item_icons.png"); background-size: 640px auto; background-repeat: no-repeat; }
+    .ab.full { border-color: #6d5a3a; background-image: url("viewer/data/item_icons.png"); background-size: calc(var(--ab-size, 40px) * 16) auto; background-repeat: no-repeat; }
     .ab:hover { border-color: #c9a227; }
     .ab.drop { outline: 2px dashed #28dce6; outline-offset: -1px; }
     .ab.empty-stack, .ab.busy { filter: grayscale(1) brightness(.45); }
@@ -2566,7 +2566,8 @@
       if (a && a.k === "item" && itemInfo) {
         const it = itemInfo[a.t] || { name: `objet ${a.t}`, icon: -1 }, n = countOf(a.t);
         d.classList.add("full");
-        if (it.icon >= 0) d.style.backgroundPosition = `-${(it.icon % ICON_COLS) * AB_ICON}px -${Math.floor(it.icon / ICON_COLS) * AB_ICON}px`;
+        const S = inDialog ? AB_ICON : parseFloat(getComputedStyle(el).getPropertyValue("--ab-size")) || AB_ICON;
+        if (it.icon >= 0) d.style.backgroundPosition = `-${(it.icon % ICON_COLS) * S}px -${Math.floor(it.icon / ICON_COLS) * S}px`;
         if (!n) d.classList.add("empty-stack");
         const c = document.createElement("span"); c.className = "cnt"; c.textContent = n; d.appendChild(c);
         const who = a.for === undefined || a.for === "auto" ? "le plus blessé" : (partyNow().find((p) => p.slot === a.for) || {}).name || "?";
@@ -2827,6 +2828,7 @@
     let pos = null, on = true;
     try { pos = JSON.parse(localStorage.getItem("actionBarPos") || "null"); on = localStorage.getItem("actionBar") !== "off"; } catch (e) {}
     function place() {
+      if (document.body.classList.contains("ui-classic")) return;       // ancrée sur l'interface originale (classic.js)
       const r = el.getBoundingClientRect(), w = r.width || 420, h = r.height || 50;
       let x, y;
       if (pos) { x = pos.x; y = pos.y; }

@@ -1657,6 +1657,21 @@ The meaning of the functions, however, can be read directly. Comparison with our
   - **Verified**: the composite matches the game screen (frame at 267 × 218 px over the scene
     window), and a click on the copied "forward" arrow (game 43,142) moves the party
     13,17 → 13,16.
+- **Original interface: docked bar and redrawn portraits** (2026-11-23).
+  - **Inventory row**: the game draws 9 slots at x = 106 + 21 i, y = 179 (`gui_drawInventoryItem`,
+    icon at +1, 180). In "originale" mode the action bar (9 slots) is moved into the 3D view area
+    and laid exactly over that row (slot size 20 game pixels scaled). The row's scroll arrows stay
+    visible.
+  - **Portraits**: they are redrawn over the copied screen, like `gui_drawCharPortraitWithStats`.
+    Frames are 66 × 34 at y = 143, at x = 66 i + t (i + 1) + 83 with t = (235 − 66 n) / (n + 1)
+    (`calcCharPortraitXpos`, normal control mode).
+    - The face is a 32 × 32 frame from `faces.png`, at (0, 1), chosen like `gui_drawCharFaceShape`.
+    - The magic bar is at x 33 and the life bar at x 39 (`gui_drawLiveMagicBar`: 5 × 32, filled from
+      the bottom). Life is green, yellow under half and red under a quarter. "M" and "V" are on top.
+    - The weapon and magic buttons are left as copied. The redraw ignores the mouse, so clicks
+      still reach the game.
+  - **Verified**: bar docked at the inventory row (30 px slots at this size), key 1 puts the aloe
+    in hand, Michael's portrait redrawn, back to "moderne" → floating bar restored.
 - **Unavailable actions greyed out** (2026-11-23). `clickedAttackButton` refuses an attack while
   the character's flags & 0x314C (0x4: weapon recovering after a hit; 0x8: unconscious…). The bar
   reads the party records every 200 ms. An attack slot is greyed while those flags are set or
@@ -2400,3 +2415,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: action bar greys out attacks while the character cannot strike (flags & 0x314C) and spells the caster cannot afford (§ 10a).
 - **2026-11-23**: draggable separator between the game screen and the 3D view (both versions): game height kept as a share of the column (`splitRatio` in localStorage), iframes ignore the mouse while dragging, double-click restores the 3 : 2 split. Verified with ScummVM: 547 / 365 px → 347 / 565 px, double-click → 547 / 365.
 - **2026-11-23**: "originale" interface mode: live game screen in the 3D view area with the 3D render in the scene window, clicks forwarded to the game (§ 10a).
+- **2026-11-23**: original interface mode: action bar docked on the game's inventory row, portraits redrawn like the original (§ 10a).
