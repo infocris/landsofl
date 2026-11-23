@@ -716,6 +716,19 @@ The 3D view uses it for the forest: one storey of repeated trunk, then this band
 are thus about 2.6 walls high. The band's size relative to the wall gives at least 1.6 at 3
 cells; the extra trunk storey follows the near trees, which fill the whole view in the game.
 
+**Randomized treetops (2026-11-23).** With one repeated storey and the same 48 px of band on
+every face, the forest's skyline was flat and the crowns repeated every cell. The 3D view now
+generates the part above the walls pseudo-randomly, always identical at the same place:
+- along each row of faces (same boundary line and facing), a smoothed value noise of the world
+  coordinate along the wall (two octaves, 0.9 and 2.3 per cell) gives the trunk height above the
+  wall, 0.3 to 1.5 storey (the wall texture continued upwards, cut from its bottom), and the
+  crown height, 0.8 to 1.35 times the band's 24/40;
+- the crown is read continuously across the whole band (176 px of the background, 48 px per
+  face), mirrored back and forth so it never shows a seam, from an offset drawn per row.
+Neighbouring faces therefore join without a step, and the treeline rises and falls
+irregularly. `viewer.js`: `forestNoise`, `drawUpper` (`?p=` in the URL raises the gaze, for
+screenshots).
+
 ### 9.3e Generating floors from the floor images (2026-11-22)
 
 Two generators, depending on the floor (§ 9.3c):
@@ -2089,3 +2102,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: switches in the 3D view: door buttons attached by the level script (`assignLevelDecorationShape` + `resetBlockShapeAssignment`) now drawn; walls' switch type and clickable area exported; engine command op 20 (`clickwall`) clicks the wall in front like the game (`clickedWall`); the 3D view outlines the switch in front and clicks it; engine files versioned in URLs and served `no-cache` (§ 9.6).
 - **2026-11-22**: doors of the script-opened series (walls 8–12, 18–22: shape 0, e.g. Gladstone's locked library door) now drawn closed with their leaf; they looked open in the 3D view (§ 9.6).
 - **2026-11-23**: objects in the party's own cell (dropped in front of it) drawn as the engine does, full size at the bottom of the view (`_monsterScaleY`/`_monsterScaleX` tables); the 3D view projected them below the image (§ 9.3h).
+- **2026-11-23**: forest treetops in the 3D view generated pseudo-randomly per row of faces (trunk and crown heights from a smoothed noise, crown read across the whole background band); the skyline was flat and repeated every cell (§ 9.3d).

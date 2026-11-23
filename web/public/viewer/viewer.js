@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261123a";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261123b";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -132,12 +132,13 @@
       const sky = [...cnt].sort((a, c) => c[1] - a[1])[0][0];
       L.sky = [sky];
       const c = document.createElement("canvas");
-      c.width = CROWN.w; c.height = CROWN.h;
-      const g = c.getContext("2d"), id = g.createImageData(CROWN.w, CROWN.h), out = new Uint32Array(id.data.buffer);
-      for (let y = 0; y < CROWN.h; y++) for (let x = 0; x < CROWN.w; x++) {
-        const v = b.px[y * b.w + CROWN.x + x];
-        out[y * CROWN.w + x] = v === sky ? 0 : v;
+      c.width = b.w; c.height = CROWN.h;
+      const g = c.getContext("2d"), id = g.createImageData(b.w, CROWN.h), out = new Uint32Array(id.data.buffer);
+      for (let y = 0; y < CROWN.h; y++) for (let x = 0; x < b.w; x++) {
+        const v = b.px[y * b.w + x];
+        out[y * b.w + x] = v === sky ? 0 : v;
       }
+      L.crownW = b.w;
       g.putImageData(id, 0, 0);
       L.crownImgs = darken(c, SHADES);
     }
@@ -179,10 +180,27 @@
       return L.upper.get(tex);
     };
   }
-  const CROWN = { x: 64, w: 48, h: 24, wall: 40 };   // bandeau du fond au-dessus du mur à 3 cases
+  // bandeau du fond (toute la largeur) : 48 px pour une face, 24 px de haut pour un mur de 40
+  const CROWN = { w: 48, h: 24, wall: 40 };
+  // Forêt : étage tiré au hasard, mais toujours le même au même endroit. Le long d'une rangée
+  // de faces (pos = coordonnée du monde le long du mur, line = la rangée), un bruit continu
+  // donne la hauteur des troncs au-dessus du mur (TRUNK, en étages) et celle de la cime
+  // (CROWN_K) ; la cime est lue en continu dans le bandeau, en aller-retour (pas de raccord),
+  // à partir d'un point propre à la rangée. Lisière irrégulière, sans marche entre deux faces.
+  const TRUNK = [0.3, 1.5], CROWN_K = [0.8, 1.35];
+  const hash01 = (i, seed) => {
+    let h = Math.imul(i ^ Math.imul(seed, 0x27d4eb2d), 0x9e3779b1);
+    h ^= h >>> 15; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13;
+    return (h >>> 0) / 4294967296;
+  };
+  const vnoise = (x, seed) => {                    // bruit de valeurs lissé, 1 valeur par unité
+    const i = Math.floor(x), t = x - i, k = t * t * (3 - 2 * t);
+    return hash01(i, seed) * (1 - k) + hash01(i + 1, seed) * k;
+  };
+  const forestNoise = (pos, line, o) => 0.65 * vnoise(pos * 0.9 + o, line) + 0.35 * vnoise(pos * 2.3 + o, line + 7919);
   const skyAt = (y, hz) => L.sky[Math.max(0, Math.min(L.sky.length - 1, Math.floor(BG_HORIZON - (hz - y) / Math.max(1, hz) * BG_HORIZON)))];
   // étages au-dessus d'une colonne de mur (de bas en haut), même assombrissement que la face
-  function drawUpper(tex, u, dist, x, top, colH) {
+  function drawUpper(tex, u, dist, x, top, colH, pos, line) {
     const S = L.outdoor.storeys, fw = L.faceW, fh = L.faceH, cols = L.atlasCols;
     const ut = L.upperOf(tex), sh = fh - FOOT, h = colH * sh / fh;
     const tx = (ut % cols) * fw + Math.min(fw - 1, Math.floor(u * fw)), ty = Math.floor(ut / cols) * fh;
@@ -194,6 +212,21 @@
       if (y < fogY) { const cut = (fogY - y) / h2; sy += cut * sh2; sh2 -= cut * sh2; h2 -= fogY - y; y = fogY; }
       ctx.drawImage(im, sx, sy, 1, sh2, x, y, 1, h2 + 0.5);
     };
+    if (L.crownImgs && pos !== undefined) {         // forêt : hauteurs tirées au hasard
+      const tr = TRUNK[0] + (TRUNK[1] - TRUNK[0]) * forestNoise(pos, line, 0);
+      const ck = CROWN_K[0] + (CROWN_K[1] - CROWN_K[0]) * forestNoise(pos, line, 101.5);
+      for (let k = 0, rest = tr; rest > 0 && top - k * h > 0; k++, rest--) {
+        const f = Math.min(1, rest);
+        part(img, tx, ty + sh * (1 - f), sh * f, top - k * h - f * h, f * h);
+      }
+      const ch = colH * CROWN.h / CROWN.wall * ck, y0 = top - tr * h - ch;
+      if (y0 + ch > 0) {
+        const n = L.crownW, m = (((pos * CROWN.w + hash01(line, 3) * 2 * n) % (2 * n)) + 2 * n) % (2 * n);
+        const cx = Math.min(n - 1, Math.floor(m < n ? m : 2 * n - 1 - m));
+        ctx.drawImage(L.crownImgs[shadeFor(dist)], cx, 0, 1, CROWN.h, x, y0, 1, ch + 0.5);
+      }
+      return;
+    }
     for (let k = 1; k < S && top - (k - 1) * h > Math.max(0, fogY); k++) part(img, tx, ty, sh, top - k * h, h);
     // premier étage vu dans le jeu (décorations au-dessus du mur) : par-dessus l'étage répété,
     // transparent là où le jeu ne le montre jamais (haut de l'étage)
@@ -205,7 +238,7 @@
     if (L.fogFade && fogY + colH * FOG_FADE > 0) ctx.drawImage(L.fogFade, 0, 0, 1, 32, x, fogY, 1, colH * FOG_FADE);
     if (L.crownImgs) {                              // cime au-dessus du dernier étage
       const ch = colH * CROWN.h / CROWN.wall, y0 = top - (S - 1) * h - ch;
-      if (y0 + ch > 0) ctx.drawImage(L.crownImgs[shadeFor(dist)], Math.min(CROWN.w - 1, Math.floor(u * CROWN.w)), 0, 1, CROWN.h, x, y0, 1, ch + 0.5);
+      if (y0 + ch > 0) ctx.drawImage(L.crownImgs[shadeFor(dist)], Math.min(L.crownW - 1, Math.floor(u * CROWN.w)), 0, 1, CROWN.h, x, y0, 1, ch + 0.5);
     }
   }
 
@@ -399,10 +432,11 @@
         if (!t) continue;
         const dist = side === 0 ? sdx - ddx : sdy - ddy;
         let u = side === 0 ? player.y + dist * ry : player.x + dist * rx;
+        const pos = u, line = side === 0 ? (cx << 3) | f : (cy << 3) | f;   // rangée de faces
         u -= Math.floor(u);
         // sens de lecture de la texture vu depuis l'extérieur de la face
         if (f === FACE_E || f === FACE_N) u = 1 - u;
-        if (t.tex >= 0) items.push({ d: dist, tex: t.tex, u, door: t.panel ? t : null });
+        if (t.tex >= 0) items.push({ d: dist, tex: t.tex, u, pos, line, door: t.panel ? t : null });
         if (t.block && (t.opaque || t.tex < 0)) { nearestOpaque = dist; break; }
       }
       zbuf[x] = nearestOpaque;
@@ -427,7 +461,7 @@
           const top = H / 2 + pitch - colH / 2;
           const tx = (it.tex % cols) * fw + Math.min(fw - 1, Math.floor(it.u * fw));
           const ty = Math.floor(it.tex / cols) * fh;
-          if (L.outdoor) drawUpper(it.tex, it.u, dist, x, top, colH);
+          if (L.outdoor) drawUpper(it.tex, it.u, dist, x, top, colH, it.pos, it.line);
           ctx.drawImage(L.wallImgs[shadeFor(dist)], tx, ty, 1, fh, x, top, 1, colH);
           if (it.door) drawPanel(it, dist, x, top, colH);
         }
@@ -662,13 +696,14 @@
         for (const c of cross) {
           const hx = pwx + (wx - pwx) * c.t, hy = pwy + (wy - pwy) * c.t, hz = pz + DZ * c.t;
           let f, uu;
-          if (c.axis === 0) { const nx = ncx > cx ? cx + 1 : cx - 1; f = nx > cx ? FACE_W : FACE_E; cx = nx; uu = hy - Math.floor(hy); }
-          else { const ny = ncy > cy ? cy + 1 : cy - 1; f = ny > cy ? FACE_N : FACE_S; cy = ny; uu = hx - Math.floor(hx); }
+          let pos, line;
+          if (c.axis === 0) { const nx = ncx > cx ? cx + 1 : cx - 1; f = nx > cx ? FACE_W : FACE_E; cx = nx; uu = hy - Math.floor(hy); pos = hy; line = (cx << 3) | f; }
+          else { const ny = ncy > cy ? cy + 1 : cy - 1; f = ny > cy ? FACE_N : FACE_S; cy = ny; uu = hx - Math.floor(hx); pos = hx; line = (cy << 3) | f; }
           if (!inside(cx, cy)) { done = true; break; }
           const t = texFor(cx, cy, f);
           if (!t) continue;
           if (f === FACE_E || f === FACE_N) uu = 1 - uu;
-          if (t.tex >= 0) items.push({ d: hz, tex: t.tex, u: uu, door: t.panel ? t : null });
+          if (t.tex >= 0) items.push({ d: hz, tex: t.tex, u: uu, pos, line, door: t.panel ? t : null });
           if (t.block && (t.opaque || t.tex < 0)) { nearest = hz; done = true; break; }
         }
         pwx = wx; pwy = wy; pz = z;
@@ -690,7 +725,7 @@
           const colH = WALL_H * proj / deff(dist), top = half - colH / 2;
           const tx = (it.tex % cols) * fw + Math.min(fw - 1, Math.floor(it.u * fw));
           const ty = Math.floor(it.tex / cols) * fh;
-          if (L.outdoor) drawUpper(it.tex, it.u, dist, x, top, colH);
+          if (L.outdoor) drawUpper(it.tex, it.u, dist, x, top, colH, it.pos, it.line);
           ctx.drawImage(L.wallImgs[shadeFor(dist)], tx, ty, 1, fh, x, top, 1, colH);
           if (it.door) drawPanel(it, dist, x, top, colH);
         }
@@ -1176,6 +1211,7 @@
     if (q.has("x")) player.x = +q.get("x");
     if (q.has("y")) player.y = +q.get("y");
     if (q.has("a")) player.a = +q.get("a") * Math.PI / 180;   // degrés, 0 = est, 90 = sud
+    if (q.has("p")) pitch = +q.get("p");                       // horizon décalé (px), > 0 = regard vers le haut
     if (q.has("hud")) { helpEl.classList.add("hidden"); }
     if (EMBED) {
       for (const id of ["top", "help", "map"]) document.getElementById(id).style.display = "none";
