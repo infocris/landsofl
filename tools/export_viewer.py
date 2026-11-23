@@ -1008,6 +1008,141 @@ def flagstone_floor(bg):
     return img
 
 
+# Cavernes (CAVE1 : niveaux 5 à 9 et 25, ce dernier avec une autre palette, même dessin),
+# redessinées en pixel art d'après le fond d'origine (docs/reverse-engineering.md § 9.3c, § 9.3f).
+# Deux familles de teintes : roche (peu saturée) et mousse ou racines (saturée : vert aux niveaux
+# 5 à 9, brun orangé au 25). Sol : dalles de roche arrondies, fissures, plaques de mousse dans
+# les creux. Plafond : roche sombre sous un tapis de mousse et de racines pendantes, pointes
+# claires. Textures sur CAVE_SPAN × CAVE_SPAN cases, sans miroir ni rotation (floorSpan,
+# ceilSpan).
+CAVE_TILESETS = {"CAVE1"}
+CAVE_SPAN = 2
+CAVE_PX = 128                    # pixels de texture par case
+
+
+def cave_ramps(bg):
+    """(roche, mousse) du fond, chacune du plus sombre au plus clair. Mousse : saturation
+    (max − min) / max ≥ 0,5 et somme ≥ 30 ; roche : le reste, noir exclu."""
+    from collections import Counter
+    cnt = Counter(tuple(bg.px[(y * bg.w + x) * 4:(y * bg.w + x) * 4 + 3])
+                  for y in range(bg.h) for x in range(bg.w))
+    cols = [c for c, n in cnt.items() if n > 10 and sum(c) > 0]
+    moss = lambda c: sum(c) >= 30 and (max(c) - min(c)) / max(c) >= 0.5
+    return (sorted((c for c in cols if not moss(c)), key=sum),
+            sorted((c for c in cols if moss(c)), key=sum))
+
+
+def _cave_tools(seed):
+    def h(*a):
+        x = seed
+        for v in a:
+            x = ((x ^ (v & 0xFFFFFFFF)) * 0x85EBCA6B) & 0xFFFFFFFF
+            x ^= x >> 13
+        return x / 2 ** 32
+    size = CAVE_PX * CAVE_SPAN
+    def noise(x, y, cell, s):                      # bruit de valeur lissé, périodique
+        n = size // cell
+        gx, gy = x / cell, y / cell
+        x0, y0 = int(gx), int(gy)
+        fx, fy = gx - x0, gy - y0
+        fx, fy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+        v = lambda i, j: h(s, i % n, j % n)
+        a = v(x0, y0) + (v(x0 + 1, y0) - v(x0, y0)) * fx
+        b = v(x0, y0 + 1) + (v(x0 + 1, y0 + 1) - v(x0, y0 + 1)) * fx
+        return a + (b - a) * fy
+    pick = lambda ramp, t: ramp[max(0, min(len(ramp) - 1, int(t * len(ramp))))]
+    return h, noise, pick, size
+
+
+def periodic_voronoi(size, n, h, seed, jitter=0.7):
+    """Voronoï périodique (n × n germes tremblés sur size px) : pour chaque pixel, (gap, id),
+    gap = distance (px) à la médiatrice la plus proche, id = n° du germe le plus proche."""
+    step = size / n
+    sites = [[((i + 0.5 + jitter * (h(seed, i, j) - 0.5)) * step,
+               (j + 0.5 + jitter * (h(seed + 1, i, j) - 0.5)) * step) for i in range(n)] for j in range(n)]
+    out = []
+    for y in range(size):
+        for x in range(size):
+            gi, gj = int(x / step), int(y / step)
+            best = []
+            for dj in (-1, 0, 1):
+                for di in (-1, 0, 1):
+                    i, j = gi + di, gj + dj
+                    sx, sy = sites[j % n][i % n]
+                    sx += (i // n) * size
+                    sy += (j // n) * size
+                    best.append(((sx - x - 0.5) ** 2 + (sy - y - 0.5) ** 2, (j % n) * n + i % n, sx, sy))
+            best.sort()
+            d1, k1, sx1, sy1 = best[0]
+            gap = min((d - d1) / (2 * max(1e-6, ((bx - sx1) ** 2 + (by - sy1) ** 2) ** 0.5))
+                      for d, _, bx, by in best[1:4])
+            out.append((gap, k1))
+    return out
+
+
+def cave_floor(bg):
+    """Sol de caverne : blocs de roche bombés, joints sombres où pousse la mousse."""
+    rock, moss = cave_ramps(bg)
+    if len(rock) < 6 or len(moss) < 4:
+        return None
+    h, noise, pick, size = _cave_tools(0x1F83D9AB)
+    vor = periodic_voronoi(size, 4 * CAVE_SPAN, h, 1, jitter=0.85)
+    img = Image(size, size)
+    for y in range(size):
+        for x in range(size):
+            gap, k = vor[y * size + x]
+            # mousse : dans les joints, plus ou moins large selon l'endroit
+            wid = 1.0 + 14.0 * max(0.0, noise(x, y, 32, 2) - 0.4)
+            if gap < wid and noise(x, y, 16, 3) > 0.25:
+                tm = 0.2 + 0.55 * min(1.0, gap / max(1.0, wid)) + 0.25 * (h(4, x // 2, y // 2) - 0.5)
+                if h(5, x, y) > 0.94:
+                    tm = 0.9                          # brin éclairé
+                c = pick(moss, tm)
+            elif gap < 1.0:
+                c = pick(rock, 0.06)                  # joint
+            else:
+                # bloc bombé : clair au centre, sombre au bord ; teinte propre à chaque bloc
+                dome = min(1.0, (gap - 1.0) / 14.0) ** 0.6
+                t = 0.42 + 0.55 * dome + 0.2 * (h(6, k) - 0.5) + 0.1 * (h(7, x // 2, y // 2) - 0.5)
+                if dome < 0.35 and (x + y) % 7 == 0:
+                    t -= 0.1                          # ombre au pied du bloc
+                c = pick(rock, t)
+            img.put(x, y, bytes(c))
+    return img
+
+
+def cave_ceiling(bg):
+    """Plafond de caverne vu de dessous : bosses de roche sombre, touffes de mousse et racines."""
+    rock, moss = cave_ramps(bg)
+    if len(rock) < 6 or len(moss) < 4:
+        return None
+    h, noise, pick, size = _cave_tools(0x5BE0CD19)
+    vor = periodic_voronoi(size, 7 * CAVE_SPAN, h, 11)
+    img = Image(size, size)
+    for y in range(size):
+        for x in range(size):
+            gap, k = vor[y * size + x]
+            mossy = h(12, k) < 0.55                   # bosse couverte de mousse
+            dome = min(1.0, gap / 8.0) ** 0.7
+            spill = gap < 3.0 and noise(x, y, 8, 13) > 0.55   # mousse qui déborde sur les joints
+            if mossy or spill:
+                # touffes : bruit fin, pointes de racines claires, creux sombres
+                tm = 0.1 + 0.45 * dome + 0.35 * (h(14, x // 2, y // 2) - 0.3)
+                r = h(15, x, y)
+                if r > 0.95:
+                    tm = 0.95
+                elif r < 0.07:
+                    tm = 0.0
+                c = pick(moss, tm)
+            elif gap < 1.0:
+                c = pick(rock, 0.0)                   # joint, très sombre
+            else:
+                t = 0.08 + 0.35 * dome + 0.1 * (h(16, k) - 0.5) + 0.08 * (h(17, x // 2, y // 2) - 0.5)
+                c = pick(rock, t)
+            img.put(x, y, bytes(c))
+    return img
+
+
 def floor_cell(motif, repeated):
     """Texture d'une case : le motif répété (3 × 3 motifs ≈ 3,1 unités) pour un sol pavé ;
     pour un sol peint, la demi-case proche en damier 1 2 / 2 1, 2 étant 1 en miroir (le
@@ -1559,6 +1694,13 @@ def main(game_dir, maps_dir, out_dir):
             motif = pixel_floor_motif(bg, motif)
         flags = flagstone_floor(bg) if tsname in FLOOR_FLAGSTONES else None
         floor_span = FLAG_SPAN if flags is not None else 1
+        ceil_span = 1
+        if tsname in CAVE_TILESETS:
+            cf, cc = cave_floor(bg), cave_ceiling(bg)
+            if cf is not None:
+                flags, floor_span = cf, CAVE_SPAN
+            if cc is not None:
+                ceil_img, ceil_span = cc, CAVE_SPAN
         (flags or floor_cell(motif, floor_repeated)).save(os.path.join(out_dir, f"level{n:02d}_floor.png"))
         if floor_repeated:
             motif.save(os.path.join(out_dir, f"level{n:02d}_floor_motif.png"))
@@ -1715,6 +1857,8 @@ def main(game_dir, maps_dir, out_dir):
             "floorMirror": not floor_repeated and flags is None,
             # texture du sol couvrant floorSpan × floorSpan cases (dallage redessiné)
             "floorSpan": floor_span,
+            # texture du plafond sur ceilSpan × ceilSpan cases, sans rotation ni miroir (cavernes)
+            "ceilSpan": ceil_span,
             # sol peint : tuiles de Wang (levelNN_floor_wang.png), une tuile par demi-case
             "floorWang": {"tile": WANG_T, "perCell": 2} if wang is not None else None,
         }

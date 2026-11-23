@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261124l";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261124m";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -891,7 +891,12 @@
     const d = ((Math.round(a / (Math.PI / 2)) % 4) + 4) % 4;
     const fx = [1, 0, -1, 0][d], fy = [0, 1, 0, -1][d], rx = -fy, ry = fx;
     const swap = rx === 0, flipU = rx < 0 || ry < 0, flipV = fx > 0 || fy > 0;
-    const C = L.ceilTex, cw = C.w, ch = C.h;
+    const C = L.ceilTex, cw = C.w, ch = C.h, span = L.ceilSpan || 1;
+    // plafond organique (cavernes) : texture sur span × span cases, sans rotation ni miroir
+    if (span > 1) return (fu, fv, odd, wx, wy) => {
+      const u = wx / span - Math.floor(wx / span), v = wy / span - Math.floor(wy / span);
+      return Math.min(ch - 1, (v * ch) | 0) * cw + Math.min(cw - 1, (u * cw) | 0);
+    };
     return (fu, fv, odd) => {
       let u = swap ? fv : fu, v = swap ? fu : fv;
       if (flipU !== !!odd) u = 1 - u;                    // miroir une case sur deux
@@ -919,7 +924,7 @@
       const dx = rowDist * stepX, dyw = rowDist * stepY;
       for (let x = 0; x < W; x++, wx += dx, wy += dyw) {
         const cx = Math.floor(wx), cy = Math.floor(wy);
-        if (dy < 0) { frame32[fRow + x] = shade(C.px[cTex(wx - cx, wy - cy, (cx + cy) & 1)], k); continue; }
+        if (dy < 0) { frame32[fRow + x] = shade(C.px[cTex(wx - cx, wy - cy, (cx + cy) & 1, wx, wy)], k); continue; }
         let tx, ty;
         if (span > 1) { const sx = wx / span, sy = wy / span; tx = ((sx - Math.floor(sx)) * tw) | 0; ty = ((sy - Math.floor(sy)) * th) | 0; }
         else { tx = ((wx - cx) * tw) | 0; ty = ((wy - cy) * th) | 0; }
@@ -967,7 +972,7 @@
         if (L.outdoor) continue;
         lat = u * d / proj; wx = player.x + fx * z + rx * lat; wy = player.y + fy * z + ry * lat;
         cx = Math.floor(wx); cy = Math.floor(wy); odd = (cx + cy) & 1;
-        frame32[cRow + x] = shade(L.ceilTex.px[cTex(wx - cx, wy - cy, odd)], k);
+        frame32[cRow + x] = shade(L.ceilTex.px[cTex(wx - cx, wy - cy, odd, wx, wy)], k);
       }
       if (L.outdoor) frame32.fill(skyAt(H - 1 - y, half), cRow, cRow + W);
     }

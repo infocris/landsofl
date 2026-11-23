@@ -757,6 +757,29 @@ are paved with a visible repeating pattern: `KEEP` (level 1, octagons) and `TOWE
     south-east;
   - grain in 2 × 2 blocks and a few chips.
 
+- **Caves (CAVE1, 2026-11-24)**: levels 5–9 share one background. Level 25 shows **the
+  same drawing with another palette** (identical pixel counts per colour, green moss turned
+  orange-brown). Floor: grey rock with green moss in the hollows. Ceiling: dark rock under
+  a mat of moss and hanging roots with light tips. Colours fall into two families,
+  separated without knowing the palette:
+  - **moss/roots**: saturation `(max − min) / max ≥ 0.5` and sum ≥ 30, 7 tones (16,28,8) to
+    (162,170,56) on levels 5–9, 6 tones (36,16,16) to (166,125,60) on level 25;
+  - **rock**: the other tones, 12 or 13.
+
+  `cave_floor` and `cave_ceiling` redraw both in pixel art on a periodic Voronoi diagram
+  (`periodic_voronoi`). Smoothed value noise had been tried first: its contours left
+  axis-aligned strokes, and the cracks looked like squiggles.
+  - **floor**: 4 × 4 blocks per cell, domed (light at the centre, dark at the edge, one tone
+    per block), with dark joints. Moss grows in the joints, from 1 to about 6 px wide
+    following a noise, and a few strands catch the light.
+  - **ceiling**: 7 × 7 bumps per cell. 55 % are covered by moss tufts with light root tips;
+    the others are dark rock (lower half of the ramp). Some moss spills onto the joints.
+
+  The textures cover **2 × 2 cells**, without mirroring or Wang tiles. The level JSON
+  carries `floorSpan: 2` and `ceilSpan: 2`. With `ceilSpan` > 1, the 3D view samples the
+  ceiling in world coordinates, without turning it with the gaze, since an organic ceiling
+  has no direction.
+
 ### 9.3d Wall pieces and the forest's upper part — verified in ScummVM (2026-11-22)
 
 `KyraRpgEngine::drawVcnBlocks` (`scene_rpg.cpp`) builds the view, 22×15 tiles, from the
@@ -870,7 +893,7 @@ Two generators, depending on the floor (§ 9.3c):
     Two tiles sharing an edge get the same color, hence the same joint.
   - **Result**: good on cobblestones (Yvel), rubble (Urbish), lava, grass and moss. On
     the manor floor (MANOR), whose near band is less detailed, blocks remained visible: it is
-  now redrawn instead (§ 9.3c, flagstones).
+  now redrawn instead (§ 9.3c, flagstones). The caves (CAVE1) are redrawn too (§ 9.3c, caves).
   - `levelNN_floor.png` stays the one-cell texture (minimap, fallback).
 
 ### 9.3f Ceiling of the background: projection and coffers — measured (2026-11-22)
@@ -2505,6 +2528,7 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-23**: isometric coffered ceiling also in Roland's manor (MANOR), with a minimum contrast for the recess (§ 9.3f).
 - **2026-11-23**: Roland's manor ceiling (MANOR) redrawn from the original background in pixel art: squared beams with a light underside and angled side faces, recessed olive plank panels (§ 9.3f).
 - **2026-11-23**: Roland's manor floor (MANOR) redrawn in pixel art: irregular flagstones from a periodic Voronoi diagram, 12-colour ramp of the painted floor, texture over 2 × 2 cells (`floorSpan`) (§ 9.3c).
+- **2026-11-24**: cave floor and ceiling (CAVE1, levels 5–9 and 25) redrawn in pixel art on a periodic Voronoi diagram: domed rock blocks with moss in the joints, ceiling bumps under moss and roots; moss/rock split by saturation, so level 25's palette works too; `ceilSpan` in the 3D view (§ 9.3c).
 - **2026-11-23**: mine ceiling (MINE1, levels 13–16) redrawn from the original background in pixel art: round logs on the cell edges, lagging boards, rock where boards are missing (§ 9.3f).
 - **2026-11-22**: switches in the 3D view: door buttons attached by the level script (`assignLevelDecorationShape` + `resetBlockShapeAssignment`) now drawn; walls' switch type and clickable area exported; engine command op 20 (`clickwall`) clicks the wall in front like the game (`clickedWall`); the 3D view outlines the switch in front and clicks it; engine files versioned in URLs and served `no-cache` (§ 9.6).
 - **2026-11-22**: doors of the script-opened series (walls 8–12, 18–22: shape 0, e.g. Gladstone's locked library door) now drawn closed with their leaf; they looked open in the 3D view (§ 9.6).
