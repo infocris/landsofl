@@ -474,6 +474,84 @@ def ceiling_cell(bg, tsname):
     return acc_image(acc, T)
 
 
+# Caisson isométrique (docs/reverse-engineering.md § 9.3f) : au lieu du pli, flou, un caisson
+# dessiné en relief avec les teintes du pli. Poutres sur les bords de la case, puis deux
+# gradins biseautés (onglets à 45°) jusqu'au panneau en retrait. Chaque face est éclairée selon
+# son orientation, la lumière venant du fond de la vue : la face côté nord (tournée vers le
+# joueur) est claire, la face sud sombre, les faces est/ouest intermédiaires. L'éclairage est
+# symétrique gauche-droite, donc compatible avec le miroir une case sur deux de la vue 3D.
+CEIL_ISO = {"KEEP"}
+CEIL_ISO_STEPS = (               # (largeur en fraction de case, nature) depuis le bord
+    (0.09, "beam"),              # dessous de la poutre (demi-poutre de chaque côté du bord)
+    (0.13, "bevel"),             # premier gradin : face oblique de la poutre
+    (0.035, "ledge"),            # rebord plat
+    (0.045, "bevel"),            # second gradin, plus court
+)
+CEIL_ISO_LIGHT = (1.0, 0.72, 0.42, 0.72)          # faces nord, est, sud, ouest
+
+
+def ceiling_palette(img):
+    """Teintes d'un caisson plié : (clair, moyen, sombre), par quantiles de luminance."""
+    cols = sorted((img.px[o] + img.px[o + 1] + img.px[o + 2], tuple(img.px[o:o + 3]))
+                  for o in range(0, len(img.px), 4) if img.px[o + 3] and sum(img.px[o:o + 3]) > 30)
+    def mean(a, b):
+        part = [c for _, c in cols[int(a * len(cols)):max(int(a * len(cols)) + 1, int(b * len(cols)))]]
+        return tuple(sum(c[i] for c in part) / len(part) for i in range(3))
+    return mean(0.88, 0.98), mean(0.3, 0.5), mean(0.05, 0.3)
+
+
+def iso_ceiling_cell(folded, size=CEIL_TEX):
+    """Caisson en relief (size × size, rangée 0 = nord), teintes tirées du caisson plié."""
+    bright, mid, dark = ceiling_palette(folded)
+    def h(*a):                                   # bruit déterministe dans [0, 1)
+        x = 0x9E3779B1
+        for v in a:
+            x = ((x ^ (v & 0xFFFFFFFF)) * 0x85EBCA6B) & 0xFFFFFFFF
+            x ^= x >> 13
+        return (x * 0xC2B2AE35 & 0xFFFFFFFF) / 2 ** 32
+    bounds, t = [], 0.0
+    for wdt, kind in CEIL_ISO_STEPS:
+        t += wdt
+        bounds.append((t * size, kind))
+    img = Image(size, size)
+    for y in range(size):
+        for x in range(size):
+            d = (y + 0.5, size - x - 0.5, size - y - 0.5, x + 0.5)       # distances N, E, S, O
+            m = min(d)
+            side = d.index(m)                    # bord le plus proche : onglets diagonaux
+            along = x if side in (0, 2) else y   # coordonnée le long du bord
+            kind, inner, start = "panel", 0.0, 0.0
+            for b, k in bounds:
+                if m < b:
+                    kind, inner = k, (m - start) / max(1e-6, b - start)
+                    break
+                start = b
+            if kind == "beam":
+                # veinage du bois le long de la poutre, arête claire à la naissance du biseau
+                grain = 0.9 + 0.12 * h(side & 1, int(m * 3)) + 0.05 * h(side & 1, int(m), along // 7)
+                c = tuple(v * grain for v in bright)
+                if inner > 0.82:
+                    c = tuple(min(255, v * 1.12) for v in c)
+            elif kind == "bevel":
+                lit = CEIL_ISO_LIGHT[side]
+                base = [mid[i] + (dark[i] - mid[i]) * 0.35 * inner for i in range(3)]
+                grain = 0.94 + 0.08 * h(side, int(m * 2), along // 11)
+                c = tuple(v * lit * grain for v in base)
+            elif kind == "ledge":
+                lit = 0.55 + 0.45 * CEIL_ISO_LIGHT[side]
+                c = tuple(v * lit for v in mid)
+            else:
+                # panneau en retrait : ombre portée près des gradins, planches est-ouest
+                depth = m - bounds[-1][0]
+                ao = min(1.0, 0.55 + depth / (0.12 * size))
+                plank = 0.93 + 0.1 * h(7, int(y / size * 5)) + 0.04 * h(8, y, x // 13)
+                if (y * 5) % size < 5:
+                    plank *= 0.8                 # joint entre planches
+                c = tuple(v * ao * plank for v in dark)
+            img.put(x, y, bytes(max(0, min(255, round(v))) for v in c))
+    return img
+
+
 # Tuiles de Wang du sol peint (docs/reverse-engineering.md § 9.3e). Une tuile = une demi-case
 # (WANG_T pixels pour CELL_UNITS / 2 unités). Chaque bord porte une couleur 0/1 ; la tuile
 # d'indice n + 2·e + 4·s + 8·w a ces couleurs au nord, à l'est, au sud et à l'ouest.
@@ -599,6 +677,79 @@ def wang_tiles(bg):
                     p, q = fa(x, y), fb(x, y)
                     atlas.put(ox + x, oy + y, bytes(min(255, round(p[k] * (1 - t) + q[k] * t)) for k in range(3)))
     return atlas
+
+
+# Carrelage de Gladstone redessiné en pixel art (docs/reverse-engineering.md § 9.3c). Le motif
+# replié est une moyenne floue ; le sol peint n'utilise que 10 teintes, qui forment trois rampes :
+# joint, octogone sombre (ombre, base, reflet), octogone clair (idem), losange (idem). On redessine
+# la maille (octogones au pas de MOTIF / 2, en damier, losanges aux jonctions) avec ces seules
+# teintes, sans anti-crénelage, puis on la cale sur le motif replié par décalage circulaire.
+FLOOR_PIXEL_ART = {"KEEP"}
+OCT_R, OCT_C = 11, 17            # demi-largeur de l'octogone, coupe des coins (|dx| + |dy|)
+
+
+def floor_palette(bg, y_min=60):
+    """Teintes du sol peint (hors noir), de la plus sombre à la plus claire."""
+    cols = {tuple(bg.px[(y * bg.w + x) * 4:(y * bg.w + x) * 4 + 3])
+            for y in range(y_min, bg.h) for x in range(bg.w)}
+    return sorted((c for c in cols if sum(c) > 0), key=sum)
+
+
+def pixel_floor_motif(bg, ref):
+    """Maille du carrelage (MOTIF × MOTIF) en pixel art, aux teintes du fond, calée sur ref."""
+    pal = floor_palette(bg)
+    if len(pal) < 10:
+        return ref
+    pal = pal[-10:]
+    joint, dark, light, diamond = pal[0], pal[1:4], pal[4:7], pal[7:10]
+    n, p = MOTIF, MOTIF // 2
+    def h(*a):
+        x = 0x2545F491
+        for v in a:
+            x = ((x ^ (v & 0xFFFFFFFF)) * 0x9E3779B1) & 0xFFFFFFFF
+            x ^= x >> 15
+        return x / 2 ** 32
+    def texel(x, y):
+        # centre d'octogone le plus proche (pas p), position relative (dx, dy)
+        i, j = x // p, y // p
+        dx, dy = x - (i * p + p // 2) + 0.5, y - (j * p + p // 2) + 0.5
+        ax, ay = abs(dx), abs(dy)
+        inside = ax <= OCT_R and ay <= OCT_R and ax + ay <= OCT_C
+        if inside:
+            ramp = light if (i + j) & 1 else dark
+            edge = min(OCT_R - ax, OCT_R - ay, (OCT_C - ax - ay) / 1.4)
+            if edge < 1.2:                              # liseré : reflet au nord-ouest, ombre au sud-est
+                return ramp[2] if dx + dy < 0 else ramp[0]
+            # veinage du marbre : taches groupées par blocs de 2 × 2
+            r = h(x // 2, y // 2, i, j)
+            if r < 0.10:
+                return ramp[0]
+            if r > 0.93:
+                return ramp[2]
+            return ramp[1]
+        # losange à la jonction de quatre octogones
+        sx = (x + 0.5 + p / 2) % p - p / 2               # position relative au coin de maille
+        sy = (y + 0.5 + p / 2) % p - p / 2
+        dd = abs(sx) + abs(sy)
+        rad = p - OCT_C - 2                              # joint de 2 px le long des coupes
+        if dd <= rad:
+            if dd > rad - 1.2:
+                return diamond[2] if sx + sy < 0 else diamond[0]
+            return diamond[1]
+        return joint
+    art = [[texel(x, y) for x in range(n)] for y in range(n)]
+    # calage : décalage circulaire qui rapproche le plus la luminance du motif replié
+    lr = [[sum(ref.px[(y * n + x) * 4:(y * n + x) * 4 + 3]) for x in range(n)] for y in range(n)]
+    la = [[sum(c) for c in row] for row in art]
+    best = min(((sum((lr[y][x] - la[(y - a) % n][(x - b) % n]) ** 2
+                     for y in range(0, n, 2) for x in range(0, n, 2)), a, b)
+                for a in range(n) for b in range(n)))
+    _, a, b = best
+    out = Image(n, n)
+    for y in range(n):
+        for x in range(n):
+            out.put(x, y, bytes(art[(y - a) % n][(x - b) % n]))
+    return out
 
 
 def floor_cell(motif, repeated):
@@ -1141,7 +1292,11 @@ def main(game_dir, maps_dir, out_dir):
         bg = background(ts, pal)
         bg.save(os.path.join(out_dir, f"level{n:02d}_bg.png"))
         ceil_img = ceiling_cell(bg, tsname)
+        if tsname in CEIL_ISO:
+            ceil_img = iso_ceiling_cell(ceil_img)
         motif, floor_repeated = floor_motif(bg, tsname)
+        if tsname in FLOOR_PIXEL_ART:
+            motif = pixel_floor_motif(bg, motif)
         floor_cell(motif, floor_repeated).save(os.path.join(out_dir, f"level{n:02d}_floor.png"))
         if floor_repeated:
             motif.save(os.path.join(out_dir, f"level{n:02d}_floor_motif.png"))

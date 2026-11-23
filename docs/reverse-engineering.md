@@ -722,6 +722,18 @@ are paved with a visible repeating pattern: `KEEP` (level 1, octagons) and `TOWE
   the game, floor and walls no longer share one geometry. Checked at level 1 next to the game
   (13,16 and 13,17 facing north): same regular octagon rows, no fan at the bottom.
 
+- **Pixel-art tiling (KEEP, 2026-11-23)**: the folded motif stays blurry (an average of
+  many screen pixels), so Gladstone's floor is redrawn (`pixel_floor_motif`,
+  `FLOOR_PIXEL_ART`). The painted floor uses only **10 colours**, which form three 3-step
+  ramps plus a joint colour: joint (8,8,24); dark octagon (16,16,40 / 28,28,56 / 44,44,73);
+  light octagon (60,60,89 / 77,77,105 / 101,101,121); diamond (121,121,142 / 146,146,162 /
+  170,170,186). The 48 px motif is redrawn with these colours only, without anti-aliasing:
+  octagons at a 24 px pitch in a light/dark checkerboard (half-width 11, corners cut at
+  `|dx| + |dy| ≤ 17`), diamonds at the junctions (radius 5, 2 px joint), a 1 px rim (light
+  to the north-west, shade to the south-east) and marble flecks in 2 × 2 blocks. The
+  drawing is aligned on the folded motif by the circular shift that best matches its
+  luminance, so the joints keep the measured phase.
+
 ### 9.3d Wall pieces and the forest's upper part — verified in ScummVM (2026-11-22)
 
 `KyraRpgEngine::drawVcnBlocks` (`scene_rpg.cpp`) builds the view, 22×15 tiles, from the
@@ -887,6 +899,16 @@ structure. CIMMERIA's ceiling is black.
     folding; it is mirrored every other cell.
   - A fold symmetrised in all four directions was tried. It blurred the coffer into a
     cross, so it was not kept.
+- **Isometric coffer (KEEP, 2026-11-23)**: Gladstone's ceiling no longer uses the fold,
+  which stays blurry, but a coffer **drawn in relief** (`iso_ceiling_cell`, `CEIL_ISO`).
+  Three tones are taken from the folded coffer by luminance quantiles (light 88–98 %,
+  mid 30–50 %, dark 5–30 %). From the cell edge inwards: beam underside (0.09 cell, wood
+  grain, light arris), a first bevel (0.13), a flat ledge (0.035), a second bevel (0.045),
+  then the recessed panel (dark planks, ambient occlusion near the steps). The bevels meet at
+  45° mitres, as on a coffer seen from below. Each face is lit by its orientation, the light
+  coming from the far end of the view: north face 1.0, east/west 0.72, south 0.42. The
+  shading is left-right symmetric, so it survives the mirror applied every other cell, and
+  the texture turns with the gaze like the folded one. Other beamed tilesets keep the fold.
 - **Use in the 3D view**: the game draws the same background whichever way the party
   faces, so the ceiling texture is turned to the cardinal direction nearest to the gaze,
   while staying aligned on the cells. Crossbeams therefore always run across the view, as
@@ -2421,6 +2443,8 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-22**: built-in 3D view displayed with the game's pixel aspect (1.2 times taller than wide, 352×240 shown at 352×288); it was wider and flatter than the game view (§ 9.3a).
 - **2026-11-22**: door leaf height taken from the engine (`drawDoor`: bottom at view row 86 for the next-cell door, face row 78), 10 px higher than before; it now fills its frame up to the lintel, as in the game (§ 9.5).
 - **2026-11-22**: sharper Gladstone textures: the floor pattern takes its depth detail from its transpose (diagonal symmetry of the octagons, § 9.3c); beamed ceilings are folded without row interpolation, with cubic resolution weights, at 96×96 (§ 9.3f).
+- **2026-11-23**: Gladstone's ceiling (KEEP) generated as an isometric coffer in relief: beams, two mitred bevels lit by orientation, recessed planked panel, tones from the folded coffer (§ 9.3f).
+- **2026-11-23**: Gladstone's floor (KEEP) redrawn in pixel art with the 10 colours of the painted floor: checkerboard octagons, diamonds, 1 px rims, aligned on the folded motif (§ 9.3c).
 - **2026-11-22**: switches in the 3D view: door buttons attached by the level script (`assignLevelDecorationShape` + `resetBlockShapeAssignment`) now drawn; walls' switch type and clickable area exported; engine command op 20 (`clickwall`) clicks the wall in front like the game (`clickedWall`); the 3D view outlines the switch in front and clicks it; engine files versioned in URLs and served `no-cache` (§ 9.6).
 - **2026-11-22**: doors of the script-opened series (walls 8–12, 18–22: shape 0, e.g. Gladstone's locked library door) now drawn closed with their leaf; they looked open in the 3D view (§ 9.6).
 - **2026-11-23**: objects in the party's own cell (dropped in front of it) drawn as the engine does, full size at the bottom of the view (`_monsterScaleY`/`_monsterScaleX` tables); the 3D view projected them below the image (§ 9.3h).
