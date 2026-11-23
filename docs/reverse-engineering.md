@@ -2553,3 +2553,4 @@ spells, on the in-game automap) remains **unknown**.
   - **Fix**: `webLangString` reads a string and then restores the buffer it used and the rotation index. `webFormat` restores `_dialogueBuffer`.
   - **Verified**: after Victor's offer, hovering NON highlights it normally and OUI keeps its label.
   - **Merchant click**: the synthetic click on the merchant is also retried, up to 3 times, until a reply arrives, because it was not always taken.
+- **2026-11-24**: leaving a shop works. The user's sequence: click SORTIR, then the merchant says goodbye, and the scene only closes once that line is skipped with Space. The page's "Sortir" now waits for the end of any speech (skipping it), clicks SORTIR, then presses Space every 650 ms until the scene state ends (10 s max). Verified: from Victor's shop, about 2 s after the click, `_updateFlags` 3 → 0 and the party is back at 15,12 facing the door. The shop bar hides, and the 3D view drops the shop picture.

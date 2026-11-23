@@ -3075,10 +3075,16 @@
       barEl.classList.toggle("talk", talk);
       barEl.title = talk ? "Le marchand parle : la vente et la sortie attendent la fin du dialogue" : "";
     }, 400);
+    // Sortir : SORTIR cliqué, puis le marchand dit au revoir ; la scène ne se ferme qu'une fois ce
+    // dialogue passé (Espace, comme le joueur) : Espace répété jusqu'à la fermeture (10 s au plus)
     barEl.querySelector(".leave").addEventListener("click", async () => {
       const g = document.getElementById("dos"); if (g && g.focus) g.focus();
       await untilQuiet(true);
-      gameClick(270, 113);
+      await gameClick(270, 113);
+      for (let k = 0; k < 16 && !barEl.hidden; k++) {
+        await new Promise((ok) => setTimeout(ok, 650));
+        if (!barEl.hidden && window.LoLKeys) LoLKeys.pressGame("SKIP");
+      }
     });
     dlg.querySelector(".sx").addEventListener("click", () => dlg.close());
     dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
