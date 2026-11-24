@@ -3266,7 +3266,9 @@
       }
       d.addEventListener("dragover", (e) => {
         if (dragFrom >= 0 || dragSlot >= 0 || e.dataTransfer.types.includes("application/x-lol-action")) {
-          e.preventDefault(); e.dataTransfer.dropEffect = dragSlot >= 0 ? "move" : "copy"; d.classList.add("drop");
+          // l'effet doit être permis par la source (sac : « move », panneau de magie : « copy »), sinon
+          // le navigateur refuse le dépôt
+          e.preventDefault(); e.dataTransfer.dropEffect = dragSlot >= 0 || dragFrom >= 0 ? "move" : "copy"; d.classList.add("drop");
         }
       });
       d.addEventListener("dragleave", () => d.classList.remove("drop"));
