@@ -1407,6 +1407,38 @@ def tower_ceiling_cell(bg, size=CEIL_TEX):
     return img
 
 
+# Sol et plafond tirés des murs (docs/reverse-engineering.md § 9.3c) : aux Donjons (RUIN,
+# niveau 26), le fond montre au sol et au plafond les mêmes blocs aux joints de lave que les
+# murs. La face de mur simple (128 × 96, une case de large) se raccorde à gauche et à droite,
+# pas en haut et en bas : on l'empile en alternant avec son reflet vertical (raccords
+# invisibles), trois faces de large par rangée, décalées d'une rangée à l'autre. La première et
+# la dernière rangée de la face (arête claire du mur, luminosité 239 et 209 contre ~125) sont
+# écartées. Texture de WALL_SURF_SPAN cases (384 × 376 px), pixels recopiés tels quels.
+WALL_SURFACES = {"RUIN": 0}       # tileset -> n° de texture de la face de mur simple
+WALL_SURF_SPAN = 3
+
+
+def wall_surface(atlas, tex, shifts):
+    """Texture (WALL_SURF_SPAN cases de côté) faite de la face de mur tex ; shifts : décalage
+    horizontal (px) de chaque rangée de faces."""
+    cols = atlas.w // FACE_W
+    x0, y0 = (tex % cols) * FACE_W, (tex // cols) * FACE_H + 1
+    fh = FACE_H - 2                                   # sans l'arête claire du haut et du bas du mur
+    size = WALL_SURF_SPAN * FACE_W
+    height = (size // fh) * fh                        # 4 rangées de 94 px : 376 (étirement de 2 %)
+    img = Image(size, height)
+    for y in range(height):
+        r, v = y // fh, y % fh
+        if r % 2:
+            v = fh - 1 - v                            # une rangée sur deux : reflet vertical
+        sh = shifts[r % len(shifts)]
+        for x in range(size):
+            u = (x + sh) % FACE_W
+            o = ((y0 + v) * atlas.w + x0 + u) * 4
+            img.put(x, y, bytes(atlas.px[o:o + 3]))
+    return img
+
+
 def floor_cell(motif, repeated):
     """Texture d'une case : le motif répété (3 × 3 motifs ≈ 3,1 unités) pour un sol pavé ;
     pour un sol peint, la demi-case proche en damier 1 2 / 2 1, 2 étant 1 en miroir (le
@@ -1963,6 +1995,9 @@ def main(game_dir, maps_dir, out_dir):
                  if tsname in FLOOR_FLAGSTONES else None)
         floor_span = FLAG_SPAN if flags is not None else 1
         ceil_span = 1
+        if tsname in WALL_SURFACES:
+            flags, floor_span = wall_surface(atlas, WALL_SURFACES[tsname], (0, 64, 32, 96)), WALL_SURF_SPAN
+            ceil_img, ceil_span = wall_surface(atlas, WALL_SURFACES[tsname], (40, 104, 8, 72)), WALL_SURF_SPAN
         if tsname in TOWER_TILESETS:
             tf, tc = tower_floor(bg), tower_ceiling_cell(bg)
             if tf is not None:

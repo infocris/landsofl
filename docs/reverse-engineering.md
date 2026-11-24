@@ -787,6 +787,19 @@ are paved with a visible repeating pattern: `KEEP` (level 1, octagons) and `TOWE
   opacity 0.3: the fire niches and arches reflect on the paving. The ceiling stays black, as
   in the game (§ 9.3f).
 
+- **Dungeons from the walls (RUIN, level 26, 2026-11-24)**: the background shows the same
+  stone blocks with glowing lava joints on the floor and the ceiling as on the walls, so both
+  are built from the plain wall face (texture 0, 128 × 96, one cell wide):
+  - **seams**: the face joins left to right (mean edge difference 22, below the 27 between
+    neighbouring pixels), but not top to bottom (71). Its first and last rows are the
+    wall's light arris (luminance 239 and 209 against about 125 elsewhere).
+  - **`wall_surface`**: keeps rows 1–94 and stacks them, alternating with their vertical
+    mirror, so the vertical seams vanish. Each row holds three faces, shifted per row:
+    0/64/32/96 px on the floor, 40/104/8/72 px on the ceiling, so the two surfaces differ.
+    The pixels are copied unchanged.
+  - **size**: 3 cells across, 384 × 376 px (a 2 % stretch), the same stone scale as the
+    walls. `floorSpan` and `ceilSpan` are 3, without mirroring or Wang tiles (`WALL_SURFACES`).
+
 - **Caves (CAVE1, 2026-11-24)**: levels 5–9 share one background. Level 25 shows **the
   same drawing with another palette** (identical pixel counts per colour, green moss turned
   orange-brown). Floor: grey rock with green moss in the hollows. Ceiling: dark rock under
@@ -2634,6 +2647,7 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-24**: Cimmeria castle floor (CIMMERIA, levels 27–29) redrawn as red-brown pixel-art flagstones with near-black joints, and glossy like Gladstone's (§ 9.3c).
 - **2026-11-24**: Cimmeria flagstones with meandering joints (crazing): domain-warped Voronoi, continuous joints, mottled stone (§ 9.3c).
 - **2026-11-24**: manor paving more fragmented: 8 × 8 flagstones per cell instead of 5 × 5 (§ 9.3c).
+- **2026-11-24**: Dungeons (RUIN, level 26): floor and ceiling built from the plain wall face (lava-jointed blocks), stacked with vertical mirroring and row shifts, over 3 × 3 cells (§ 9.3c).
 - **2026-11-23**: mine ceiling (MINE1, levels 13–16) redrawn from the original background in pixel art: round logs on the cell edges, lagging boards, rock where boards are missing (§ 9.3f).
 - **2026-11-22**: switches in the 3D view: door buttons attached by the level script (`assignLevelDecorationShape` + `resetBlockShapeAssignment`) now drawn; walls' switch type and clickable area exported; engine command op 20 (`clickwall`) clicks the wall in front like the game (`clickedWall`); the 3D view outlines the switch in front and clicks it; engine files versioned in URLs and served `no-cache` (§ 9.6).
 - **2026-11-22**: doors of the script-opened series (walls 8–12, 18–22: shape 0, e.g. Gladstone's locked library door) now drawn closed with their leaf; they looked open in the 3D view (§ 9.6).
