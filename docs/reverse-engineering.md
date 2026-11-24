@@ -757,6 +757,10 @@ are paved with a visible repeating pattern: `KEEP` (level 1, octagons) and `TOWE
     south-east;
   - grain in 2 × 2 blocks and a few chips.
 
+- **Finer manor paving (2026-11-24)**: at the user's request, the manor floor is more
+  fragmented: 8 × 8 flagstones per cell instead of 5 × 5 (`FLAG_SITES_BY`, the new `sites`
+  parameter of `flagstone_floor`). That is about 0.4 unit per stone instead of 0.6, smaller
+  than measured on the background, chosen for looks. Other tilesets keep `FLAG_SITES` (5).
 - **Cimmeria flagstones (CIMMERIA, levels 27–29, 2026-11-24)**: the three levels share one
   background. Its floor is the same kind of crazy paving as the manor's, in red-brown. A
   single ramp of 15 tones runs from (4,0,0) to (105,48,44), and the joints are almost black,
@@ -2629,6 +2633,7 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-24**: tower floor and ceiling (TOWER1, levels 18–21) redrawn in pixel art: blue granite slabs flecked with mauve, joints on the measured lattice, over 2 × 2 cells; speckled mauve granite beams with a dark recess (§ 9.3c).
 - **2026-11-24**: Cimmeria castle floor (CIMMERIA, levels 27–29) redrawn as red-brown pixel-art flagstones with near-black joints, and glossy like Gladstone's (§ 9.3c).
 - **2026-11-24**: Cimmeria flagstones with meandering joints (crazing): domain-warped Voronoi, continuous joints, mottled stone (§ 9.3c).
+- **2026-11-24**: manor paving more fragmented: 8 × 8 flagstones per cell instead of 5 × 5 (§ 9.3c).
 - **2026-11-23**: mine ceiling (MINE1, levels 13–16) redrawn from the original background in pixel art: round logs on the cell edges, lagging boards, rock where boards are missing (§ 9.3f).
 - **2026-11-22**: switches in the 3D view: door buttons attached by the level script (`assignLevelDecorationShape` + `resetBlockShapeAssignment`) now drawn; walls' switch type and clickable area exported; engine command op 20 (`clickwall`) clicks the wall in front like the game (`clickedWall`); the 3D view outlines the switch in front and clicks it; engine files versioned in URLs and served `no-cache` (§ 9.6).
 - **2026-11-22**: doors of the script-opened series (walls 8–12, 18–22: shape 0, e.g. Gladstone's locked library door) now drawn closed with their leaf; they looked open in the 3D view (§ 9.6).

@@ -1008,6 +1008,7 @@ def pixel_floor_motif(bg, ref):
 FLOOR_FLAGSTONES = {"MANOR": 7, "CIMMERIA": 11}
 FLAG_SEEDS = {"CIMMERIA": 0x6A09E667}   # autre disposition des dalles que le manoir
 FLAG_WARP = {"CIMMERIA": 6.0}            # joints sinueux (craquelé) : déformation en pixels
+FLAG_SITES_BY = {"MANOR": 8}             # dallage plus fragmenté (dalles par case, de côté)
 FLAG_SPAN = 2                    # cases couvertes par la texture, de côté
 FLAG_PX = 128                    # pixels de texture par case
 FLAG_SITES = 5                   # dalles par case, de côté (≈ 0,6 unité, comme sur le fond)
@@ -1021,7 +1022,7 @@ def floor_ramp(bg, y_min=60):
     return sorted((c for c, n in cnt.items() if n > 10 and sum(c) > 0), key=sum)
 
 
-def flagstone_floor(bg, joint=7, seed=0x510E527F, warp=0.0):
+def flagstone_floor(bg, joint=7, seed=0x510E527F, warp=0.0, sites=FLAG_SITES):
     """Dallage irrégulier (FLAG_SPAN cases de côté), pixel art aux teintes du fond.
 
     warp > 0 (Cimmeria) : craquelé. Les coordonnées sont tordues par un bruit lissé avant le
@@ -1037,7 +1038,7 @@ def flagstone_floor(bg, joint=7, seed=0x510E527F, warp=0.0):
             x = ((x ^ (v & 0xFFFFFFFF)) * 0x85EBCA6B) & 0xFFFFFFFF
             x ^= x >> 13
         return x / 2 ** 32
-    n = FLAG_SITES * FLAG_SPAN                       # germes par côté de la texture
+    n = sites * FLAG_SPAN                            # germes par côté de la texture
     size = FLAG_PX * FLAG_SPAN
     step = size / n
     sites = [[((i + 0.5 + 0.7 * (h(1, i, j) - 0.5)) * step, (j + 0.5 + 0.7 * (h(2, i, j) - 0.5)) * step)
@@ -1958,7 +1959,7 @@ def main(game_dir, maps_dir, out_dir):
         if tsname in FLOOR_PIXEL_ART:
             motif = pixel_floor_motif(bg, motif)
         flags = (flagstone_floor(bg, FLOOR_FLAGSTONES[tsname], FLAG_SEEDS.get(tsname, 0x510E527F),
-                                 FLAG_WARP.get(tsname, 0.0))
+                                 FLAG_WARP.get(tsname, 0.0), FLAG_SITES_BY.get(tsname, FLAG_SITES))
                  if tsname in FLOOR_FLAGSTONES else None)
         floor_span = FLAG_SPAN if flags is not None else 1
         ceil_span = 1
