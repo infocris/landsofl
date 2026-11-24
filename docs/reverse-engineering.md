@@ -2106,6 +2106,43 @@ The meaning of the functions, however, can be read directly. Comparison with our
 - Saves and settings stay in the browser (IndexedDB), separate from the
   DOSBox version.
 
+## 10b. Reference: KForestland/lands-of-lore-1-re (MIT) — read 2026-11-24
+
+<https://github.com/KForestland/lands-of-lore-1-re> is a separate reverse-engineering project
+(formats, EMC2 script tables, level sheets, native offsets in the CD and floppy `MAIN.EXE`). It is
+only read here; nothing from it is copied into the code yet. What bears on cut-scenes and map
+transitions:
+
+- **TIM sequence scripts** (`docs/formats/tim.md`, `docs/unknowns/06_tim_opcodes.md`):
+  - container: IFF `FORM`/`AVFS`, with chunks `TEXT` (strings) and `AVTL` (16-bit words);
+  - instruction: `length, delay, opcode, params…`; the first ≤ 10 words are entry points of
+    parallel functions;
+  - the 139 CD files use only 11 commands: init/release/show WSA frame, loop points, dialogue box
+    (0x1D), and 0x19 = nested game function (copy screen region, fade/clear window, chat, music,
+    sound, set party position, give item…);
+  - matches ScummVM `TIMInterpreter_LoL`.
+- **WSA v2 animations** (`docs/formats/wsa.md`):
+  - header: frames, x/y add, w/h, delta size, flags (bit 0 = 768-byte palette);
+  - Frame4 delta frames, XOR-applied;
+  - pitfall: offsets do not count the palette in the 22 files that have one;
+  - a checker decodes every CD frame (4480 in 241 files).
+- **Per-level event tables** (`docs/levels/levelNN.md`): for each INF block entry, a static walk
+  lists its trigger mask (steps in, arrives, leaves, wall clicked, item put down/taken) and its
+  actions. Those actions include:
+  - "moves the party to level L, block B, facing F" (our `exits` lack the facing);
+  - the cut-scene TIM it loads, for example level 2:
+    - TIM1.TIM at 13,4 (arrival in the forest);
+    - SCOTIA1.TIM at 8,7;
+    - VICTOR5–7.TIM at the 12,8 / 12,9 / 13,9 jump to level 10;
+    - LYNN1–3.TIM at the marina;
+    - BOAT.TIM on the 8,12 click, which moves the party to level 3, block 526, facing 2.
+- **Fade helpers** (`docs/emc2_scripts.md`, `docs/emc2_native_handlers.md`), consistent with § 10a:
+  - 0x27 fadeToBlack: duration 10;
+  - 0x39 fadeClearSceneWindow: the same fade/clear helper the level change uses;
+  - 0x98 crossFadeRegion;
+  - 0xB8 crossFadeScene: draws the 176 × 120 scene rectangle and crossfades it;
+  - 0x92 / 0x93 prepare / restore special scene (fade flag, suspend GUI…).
+
 ## 11. Tools and outputs
 
 | Tool | Role | Output |
@@ -2752,3 +2789,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-24**: the map grid wraps beyond its edges (block index `& 0x3FF`, § 9.3j). The 3D view reads the cell beyond the edge with the same wrap, so the open cells on the South Forest's edge now have their outer wall. Verified in the standalone viewer, level 3, cell 0,19 facing west.
 - **2026-11-24**: dragging a bag item onto the action bar was refused by the browser. The bag sets `effectAllowed = "move"` while the bar answered `dropEffect = "copy"`, so no drop event fired; synthetic test events skip that check. The bar now answers "move" for bag drags. Verified with a real mouse drag (CDP `Input.setInterceptDrags` / `dispatchDragEvent`): the ointment lands in slot 4.
 - **2026-11-24**: exits whose face is an opaque picture that the party walks into (the thieves' cave mouth in the North Forest, level 2 cell 0,3, wall 63 = texture 54 not blocking; the cave and mine stair pictures 38/39 on many levels) no longer open a portal in the 3D view. Before this change, the destination level's render was pasted there and showed as stretched stripes above the cave. Portals now only apply to non-opaque faces (open doors, gates). Verified in the standalone viewer: level 2 from 3,3 and 2,3 facing west; the Gladstone gate is unchanged (door, non-opaque).
+- **2026-11-24**: read KForestland/lands-of-lore-1-re (§ 10b): TIM/WSA formats, per-level INF event tables (cut-scene triggers, level jumps with facing), fade helpers.
