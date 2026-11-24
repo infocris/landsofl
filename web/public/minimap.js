@@ -3567,8 +3567,31 @@
         stackView = !stackView; paint(); b.blur();
         try { localStorage.setItem("invStacks", stackView ? "on" : "off"); } catch (e) {}
         lastInv = ""; updateInventory().catch(() => {});
+        dispatchEvent(new Event("lol-stacks"));
       });
+      addEventListener("lol-stacks-set", () => paint());
     }
+    // même réglage pour la barre d'objets du jeu (moteur ScummVM, commande 26) : renvoyé au
+    // changement et toutes les 3 s (le jeu peut avoir redémarré)
+    let stackSent = -1, stackSentAt = 0;
+    const sendStacks = async () => {
+      const v = stackView ? 1 : 0;
+      if (v === stackSent && performance.now() - stackSentAt < 3000) return;
+      const r = await mem.cmd({ op: "stacks", a: v }, 1500);
+      if (r && r.code === 0) { stackSent = v; stackSentAt = performance.now(); }
+    };
+    addEventListener("lol-stacks", () => { stackSent = -1; sendStacks().catch(() => {}); });
+    // case « Empiler les objets identiques » de la fenêtre Options
+    window.lolStacks = (on) => {
+      if (on === undefined) return stackView;
+      stackView = !!on;
+      try { localStorage.setItem("invStacks", stackView ? "on" : "off"); } catch (e) {}
+      lastInv = ""; updateInventory().catch(() => {});
+      dispatchEvent(new Event("lol-stacks-set"));
+      dispatchEvent(new Event("lol-stacks"));
+      return stackView;
+    };
+    setInterval(() => { if (!previewing) sendStacks().catch(() => {}); }, 1000);
   }
 
   // --- Triche : monter de niveau ---------------------------------------------------

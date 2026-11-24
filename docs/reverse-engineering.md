@@ -1956,6 +1956,21 @@ The meaning of the functions, however, can be read directly. Comparison with our
     target and clearing.
   - **Stacks view**: the "Par piles" button shows the bag as one slot per item type, with a count;
     each item still has its own slot in the game. Dragging a stack moves its first item.
+  - **Stacks in the game's own bar** (2026-11-25, ScummVM engine, page command 26 `stacks`). The
+    Options window's "Empiler les objets identiques" box (same setting as "Par piles", localStorage
+    `invStacks`, re-sent every 3 s) switches the engine's 9-slot item bar to one slot per stack:
+    - stack key: `itemPropertyIndex` plus `shpCurFrame_flg & 0x1FFF` (icon frame, e.g. charges);
+      stacks listed in bag-slot order; the count is drawn in FONT6P, colour 254, right-aligned with
+      a shadow, at (x + 20, 190);
+    - `_inventory[48]` is unchanged (saves, scripts, page commands still see real slots); only
+      `gui_drawInventoryItem`, `clickedInventorySlot`, `clickedInventoryScroll` and
+      `addItemToInventory` change, with their own scroll `_webStackScroll` (no wrap-around, one empty
+      slot left at the end so a new kind of item can be put down);
+    - click with empty hand: takes the stack's first item; with an item of the same kind, or on an
+      empty slot: the item goes to the first free bag slot; with another kind: swap with the stack's
+      first item (the Ruby of Truth merge still runs);
+    - verified: 4 potions and 2 herbs shown as "4" and "2"; take, put back, swap and put down give
+      the expected `_inventory` contents.
   - **Verified**: 3 aloes created (4 in the bag), life lowered to 8 / 20, aloe dragged onto slot 1
     in the stacks view, key 1 → 13 / 20 and 3 left. Slot 2 set to "Attaque : Michael" from its menu.
   - **Dragging actions** (2026-11-23). The magic panel's level buttons and new attack chips
@@ -2905,3 +2920,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-24**: Gladstone gate (§ 9.3k): the portcullis WSA plays on the gate face in the 3D view before the forest loads; the exit cell keeps its own floor (the portal copy starts at its far side). Verified with CDP: from 13,18 facing south, the 3D view shows the portcullis rising, then the forest at 10,3.
 - **2026-11-24**: forest → Gladstone (§ 9.3l): the 3D view shows the castle picture (KEEP.CPS, or KEEPBRN.CPS with flag 67) at 10,3 facing north, then the guard's animated face (GUARD.WSA, frame order from GUARD4.TIM) at 10,2 until Gladstone loads; the view's place label no longer doubles the scene label. Verified with CDP.
 - **2026-11-24**: script pictures (§ 9.3m): the engine publishes when the scene window shows script art (`loadBitmap`, full-window WSA; cleared when the 3D scene is drawn). The modern interface then copies the game's scene window onto the 3D view, so all place and character pictures and their animations show, including the ~60 the export missed. Verified with CDP on the Gladstone guard and Victor's armoury.
+- **2026-11-25**: item stacks in the game's own inventory bar (ScummVM engine, command 26; § 10a).

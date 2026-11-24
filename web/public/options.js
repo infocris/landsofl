@@ -52,6 +52,9 @@
     <div class="ob"><label><input type="checkbox" id="opt-cheats"><span>Afficher les options de triche
       <small>Vie et magie infinies, attaque auto, couronnes, déblocages, création et destruction d'objets, montée de niveau,
       compagnons, téléportation sur la carte. Cachées, les triches actives sont coupées.</small></span></label>
+    <label style="margin-top:12px"><input type="checkbox" id="opt-stacks"><span>Empiler les objets identiques
+      <small>La barre d'objets du jeu (et le sac du panneau) montre une case par type d'objet, avec le nombre.
+      Un clic prend un exemplaire ; poser un objet du même type l'ajoute à la pile. Version ScummVM.</small></span></label>
     <div class="row">Taille de l'interface <select id="opt-zoom"><option value="1">100 %</option><option value="1.5">150 %</option>
       <option value="2">200 %</option></select></div></div>`;
   document.body.append(open, dlg);
@@ -73,7 +76,11 @@
     try { localStorage.setItem("showCheats", shown ? "on" : "off"); } catch (e) {}
     apply();
   });
-  open.addEventListener("click", () => { open.blur(); dlg.showModal(); });
+  const stk = dlg.querySelector("#opt-stacks");
+  const paintStacks = () => { stk.checked = window.lolStacks ? window.lolStacks() : (() => { try { return localStorage.getItem("invStacks") === "on"; } catch (e) { return false; } })(); };
+  stk.addEventListener("change", () => { if (window.lolStacks) window.lolStacks(stk.checked); else paintStacks(); });
+  addEventListener("lol-stacks-set", paintStacks);
+  open.addEventListener("click", () => { open.blur(); paintStacks(); dlg.showModal(); });
   dlg.querySelector(".ox").addEventListener("click", () => dlg.close());
   dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
   dlg.addEventListener("close", () => { const f = document.getElementById("dos"); if (f && f.focus) f.focus(); });

@@ -1,5 +1,23 @@
+diff --git a/engines/kyra/engine/items_lol.cpp b/engines/kyra/engine/items_lol.cpp
+index 4c00889e..53832b5e 100644
+--- a/engines/kyra/engine/items_lol.cpp
++++ b/engines/kyra/engine/items_lol.cpp
+@@ -258,6 +258,13 @@ bool LoLEngine::addItemToInventory(Item itemIndex) {
+ 	if (i == 48)
+ 		return false;
+ 
++	if (_webStackInv) {	// version web : barre par piles, on montre la pile de l'objet
++		_inventory[pos] = itemIndex;
++		webStackShow(itemIndex);
++		gui_drawInventory();
++		return true;
++	}
++
+ 	while ((_inventoryCurItem > pos) || ((_inventoryCurItem + 9) <= pos)) {
+ 		if (++_inventoryCurItem > 47)
+ 			_inventoryCurItem -= 48;
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..a625330e 100644
+index 392e4c2d..a74a105c 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -32,6 +32,7 @@
@@ -21,7 +39,7 @@ index 392e4c2d..a625330e 100644
  namespace Kyra {
  
  const char *const LoLEngine::kMouseKeymapName = "lolmouse";
-@@ -929,6 +934,773 @@ void LoLEngine::startupNew() {
+@@ -929,6 +934,790 @@ void LoLEngine::startupNew() {
  	_screen->showMouse();
  }
  
@@ -728,6 +746,23 @@ index 392e4c2d..a625330e 100644
 +		clickedPortraitLeft(&btn);
 +		return 0;
 +	}
++	if (op == 26) {	// barre d'objets du jeu par piles (a = 1) ou par emplacements (a = 0)
++		if ((a != 0) != _webStackInv) {
++			_webStackInv = a != 0;
++			if (_webStackInv) {	// on garde en vue la pile du premier objet visible
++				_webStackScroll = 0;
++				for (int i = 0; i < 9; i++) {
++					const Item it = _inventory[(_inventoryCurItem + i) % 48];
++					if (it) {
++						webStackShow(it);
++						break;
++					}
++				}
++			}
++			gui_drawInventory();
++		}
++		return 0;
++	}
 +	if (op == 6) {	// ajouter a couronnes
 +		if (a <= 0)
 +			return 1;
@@ -795,7 +830,7 @@ index 392e4c2d..a625330e 100644
  void LoLEngine::runLoop() {
  	// Initialize debugger since how it should be fully usable
  	static_cast<Debugger_LoL *>(getDebugger())->initialize();
-@@ -957,6 +1729,7 @@ void LoLEngine::runLoop() {
+@@ -957,6 +1746,7 @@ void LoLEngine::runLoop() {
  		gui_updateInput();
  
  		update();
@@ -803,7 +838,7 @@ index 392e4c2d..a625330e 100644
  
  		updatePlayTimer();
  
-@@ -1031,6 +1804,7 @@ void LoLEngine::readSettings() {
+@@ -1031,6 +1821,7 @@ void LoLEngine::readSettings() {
  }
  
  void LoLEngine::update() {
@@ -811,7 +846,7 @@ index 392e4c2d..a625330e 100644
  	updateSequenceBackgroundAnimations();
  
  	if (_updateCharNum != -1 && _system->getMillis() > _updatePortraitNext)
-@@ -1178,6 +1952,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
+@@ -1178,6 +1969,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
  	return size;
  }
  
@@ -909,7 +944,7 @@ index 392e4c2d..a625330e 100644
  bool LoLEngine::addCharacter(int id) {
  	const uint16 *cdf[] = {
  		_charDefsMan, _charDefsMan, _charDefsMan, _charDefsWoman,
-@@ -1477,6 +2342,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
+@@ -1477,6 +2359,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
  
  	int newVal = (mode == 2) ? (pointsMax + points) : (mode ? (pointsCur + points) : points);
  	newVal = CLIP(newVal, 0, pointsMax);
@@ -918,7 +953,7 @@ index 392e4c2d..a625330e 100644
  
  	if (type) {
  		c->magicPointsCur = newVal;
-@@ -1969,6 +2836,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
+@@ -1969,6 +2853,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
  		}
  	}
  
@@ -926,7 +961,7 @@ index 392e4c2d..a625330e 100644
  	if (!skipAnim && charId < 3) {
  		_updateCharNum = charId;
  		_portraitSpeechAnimMode = mode;
-@@ -1981,6 +2849,8 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
+@@ -1981,6 +2866,8 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
  	else if (paramList)
  		snd_playCharacterSpeech(paramList[2], ch, 0);
  
@@ -935,7 +970,7 @@ index 392e4c2d..a625330e 100644
  	if (textEnabled()) {
  		if (mode == 0) {
  			_txt->printDialogueText2(3, str, script, paramList, paramIndex);
-@@ -2074,6 +2944,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
+@@ -2074,6 +2961,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
  
  void LoLEngine::delay(uint32 millis, bool doUpdate, bool) {
  	while (millis && !shouldQuit()) {
@@ -943,7 +978,7 @@ index 392e4c2d..a625330e 100644
  		if (doUpdate)
  			update();
  		else
-@@ -2092,6 +2963,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
+@@ -2092,6 +2980,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
  // spells
  
  int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
@@ -956,7 +991,7 @@ index 392e4c2d..a625330e 100644
  	_activeSpell.spell = spellType;
  	_activeSpell.p = &_spellProperties[spellType];
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index 2cfadf37..30762f04 100644
+index 2cfadf37..dc7ee3c1 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
 @@ -315,6 +315,13 @@ private:
@@ -973,7 +1008,7 @@ index 2cfadf37..30762f04 100644
  	void update() override;
  
  	// mouse
-@@ -1072,6 +1079,31 @@ private:
+@@ -1072,6 +1079,39 @@ private:
  
  	LoLItem *_itemsInPlay;
  	ItemProperty *_itemProperties;
@@ -987,6 +1022,14 @@ index 2cfadf37..30762f04 100644
 +	int webCastSpell(int charNum, int spell, int level, int target);	// version web : comme le menu de magie d'un portrait
 +	uint8 _webAutoSpell[4] = { 0xFF, 0xFF, 0xFF, 0xFF };	// attaque auto : sort de chaque personnage (0xFF = arme)	// version web : choisir le personnage d'une place du groupe	// version web : sauvegardes listées (n° u16, nom 40 octets)
 +	bool _webInMenu = false;	// version web : menu (disquette) ouvert
++	// version web : barre d'objets du jeu « par piles » (une case par type d'objet, avec le nombre) ;
++	// chaque objet garde son emplacement dans _inventory, seul l'affichage et le clic changent
++	bool _webStackInv = false;
++	int _webStackScroll = 0;
++	bool webSameStack(Item a, Item b) const;
++	int webStackList(int8 *first, uint8 *count) const;
++	int webStackSlot(int index, Item hand) const;
++	void webStackShow(Item item);
 +	// version web : dernière réplique affichée (texte mis en forme), qui la dit (place 0-3 dans le
 +	// groupe, -1 personnage hors du groupe, -2 texte sans locuteur) et numéro de réplique
 +public:
@@ -1052,10 +1095,133 @@ index 055e4f8c..8fd1d5c3 100644
  	const uint8 *p = _screen->getCPagePtr(2);
  	const uint8 *ts[16];
 diff --git a/engines/kyra/gui/gui_lol.cpp b/engines/kyra/gui/gui_lol.cpp
-index 926e60dc..31bb0dec 100644
+index 926e60dc..96cab456 100644
 --- a/engines/kyra/gui/gui_lol.cpp
 +++ b/engines/kyra/gui/gui_lol.cpp
-@@ -1543,7 +1543,11 @@ int LoLEngine::clickedOptions(Button *button) {
+@@ -87,9 +87,83 @@ void LoLEngine::gui_drawInventory() {
+ 	}
+ }
+ 
++// version web : deux objets vont dans la même pile s'ils sont du même type et ont la même image
++// (charges d'une baguette, état d'un objet : bits 0-12 de shpCurFrame_flg)
++bool LoLEngine::webSameStack(Item a, Item b) const {
++	return a && b && _itemsInPlay[a].itemPropertyIndex == _itemsInPlay[b].itemPropertyIndex &&
++		(_itemsInPlay[a].shpCurFrame_flg & 0x1FFF) == (_itemsInPlay[b].shpCurFrame_flg & 0x1FFF);
++}
++
++// piles du sac, dans l'ordre des emplacements : premier emplacement et nombre d'objets de chacune
++int LoLEngine::webStackList(int8 *first, uint8 *count) const {
++	int n = 0;
++	for (int i = 0; i < 48; i++) {
++		if (!_inventory[i])
++			continue;
++		int k = 0;
++		while (k < n && !webSameStack(_inventory[first[k]], _inventory[i]))
++			k++;
++		if (k == n) {
++			first[n] = i;
++			count[n++] = 0;
++		}
++		count[k]++;
++	}
++	return n;
++}
++
++// emplacement réel visé par un clic sur la case index de la barre (-1 : rien à faire). Main vide :
++// premier objet de la pile. Objet en main d'un autre type : échange avec ce premier objet. Même
++// type, ou case vide : l'objet va dans un emplacement libre (il rejoint sa pile).
++int LoLEngine::webStackSlot(int index, Item hand) const {
++	int8 first[48];
++	uint8 count[48];
++	const int n = webStackList(first, count);
++	const int k = _webStackScroll + index;
++	const int target = k < n ? first[k] : -1;
++	if (!hand || (target >= 0 && !webSameStack(hand, _inventory[target])))
++		return target;
++	for (int i = 0; i < 48; i++) {
++		if (!_inventory[i])
++			return i;
++	}
++	return -1;
++}
++
++// défile la barre pour montrer la pile de l'objet (ajouté au sac)
++void LoLEngine::webStackShow(Item item) {
++	int8 first[48];
++	uint8 count[48];
++	const int n = webStackList(first, count);
++	for (int k = 0; k < n; k++) {
++		if (!webSameStack(_inventory[first[k]], item))
++			continue;
++		if (k < _webStackScroll || k >= _webStackScroll + 9)
++			_webStackScroll = MAX(0, MIN(k, n - 8));
++		return;
++	}
++}
++
+ void LoLEngine::gui_drawInventoryItem(int index) {
+ 	static const uint16 inventoryXpos[] = { 0x6A, 0x7F, 0x94, 0xA9, 0xBE, 0xD3, 0xE8, 0xFD, 0x112 };
+ 	int x = inventoryXpos[index];
++	if (_webStackInv) {
++		int8 first[48];
++		uint8 count[48];
++		const int n = webStackList(first, count);
++		_webStackScroll = CLIP(_webStackScroll, 0, n >= 9 ? n - 8 : 0);	// une case vide au bout pour poser un nouveau type
++		const int k = _webStackScroll + index;
++		_screen->drawShape(_screen->_curPage, _gameShapes[4], x, 179, 0, k & 1 ? 0 : 1);
++		if (k < n) {
++			_screen->drawShape(_screen->_curPage, getItemIconShapePtr(_inventory[first[k]]), x + 1, 180, 0, 0);
++			if (count[k] > 1) {
++				Screen::FontId of = _screen->setFont(Screen::FID_6_FNT);
++				_screen->fprintString("%d", x + 20, 190, _flags.use16ColorMode ? 0x33 : 254, 0, 2 | 4, count[k]);
++				_screen->setFont(of);
++			}
++		}
++		return;
++	}
+ 	int item = _inventoryCurItem + index;
+ 	if (item > 47)
+ 		item -= 48;
+@@ -1336,6 +1410,11 @@ int LoLEngine::clickedInventorySlot(Button *button) {
+ 	int slot = _inventoryCurItem + button->arg;
+ 	if (slot > 47)
+ 		slot -= 48;
++	if (_webStackInv) {	// version web : barre par piles
++		slot = webStackSlot(button->arg, _itemInHand);
++		if (slot < 0)
++			return 1;
++	}
+ 
+ 	uint16 slotItem = _inventory[slot];
+ 	int hItem = _itemInHand;
+@@ -1378,7 +1457,10 @@ int LoLEngine::clickedInventorySlot(Button *button) {
+ 		_inventory[slot] = hItem;
+ 	}
+ 
+-	gui_drawInventoryItem(button->arg);
++	if (_webStackInv)
++		gui_drawInventory();	// les piles ont changé (nombres, cases suivantes)
++	else
++		gui_drawInventoryItem(button->arg);
+ 
+ 	return 1;
+ }
+@@ -1392,6 +1474,14 @@ int LoLEngine::clickedInventoryScroll(Button *button) {
+ 	if (button->flags2 & 0x1000)
+ 		inc *= 9;
+ 
++	if (_webStackInv) {	// version web : barre par piles, sans tour complet (bornée au dessin)
++		_webStackScroll = MAX(0, _webStackScroll + inc);
++		gui_toggleButtonDisplayMode(shp, 1);
++		gui_drawInventory();
++		gui_toggleButtonDisplayMode(shp, 0);
++		return 1;
++	}
++
+ 	_inventoryCurItem += inc;
+ 
+ 	gui_toggleButtonDisplayMode(shp, 1);
+@@ -1543,7 +1633,11 @@ int LoLEngine::clickedOptions(Button *button) {
  	if (_flags.isTalkie && getVolume(kVolumeSpeech) == 2)
  		_configVoice |= (textEnabled() ? 2 : 1);
  
