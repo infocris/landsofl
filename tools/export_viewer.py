@@ -1007,6 +1007,7 @@ def pixel_floor_motif(bg, ref):
 # joints presque noirs
 FLOOR_FLAGSTONES = {"MANOR": 7, "CIMMERIA": 11}
 FLAG_SEEDS = {"CIMMERIA": 0x6A09E667}   # autre disposition des dalles que le manoir
+FLAG_WARP = {"CIMMERIA": 6.0}            # joints sinueux (craquelé) : déformation en pixels
 FLAG_SPAN = 2                    # cases couvertes par la texture, de côté
 FLAG_PX = 128                    # pixels de texture par case
 FLAG_SITES = 5                   # dalles par case, de côté (≈ 0,6 unité, comme sur le fond)
@@ -1020,8 +1021,12 @@ def floor_ramp(bg, y_min=60):
     return sorted((c for c, n in cnt.items() if n > 10 and sum(c) > 0), key=sum)
 
 
-def flagstone_floor(bg, joint=7, seed=0x510E527F):
-    """Dallage irrégulier (FLAG_SPAN cases de côté), pixel art aux teintes du fond."""
+def flagstone_floor(bg, joint=7, seed=0x510E527F, warp=0.0):
+    """Dallage irrégulier (FLAG_SPAN cases de côté), pixel art aux teintes du fond.
+
+    warp > 0 (Cimmeria) : craquelé. Les coordonnées sont tordues par un bruit lissé avant le
+    Voronoï (± warp px), donc les joints serpentent ; joints d'un pixel, pierre marbrée. (Des
+    fissures secondaires en courbes de niveau d'un bruit ont été essayées : boucles et croix.)"""
     ramp = floor_ramp(bg)
     if len(ramp) < 8:
         return None
@@ -1037,10 +1042,17 @@ def flagstone_floor(bg, joint=7, seed=0x510E527F):
     step = size / n
     sites = [[((i + 0.5 + 0.7 * (h(1, i, j) - 0.5)) * step, (j + 0.5 + 0.7 * (h(2, i, j) - 0.5)) * step)
               for i in range(n)] for j in range(n)]
+    if warp:
+        _, noise, _, nsize = _cave_tools(seed ^ 0x5A5A5A5A)
+        assert nsize == size
     img = Image(size, size)
     for y in range(size):
         for x in range(size):
-            gi, gj = int(x / step), int(y / step)
+            px_, py_ = x + 0.5, y + 0.5
+            if warp:                                  # joints sinueux : domaine tordu
+                px_ += warp * (2 * noise(x, y, 32, 1) - 1) + 0.35 * warp * (2 * noise(x, y, 8, 2) - 1)
+                py_ += warp * (2 * noise(x, y, 32, 3) - 1) + 0.35 * warp * (2 * noise(x, y, 8, 4) - 1)
+            gi, gj = math.floor(px_ / step), math.floor(py_ / step)
             best = []
             for dj in (-1, 0, 1):
                 for di in (-1, 0, 1):
@@ -1048,7 +1060,7 @@ def flagstone_floor(bg, joint=7, seed=0x510E527F):
                     sx, sy = sites[j % n][i % n]
                     sx += (i // n) * size            # germe d'une texture voisine (périodique)
                     sy += (j // n) * size
-                    best.append(((sx - x - 0.5) ** 2 + (sy - y - 0.5) ** 2, i % n, j % n, sx, sy))
+                    best.append(((sx - px_) ** 2 + (sy - py_) ** 2, i % n, j % n, sx, sy))
             best.sort()
             d1, i1, j1, sx1, sy1 = best[0]
             d2, _, _, sx2, sy2 = best[1]
@@ -1056,9 +1068,9 @@ def flagstone_floor(bg, joint=7, seed=0x510E527F):
             ex, ey = sx2 - sx1, sy2 - sy1
             el = max(1e-6, (ex * ex + ey * ey) ** 0.5)
             gap = (d2 - d1) / (2 * el)
-            if gap < 0.45:
+            if gap < (0.75 if warp else 0.45):        # craquelé : joint continu en diagonale
                 idx = top - joint                     # cœur du joint
-            elif gap < 1.0:
+            elif gap < 1.0 and not warp:
                 idx = top - joint + 2                 # bord du joint
             else:
                 base = top - (h(3, i1, j1) < 0.45) - (h(4, i1, j1) < 0.15)   # teinte de la dalle
@@ -1073,7 +1085,9 @@ def flagstone_floor(bg, joint=7, seed=0x510E527F):
                     idx = min(top, idx + 1)
                 if h(6, i1, j1, x // 3, y // 3) < 0.012:
                     idx = top - 5                     # trou, éclat
-            img.put(x, y, bytes(ramp[max(0, idx)]))
+                if warp:
+                    idx += round(2.4 * (noise(x, y, 8, 7) - 0.5))   # pierre marbrée
+            img.put(x, y, bytes(ramp[max(0, min(top, idx))]))
     return img
 
 
@@ -1943,7 +1957,8 @@ def main(game_dir, maps_dir, out_dir):
         motif, floor_repeated = floor_motif(bg, tsname)
         if tsname in FLOOR_PIXEL_ART:
             motif = pixel_floor_motif(bg, motif)
-        flags = (flagstone_floor(bg, FLOOR_FLAGSTONES[tsname], FLAG_SEEDS.get(tsname, 0x510E527F))
+        flags = (flagstone_floor(bg, FLOOR_FLAGSTONES[tsname], FLAG_SEEDS.get(tsname, 0x510E527F),
+                                 FLAG_WARP.get(tsname, 0.0))
                  if tsname in FLOOR_FLAGSTONES else None)
         floor_span = FLAG_SPAN if flags is not None else 1
         ceil_span = 1

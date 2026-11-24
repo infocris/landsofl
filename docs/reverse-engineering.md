@@ -766,6 +766,19 @@ are paved with a visible repeating pattern: `KEEP` (level 1, octagons) and `TOWE
     `FLOOR_FLAGSTONES` (manor 7, so its output is unchanged; Cimmeria 11);
   - a seed, in `FLAG_SEEDS`, so the stone layout differs from the manor's.
 
+  - **Meandering joints** (2026-11-24): seen closer, Cimmeria's joints are not the
+    straight polygon edges of the manor but thin **winding crack lines** (crazing), around
+    stones with mottled tones. `flagstone_floor` therefore takes a third parameter, `warp`
+    (`FLAG_WARP`, 6 px for CIMMERIA, 0 elsewhere):
+    - the coordinates are warped by periodic smoothed noise (scales 32 and 8 px) before the
+      Voronoi lookup, so the joints meander;
+    - the joint is a single core of under 0.75 px on each side of the bisector, so
+      diagonal joints stay continuous;
+    - the stone is mottled by ±1 tone.
+
+    Secondary hairline cracks drawn along noise contour lines were tried: they formed
+    small loops and crosses, so they were not kept.
+
   The glossy floor of the 3D view (§ 9.3c, glossy floor) is on for CIMMERIA too, at peak
   opacity 0.3: the fire niches and arches reflect on the paving. The ceiling stays black, as
   in the game (§ 9.3f).
@@ -2615,6 +2628,7 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-24**: the mines of Urbish (URBISH, level 12) get the mine timbering ceiling: same drawing as MINE1, own rock tones (§ 9.3f).
 - **2026-11-24**: tower floor and ceiling (TOWER1, levels 18–21) redrawn in pixel art: blue granite slabs flecked with mauve, joints on the measured lattice, over 2 × 2 cells; speckled mauve granite beams with a dark recess (§ 9.3c).
 - **2026-11-24**: Cimmeria castle floor (CIMMERIA, levels 27–29) redrawn as red-brown pixel-art flagstones with near-black joints, and glossy like Gladstone's (§ 9.3c).
+- **2026-11-24**: Cimmeria flagstones with meandering joints (crazing): domain-warped Voronoi, continuous joints, mottled stone (§ 9.3c).
 - **2026-11-23**: mine ceiling (MINE1, levels 13–16) redrawn from the original background in pixel art: round logs on the cell edges, lagging boards, rock where boards are missing (§ 9.3f).
 - **2026-11-22**: switches in the 3D view: door buttons attached by the level script (`assignLevelDecorationShape` + `resetBlockShapeAssignment`) now drawn; walls' switch type and clickable area exported; engine command op 20 (`clickwall`) clicks the wall in front like the game (`clickedWall`); the 3D view outlines the switch in front and clicks it; engine files versioned in URLs and served `no-cache` (§ 9.6).
 - **2026-11-22**: doors of the script-opened series (walls 8–12, 18–22: shape 0, e.g. Gladstone's locked library door) now drawn closed with their leaf; they looked open in the 3D view (§ 9.6).
