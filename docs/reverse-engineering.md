@@ -955,7 +955,7 @@ structure. CIMMERIA's ceiling is black.
   45° mitres, as on a coffer seen from below. Each face is lit by its orientation, the light
   coming from the far end of the view: north face 1.0, east/west 0.72, south 0.42. The
   shading is left-right symmetric, so it survives the mirror applied every other cell, and
-  the texture turns with the gaze like the folded one. TOWER1 and URBISH keep the fold.
+  the texture turns with the gaze like the folded one. TOWER1 keeps the fold.
 - **Swamp canopy (SWAMP, level 11, 2026-11-24)**: the painted ceiling (rows 0–16) is a dense
   vault of foliage: dark green leaves and vines with a few red-brown branches. It fades into
   a grey-green haze (rows 18–40, mostly (56,56,52)). The former texture was the near band
@@ -1017,6 +1017,10 @@ structure. CIMMERIA's ceiling is black.
     smoothed value noise, with dark cracks between the blocks.
   The texture turns with the gaze, as for the other ceilings, so the boards always run along
   the corridor and the crossbeams across it, as in the game.
+  **The mines of Urbish (URBISH, level 12)** have the same timbering: 90 % of the ceiling
+  pixels (rows 0–33) are identical to MINE1's. Only the rock tones differ slightly, from
+  (28,12,12) to (101,89,81). URBISH has used `mine_ceiling_cell` with its own tones since
+  2026-11-24 (`CEIL_MINE`).
 - **Use in the 3D view**: the game draws the same background whichever way the party
   faces, so the ceiling texture is turned to the cardinal direction nearest to the gaze,
   while staying aligned on the cells. Crossbeams therefore always run across the view, as
@@ -2575,6 +2579,7 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-24**: cave floor and ceiling (CAVE1, levels 5–9 and 25) redrawn in pixel art on a periodic Voronoi diagram: domed rock blocks with moss in the joints, ceiling bumps under moss and roots; moss/rock split by saturation, so level 25's palette works too; `ceilSpan` in the 3D view (§ 9.3c).
 - **2026-11-24**: Gladstone's ceiling (KEEP) redrawn from the original background in pixel art: framed beige beams with a beaded moulding, angled faces, shadow line, dark recess; the isometric coffer is no longer used (§ 9.3f).
 - **2026-11-24**: swamp ceiling (SWAMP, level 11) redrawn as a pixel-art canopy: two layers of leaves, red-brown branches, haze in the gaps (§ 9.3f). The viewer page now loads `viewer.js` with a new version: the old one stayed cached and hid the `viewer.js` changes since 2026-11-23.
+- **2026-11-24**: the mines of Urbish (URBISH, level 12) get the mine timbering ceiling: same drawing as MINE1, own rock tones (§ 9.3f).
 - **2026-11-23**: mine ceiling (MINE1, levels 13–16) redrawn from the original background in pixel art: round logs on the cell edges, lagging boards, rock where boards are missing (§ 9.3f).
 - **2026-11-22**: switches in the 3D view: door buttons attached by the level script (`assignLevelDecorationShape` + `resetBlockShapeAssignment`) now drawn; walls' switch type and clickable area exported; engine command op 20 (`clickwall`) clicks the wall in front like the game (`clickedWall`); the 3D view outlines the switch in front and clicks it; engine files versioned in URLs and served `no-cache` (§ 9.6).
 - **2026-11-22**: doors of the script-opened series (walls 8–12, 18–22: shape 0, e.g. Gladstone's locked library door) now drawn closed with their leaf; they looked open in the 3D view (§ 9.6).

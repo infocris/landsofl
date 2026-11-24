@@ -561,7 +561,7 @@ def iso_ceiling_cell(folded, size=CEIL_TEX):
 # fuyant en diagonale à l'écran), et entre eux des planches de coffrage posées dans le sens du
 # couloir, avec de la roche grise là où elles manquent. Pixel art : seulement les teintes du
 # plafond peint (rampe bois, rampe roche), sans anti-crénelage.
-CEIL_MINE = {"MINE1"}
+CEIL_MINE = {"MINE1", "URBISH"}          # URBISH : mines d'Urbish (niveau 12), même charpente
 MINE_LOG = 0.12                  # demi-largeur d'un rondin (fraction de case), centré sur le bord
 MINE_BOARD = 11                  # largeur d'une planche de coffrage (pixels de texture)
 
