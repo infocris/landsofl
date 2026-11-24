@@ -396,9 +396,51 @@
     V.wallsSrc = walls;
     return V;
   }
+  // --- Animations de faces jouées par les scripts (docs/reverse-engineering.md § 9.3k) -------------
+  // anims.json : niveau -> texture -> { img, x, y, w, h (pixels de la face), n images, ms par image }.
+  // Herse de Gladstone : en passant la porte, le jeu lève la herse (PORTCLLS.WSA) avant de charger
+  // la forêt ; la vue reste devant la porte et joue les mêmes images sur la face.
+  let faceAnims = null, faceAnim = null;
+  const faceAnimImgs = new Map();
+  fetch(`data/anims.json?v=${DATA_V}`).then((r) => r.json()).then((j) => { faceAnims = j; }, () => {});
+  function faceAnimAt(cx, cy, f) {
+    return faceAnim && !inPortal && faceAnim.level === L.level && faceAnim.cell === cy * 32 + cx && faceAnim.f === f ? faceAnim : null;
+  }
+  function startFaceAnim(cx, cy, f) {
+    const w = info(face(cx, cy, f)), A = w && faceAnims && faceAnims[L.level] && faceAnims[L.level][w.tex];
+    if (!A) return null;
+    let img = faceAnimImgs.get(A.img);
+    if (!img) { img = new Image(); img.src = `data/${A.img}?v=${DATA_V}`; faceAnimImgs.set(A.img, img); }
+    faceAnim = { level: L.level, cell: cy * 32 + cx, f, A, img, t0: performance.now() };
+    return faceAnim;
+  }
+  // sortie animée vers le niveau « level » voisine du groupe (face qu'il regarde ou franchit) :
+  // démarre son animation si besoin ; renvoie le temps qu'il lui reste (ms), 0 sans animation
+  function exitAnimWait(level) {
+    if (!faceAnim) {
+      const px = Math.floor(anim ? anim.x1 : player.x), py = Math.floor(anim ? anim.y1 : player.y);
+      for (const e of L.exits || []) {
+        if (e.level !== level) continue;
+        const dx = e.x - px, dy = e.y - py;
+        if (Math.abs(dx) + Math.abs(dy) !== 1) continue;
+        const f = dy > 0 ? FACE_N : dy < 0 ? FACE_S : dx > 0 ? FACE_W : FACE_E;
+        if (startFaceAnim(e.x, e.y, f)) break;
+      }
+    }
+    if (!faceAnim || faceAnim.level !== L.level) return 0;
+    dirty = true;
+    return Math.max(0, faceAnim.t0 + faceAnim.A.n * faceAnim.A.ms + 250 - performance.now());
+  }
+  function drawFaceAnim(a, u, x, top, colH) {
+    const A = a.A, fw = L.faceW, fh = L.faceH, px = u * fw;
+    if (px < A.x || px >= A.x + A.w || !a.img.complete || !a.img.naturalWidth) return;
+    const k = Math.max(0, Math.min(A.n - 1, Math.floor((performance.now() - a.t0) / A.ms)));
+    ctx.drawImage(a.img, k * A.w + Math.min(A.w - 1, Math.floor(px - A.x)), 0, 1, A.h, x, top + A.y / fh * colH, 1, A.h / fh * colH);
+  }
+
   async function loadLevel(n, keepPos) {
     const data = await fetchLevel(n), nn = String(n).padStart(2, "0");
-    L = data;
+    L = data; faceAnim = null;
     setupPortals(L);
     buildDoorPanels(L.wallsSrc);
     doorShown.clear();
@@ -648,8 +690,13 @@
     openingCache.set(key, o);
     return o;
   }
-  function drawPortalColumn(P, x, top, colH, u, tex) {
-    if (P.kind === "level" && portalDrawn === P) { ctx.drawImage(portalCanvas, x, top, 1, colH, x, top, 1, colH); return; }
+  // Sortie vers un niveau : le niveau d'arrivée n'est recopié qu'au-delà de la case de sortie (fTop,
+  // fH : colonne de son côté opposé), son sol et son plafond restent ceux du niveau courant
+  function drawPortalColumn(P, x, top, colH, u, tex, fTop, fH) {
+    if (P.kind === "level" && portalDrawn === P) {
+      if (fH === undefined) { fTop = top; fH = colH; }
+      ctx.drawImage(portalCanvas, x, fTop, 1, fH, x, fTop, 1, fH); return;
+    }
     const o = opening(tex);
     if (o && u !== undefined) {                          // seulement dans l'ouverture de la porte
       const cx = Math.min(o.fw - 1, Math.floor(u * o.fw)), a = o.y0[cx], b = o.y1[cx];
@@ -703,8 +750,8 @@
           let u = side === 0 ? player.y + dist * ry : player.x + dist * rx;
           u -= Math.floor(u);
           if (f === FACE_E || f === FACE_N) u = 1 - u;
-          if (t && t.tex >= 0) items.push({ d: dist, tex: t.tex, u, pos: 0, line: 0, door: t.panel ? t : null });
-          items.push({ d: dist + 1e-3, portal: P, u, tex: t ? t.tex : -1 });
+          if (t && t.tex >= 0) items.push({ d: dist, tex: t.tex, u, pos: 0, line: 0, door: t.panel ? t : null, anim: faceAnimAt(mx, my, f) });
+          items.push({ d: dist + 1e-3, portal: P, u, tex: t ? t.tex : -1, far: Math.min(sdx, sdy) });   // far : sortie de la case
           nearestOpaque = dist; break;
         }
         if (!t) continue;
@@ -713,7 +760,7 @@
         u -= Math.floor(u);
         // sens de lecture de la texture vu depuis l'extérieur de la face
         if (f === FACE_E || f === FACE_N) u = 1 - u;
-        if (t.tex >= 0) items.push({ d: dist, tex: t.tex, u, pos, line, door: t.panel ? t : null });
+        if (t.tex >= 0) items.push({ d: dist, tex: t.tex, u, pos, line, door: t.panel ? t : null, anim: faceAnimAt(mx, my, f) });
         if (t.block && (t.opaque || t.tex < 0)) { nearestOpaque = dist; break; }
       }
       zbuf[x] = nearestOpaque;
@@ -727,7 +774,7 @@
       items.sort((a, b) => b.d - a.d);
       for (const it of items) {
         const dist = Math.max(0.05, it.d);
-        if (it.portal) { const colH = WALL_H / dist * proj; drawPortalColumn(it.portal, x, H / 2 + pitch - colH / 2, colH, it.u, it.tex); continue; }
+        if (it.portal) { const colH = WALL_H / dist * proj, fH = WALL_H / Math.max(0.05, it.far) * proj; drawPortalColumn(it.portal, x, H / 2 + pitch - colH / 2, colH, it.u, it.tex, H / 2 + pitch - fH / 2, fH); continue; }
         if (it.sp) {
           const sp = it.sp;
           if (sp.ghost) ctx.globalAlpha = sp.ghost === true ? 0.55 : sp.ghost;   // apparition sur événement, flaque
@@ -741,6 +788,7 @@
           const ty = Math.floor(it.tex / cols) * fh;
           if (L.outdoor) drawUpper(it.tex, it.u, dist, x, top, colH, it.pos, it.line);
           ctx.drawImage(L.wallImgs[shadeFor(dist)], tx, ty, 1, fh, x, top, 1, colH);
+          if (it.anim) drawFaceAnim(it.anim, it.u, x, top, colH);
           drawReflection(L.wallImgs[shadeFor(dist)], tx, ty, fh, x, top, colH);
           if (it.door) drawPanel(it, dist, x, top, colH);
         }
@@ -1051,12 +1099,12 @@
           if (!t && !P) continue;
           if (f === FACE_E || f === FACE_N) uu = 1 - uu;
           if (P && !(t && (t.opaque || (t.block && t.tex < 0)))) {   // porte ouverte d'une sortie ou d'un lieu en image (pas une image d'entrée opaque, comme la caverne)
-            if (t && t.tex >= 0) items.push({ d: hz, tex: t.tex, u: uu, pos, line, door: t.panel ? t : null });
-            items.push({ d: hz + 1e-3, portal: P, u: uu, tex: t ? t.tex : -1 });
+            if (t && t.tex >= 0) items.push({ d: hz, tex: t.tex, u: uu, pos, line, door: t.panel ? t : null, anim: faceAnimAt(mx, my, f) });
+            items.push({ d: hz + 1e-3, portal: P, u: uu, tex: t ? t.tex : -1, far: hz + 1 });
             nearest = hz; done = true; break;
           }
           if (!t) continue;
-          if (t.tex >= 0) items.push({ d: hz, tex: t.tex, u: uu, pos, line, door: t.panel ? t : null });
+          if (t.tex >= 0) items.push({ d: hz, tex: t.tex, u: uu, pos, line, door: t.panel ? t : null, anim: faceAnimAt(mx, my, f) });
           if (t.block && (t.opaque || t.tex < 0)) { nearest = hz; done = true; break; }
         }
         pwx = wx; pwy = wy; pz = z;
@@ -1071,7 +1119,7 @@
       items.sort((a, b) => b.d - a.d);
       for (const it of items) {
         const dist = Math.max(0.05, it.d);
-        if (it.portal) { const colH = WALL_H * proj / deff(dist); drawPortalColumn(it.portal, x, half - colH / 2, colH, it.u, it.tex); continue; }
+        if (it.portal) { const colH = WALL_H * proj / deff(dist), fH = WALL_H * proj / deff(it.far); drawPortalColumn(it.portal, x, half - colH / 2, colH, it.u, it.tex, half - fH / 2, fH); continue; }
         if (it.sp) {
           const sp = it.sp;
           if (sp.alpha) ctx.globalAlpha = sp.alpha;
@@ -1083,6 +1131,7 @@
           const ty = Math.floor(it.tex / cols) * fh;
           if (L.outdoor) drawUpper(it.tex, it.u, dist, x, top, colH, it.pos, it.line);
           ctx.drawImage(L.wallImgs[shadeFor(dist)], tx, ty, 1, fh, x, top, 1, colH);
+          if (it.anim) drawFaceAnim(it.anim, it.u, x, top, colH);
           drawReflection(L.wallImgs[shadeFor(dist)], tx, ty, fh, x, top, colH);
           if (it.door) drawPanel(it, dist, x, top, colH);
         }
@@ -1697,7 +1746,14 @@
     if (!L || L.level !== level) {
       freshLevel = true;
       loadingLevel = level; pendingPos = null;
-      try { await loadLevel(level, false); applyLiveGrid(); } finally { loadingLevel = null; }
+      try {
+        // passage animé (herse de Gladstone) : le jeu ne publie la case de sortie qu'après son
+        // script, juste avant le nouveau niveau ; la vue joue donc l'animation de la face franchie
+        // devant le groupe, puis charge le niveau (≈ 1 s de retard sur le jeu)
+        const wait = L && EMBED ? exitAnimWait(level) : 0;
+        if (wait > 0) await new Promise((ok) => setTimeout(ok, wait));
+        await loadLevel(level, false); applyLiveGrid();
+      } finally { loadingLevel = null; }
       if (pendingPos) {
         ({ level, x, y, dir } = pendingPos); pendingPos = null;
         if (L.level !== level) { window.postMessage({ type: "lol-pos", level, x, y, dir }, location.origin); return; }
@@ -1712,6 +1768,18 @@
       if (enterWait) clearTimeout(enterWait.t);
       enterWait = { tx, ty, ta, t: setTimeout(() => applyEnter(), 4000) };
       return;
+    }
+    // passage vers un autre niveau dont le script anime la face franchie (herse de Gladstone) : la vue
+    // reste devant la face pendant l'animation ; le changement de niveau suit (6 s au plus)
+    if (!freshLevel && Pin && Pin.kind === "level") {
+      const px = Math.floor(anim ? anim.x1 : player.x), py = Math.floor(anim ? anim.y1 : player.y), dx = x - px, dy = y - py;
+      const f = dy > 0 ? FACE_N : dy < 0 ? FACE_S : dx > 0 ? FACE_W : FACE_E;
+      if (Math.abs(dx) + Math.abs(dy) === 1 && startFaceAnim(x, y, f)) {
+        if (enterWait) clearTimeout(enterWait.t);
+        enterWait = { tx, ty, ta, t: setTimeout(() => applyEnter(), 6000) };
+        dirty = true;
+        return;
+      }
     }
     if (enterWait) { clearTimeout(enterWait.t); enterWait = null; }
     const same = Math.abs(tx - (anim ? anim.x1 : player.x)) < 1e-6 && Math.abs(ty - (anim ? anim.y1 : player.y)) < 1e-6 && ta === gameA;
@@ -1751,6 +1819,7 @@
     const dt = Math.min(0.05, (t - last) / 1000); last = t;
     if (L && EMBED) {
       if (stepDoors(dt)) dirty = true;
+      if (faceAnim && t - faceAnim.t0 < faceAnim.A.n * faceAnim.A.ms + 100) dirty = true;
       if (anim) {
         const k = Math.min(1, (t - anim.t0) / anim.dur), e = k * k * (3 - 2 * k);   // départ et arrivée en douceur
         player.x = anim.x0 + (anim.x1 - anim.x0) * e;

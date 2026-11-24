@@ -1388,6 +1388,38 @@ x = 0, y = 17/19/21) show a wall towards the outside. The viewer's two ray caste
 portals and free-standing objects through the same wrap (`wrapCell`), instead of stopping the ray
 at the map edge. Before this change, those cells showed no wall on the outer side.
 
+### 9.3k Gladstone gate: the portcullis animation — script and engine read (2026-11-24)
+
+**Gladstone → forest.** The exit is level 1, block 621 (13,19), wall 60 = texture 46, door, special 4.
+Its `LEVEL1.INF` entry (0x12D2, "party steps in") runs:
+1. `initAnimStruct("PORTCLLS", index 0, x 0x70 + 0x41 = 177, y 23, delay 0, flags 0x20 | 8)`;
+2. `playSoundEffect(109)`;
+3. `playAnimationPart(0, 1, 12, 5)`: frames 1 to 12, 5 ticks each (60 ticks/s, about 1 s);
+4. `freeAnimStruct(0)`;
+5. `loadNewLevel(2, 106, 2)`.
+
+The order matters because `moveParty` sets `_currentBlock` before it runs the script.
+
+`PORTCLLS.WSA` (in `O01D.PAK`) has 12 frames of 48 × 65 pixels: the portcullis rises and reveals
+the forest path. It is drawn at screen (177, 23). The face next to the party is drawn at
+(112 + 24, 8) at scale 1, so the frames cover the face texture pixels (41, 15)–(89, 80). A pixel
+comparison with texture 46 confirms it: difference 0 at exactly that offset.
+
+**Forest → Gladstone.** `LEVEL2.INF`, block 74 (10,2), calls the subroutine at 0x16A. It plays the
+guard cut-scene: `GUARD.WSA`, full scene window (112, 0), flags 0x2D, with dialogue. It then calls
+`loadNewLevel(1, 589, 0)`. Our `level_exits` misses this exit because the level is not an argument
+of the subroutine.
+
+**3D view.**
+- `tools/export_anims.py` writes `anims.json` and `anim_portclls.png`, using the WSA decoder
+  `wwcomp.wsa_frames`: LCW, then XOR delta "format 40" (`Screen::decodeFrameDelta`).
+- The game publishes the exit cell only after the script, just before the new level. So when the
+  view receives a level change while the party stands next to an animated exit face, it plays the
+  frames on that face first, then loads the level.
+- Exits to another level now copy the destination level only beyond the far side of the exit
+  cell. The exit cell's own floor and ceiling stay those of the current level. Before this change,
+  the forest floor showed inside Gladstone's gate cell.
+
 ## 10. Not decoded so far
 
 - `.TLC` (5376 bytes per level), `.INF` beyond monster placement, `ITEM.INF`.
@@ -2149,6 +2181,7 @@ transitions:
 |---|---|---|
 | `tools/extract_maps.py` | grids, walls, annotations, monsters | `maps/levelNN.json/.png`, `maps/levels.json`, `maps/raw/` |
 | `tools/export_viewer.py` | face textures, background, sprites | `web/public/viewer/data/` |
+| `tools/export_anims.py` | face animations played by level scripts (Gladstone portcullis), § 9.3k | `web/public/viewer/data/anims.json`, `anim_*.png` |
 | `web/public/viewer/` | free-roaming 3D viewer (home-made ray casting) | http://localhost:8000/viewer/ |
 | `web/public/minimap.js`, `memscan.js` | live minimap next to the game | http://localhost:8000/ |
 
@@ -2790,3 +2823,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-24**: dragging a bag item onto the action bar was refused by the browser. The bag sets `effectAllowed = "move"` while the bar answered `dropEffect = "copy"`, so no drop event fired; synthetic test events skip that check. The bar now answers "move" for bag drags. Verified with a real mouse drag (CDP `Input.setInterceptDrags` / `dispatchDragEvent`): the ointment lands in slot 4.
 - **2026-11-24**: exits whose face is an opaque picture that the party walks into (the thieves' cave mouth in the North Forest, level 2 cell 0,3, wall 63 = texture 54 not blocking; the cave and mine stair pictures 38/39 on many levels) no longer open a portal in the 3D view. Before this change, the destination level's render was pasted there and showed as stretched stripes above the cave. Portals now only apply to non-opaque faces (open doors, gates). Verified in the standalone viewer: level 2 from 3,3 and 2,3 facing west; the Gladstone gate is unchanged (door, non-opaque).
 - **2026-11-24**: read KForestland/lands-of-lore-1-re (§ 10b): TIM/WSA formats, per-level INF event tables (cut-scene triggers, level jumps with facing), fade helpers.
+- **2026-11-24**: Gladstone gate (§ 9.3k): the portcullis WSA plays on the gate face in the 3D view before the forest loads; the exit cell keeps its own floor (the portal copy starts at its far side). Verified with CDP: from 13,18 facing south, the 3D view shows the portcullis rising, then the forest at 10,3.
