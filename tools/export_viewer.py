@@ -1292,6 +1292,102 @@ def canopy_ceiling(bg):
     return img
 
 
+# Tour (TOWER1, niveaux 18 à 21) redessinée en pixel art d'après le fond d'origine
+# (docs/reverse-engineering.md § 9.3c, § 9.3f). Sol : dalles carrées de granit bleu moucheté de
+# mauve, joints sombres sur les bords du motif mesuré (3 dalles par case, comme floor_cell),
+# bords nord, ouest et est assombris, bord sud éclairé ; texture sur TOWER_SPAN × TOWER_SPAN
+# cases. Plafond : poutres de granit mauve sur les bords des cases (dessous clair moucheté,
+# cadre fin, faces vues en biais), retrait très sombre.
+TOWER_TILESETS = {"TOWER1"}
+TOWER_SPAN = 2
+TOWER_SLAB = MOTIF               # pixels par dalle (un motif mesuré)
+
+
+def _hash(seed):
+    def h(*a):
+        x = seed
+        for v in a:
+            x = ((x ^ (v & 0xFFFFFFFF)) * 0x85EBCA6B) & 0xFFFFFFFF
+            x ^= x >> 13
+        return x / 2 ** 32
+    return h
+
+
+def tower_floor(bg):
+    """Dalles de granit de la tour (TOWER_SPAN cases de côté, 3 dalles par case)."""
+    from collections import Counter
+    cnt = Counter(tuple(bg.px[(y * bg.w + x) * 4:(y * bg.w + x) * 4 + 3])
+                  for y in range(60, bg.h) for x in range(bg.w))
+    cols = [c for c, n in cnt.items() if n > 10 and sum(c) > 0]
+    blue = sorted((c for c in cols if c[2] - c[0] >= 12), key=sum)
+    mauve = sorted((c for c in cols if c[2] - c[0] < 12 and sum(c) > 60), key=sum)
+    if len(blue) < 6 or len(mauve) < 3:
+        return None
+    h = _hash(0x2B992DDF)
+    pick = lambda ramp, t: ramp[max(0, min(len(ramp) - 1, int(t * len(ramp))))]
+    n = round(CELL_UNITS) * TOWER_SPAN               # dalles par côté
+    size = n * TOWER_SLAB
+    img = Image(size, size)
+    for y in range(size):
+        for x in range(size):
+            i, j = x // TOWER_SLAB, y // TOWER_SLAB
+            u, v = x % TOWER_SLAB, y % TOWER_SLAB
+            if u == 0 or v == 0:
+                c = blue[0]                           # joint
+            else:
+                t = 0.65 + 0.25 * (h(1, i, j) - 0.5)  # teinte de la dalle
+                if v <= 3:
+                    t -= 0.08 * (4 - v)               # ombre sous le joint nord
+                elif v >= TOWER_SLAB - 3:
+                    t += 0.12                         # bord sud éclairé
+                if u <= 3 or u >= TOWER_SLAB - 3:
+                    t -= 0.08                         # bords ouest et est
+                r = h(2, x, y)
+                if r < 0.10:
+                    c = pick(mauve, t + 0.1)          # moucheture rosée du granit
+                else:
+                    c = pick(blue, t + 0.22 * (r - 0.55) * (r > 0.3))
+            img.put(x, y, bytes(c))
+    return img
+
+
+def tower_ceiling_cell(bg, size=CEIL_TEX):
+    """Plafond à poutres de granit de la tour (size × size, rangée 0 = nord)."""
+    ramp = ceiling_ramp(bg)
+    if len(ramp) < 8:
+        return None
+    top = len(ramp) - 1
+    h = _hash(0x1F83D9AB)
+    pick = lambda t: ramp[max(0, min(top, int(t * len(ramp))))]
+    b0, b1 = KEEP_BEAM * size, (KEEP_BEAM + KEEP_FACE) * size
+    face_t = {0: 0.62, 1: 0.5, 3: 0.5, 2: 0.4}       # N, E, S, O
+    img = Image(size, size)
+    for y in range(size):
+        for x in range(size):
+            d = (y + 0.5, size - x - 0.5, size - y - 0.5, x + 0.5)
+            m = min(d)
+            side = d.index(m)
+            r = h(1, x, y)
+            if m < b0:
+                e = b0 - m
+                if e < 1.5:
+                    c = ramp[top - 1]                 # arête claire
+                elif 4.5 <= e < 5.5:
+                    c = pick(0.6)                     # cadre fin
+                else:
+                    # dessous moucheté : granit clair
+                    c = pick(0.86 + 0.16 * (r - 0.5) - (0.12 if r < 0.08 else 0))
+            elif m < b1:
+                f = (m - b0) / (b1 - b0)
+                c = pick(face_t[side] - 0.12 * f + 0.1 * (r - 0.5))
+            elif m < b1 + 1:
+                c = ramp[0]                           # ligne d'ombre
+            else:
+                c = pick(0.17 + 0.06 * (r < 0.3))     # retrait sombre (24,20,24)-(32,28,32)
+            img.put(x, y, bytes(c))
+    return img
+
+
 def floor_cell(motif, repeated):
     """Texture d'une case : le motif répété (3 × 3 motifs ≈ 3,1 unités) pour un sol pavé ;
     pour un sol peint, la demi-case proche en damier 1 2 / 2 1, 2 étant 1 en miroir (le
@@ -1846,6 +1942,12 @@ def main(game_dir, maps_dir, out_dir):
         flags = flagstone_floor(bg) if tsname in FLOOR_FLAGSTONES else None
         floor_span = FLAG_SPAN if flags is not None else 1
         ceil_span = 1
+        if tsname in TOWER_TILESETS:
+            tf, tc = tower_floor(bg), tower_ceiling_cell(bg)
+            if tf is not None:
+                flags, floor_span = tf, TOWER_SPAN
+            if tc is not None:
+                ceil_img = tc
         if tsname in CEIL_CANOPY:
             cc = canopy_ceiling(bg)
             if cc is not None:

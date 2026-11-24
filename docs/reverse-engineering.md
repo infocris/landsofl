@@ -780,6 +780,26 @@ are paved with a visible repeating pattern: `KEEP` (level 1, octagons) and `TOWE
   ceiling in world coordinates, without turning it with the gaze, since an organic ceiling
   has no direction.
 
+- **Tower (TOWER1, levels 18–21, 2026-11-24)**: the four levels share one background,
+  redrawn in pixel art with its own tones (`tower_floor`, `tower_ceiling_cell`).
+  - **Floor**: square slabs of blue granite flecked with mauve. The blue tones
+    (`b − r ≥ 12`) run from (28,24,44) to (162,162,182), the mauve flecks are the other
+    tones. On the measured motif (§ 9.3c lattice), the joints fall on the motif edges
+    (row 0, column 0). The slab darkens over 3–4 px below the north joint and along the
+    west and east edges, and lightens along the south edge. The redraw keeps 3 slabs per
+    cell (one motif, 48 px, per slab, as `floor_cell`), with:
+    - 1 px dark joints;
+    - one tone per slab, with these edge shades;
+    - 10 % mauve flecks.
+
+    The texture covers 2 × 2 cells (`floorSpan: 2`), without mirroring.
+  - **Ceiling**: mauve granite beams on the cell edges, as in § 9.3f, but speckled and
+    without beads. The ramp has 21 tones, (4,4,4) to (239,211,231). The redraw has:
+    - a light speckled underside, with a light arris and a thin frame 5 px in;
+    - side faces lit by orientation;
+    - a 1 px shadow line;
+    - the dark recess, (24,20,24) to (32,28,32), not the near-black start of the ramp.
+
 ### 9.3d Wall pieces and the forest's upper part — verified in ScummVM (2026-11-22)
 
 `KyraRpgEngine::drawVcnBlocks` (`scene_rpg.cpp`) builds the view, 22×15 tiles, from the
@@ -955,7 +975,7 @@ structure. CIMMERIA's ceiling is black.
   45° mitres, as on a coffer seen from below. Each face is lit by its orientation, the light
   coming from the far end of the view: north face 1.0, east/west 0.72, south 0.42. The
   shading is left-right symmetric, so it survives the mirror applied every other cell, and
-  the texture turns with the gaze like the folded one. TOWER1 keeps the fold.
+  the texture turns with the gaze like the folded one. TOWER1 is redrawn too (§ 9.3c, tower).
 - **Swamp canopy (SWAMP, level 11, 2026-11-24)**: the painted ceiling (rows 0–16) is a dense
   vault of foliage: dark green leaves and vines with a few red-brown branches. It fades into
   a grey-green haze (rows 18–40, mostly (56,56,52)). The former texture was the near band
@@ -2580,6 +2600,7 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-24**: Gladstone's ceiling (KEEP) redrawn from the original background in pixel art: framed beige beams with a beaded moulding, angled faces, shadow line, dark recess; the isometric coffer is no longer used (§ 9.3f).
 - **2026-11-24**: swamp ceiling (SWAMP, level 11) redrawn as a pixel-art canopy: two layers of leaves, red-brown branches, haze in the gaps (§ 9.3f). The viewer page now loads `viewer.js` with a new version: the old one stayed cached and hid the `viewer.js` changes since 2026-11-23.
 - **2026-11-24**: the mines of Urbish (URBISH, level 12) get the mine timbering ceiling: same drawing as MINE1, own rock tones (§ 9.3f).
+- **2026-11-24**: tower floor and ceiling (TOWER1, levels 18–21) redrawn in pixel art: blue granite slabs flecked with mauve, joints on the measured lattice, over 2 × 2 cells; speckled mauve granite beams with a dark recess (§ 9.3c).
 - **2026-11-23**: mine ceiling (MINE1, levels 13–16) redrawn from the original background in pixel art: round logs on the cell edges, lagging boards, rock where boards are missing (§ 9.3f).
 - **2026-11-22**: switches in the 3D view: door buttons attached by the level script (`assignLevelDecorationShape` + `resetBlockShapeAssignment`) now drawn; walls' switch type and clickable area exported; engine command op 20 (`clickwall`) clicks the wall in front like the game (`clickedWall`); the 3D view outlines the switch in front and clicks it; engine files versioned in URLs and served `no-cache` (§ 9.6).
 - **2026-11-22**: doors of the script-opened series (walls 8–12, 18–22: shape 0, e.g. Gladstone's locked library door) now drawn closed with their leaf; they looked open in the 3D view (§ 9.6).
