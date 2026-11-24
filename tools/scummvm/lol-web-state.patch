@@ -1095,10 +1095,10 @@ index 055e4f8c..8fd1d5c3 100644
  	const uint8 *p = _screen->getCPagePtr(2);
  	const uint8 *ts[16];
 diff --git a/engines/kyra/gui/gui_lol.cpp b/engines/kyra/gui/gui_lol.cpp
-index 926e60dc..96cab456 100644
+index 926e60dc..b396bd30 100644
 --- a/engines/kyra/gui/gui_lol.cpp
 +++ b/engines/kyra/gui/gui_lol.cpp
-@@ -87,9 +87,83 @@ void LoLEngine::gui_drawInventory() {
+@@ -87,9 +87,97 @@ void LoLEngine::gui_drawInventory() {
  	}
  }
  
@@ -1127,17 +1127,31 @@ index 926e60dc..96cab456 100644
 +	return n;
 +}
 +
-+// emplacement réel visé par un clic sur la case index de la barre (-1 : rien à faire). Main vide :
-+// premier objet de la pile. Objet en main d'un autre type : échange avec ce premier objet. Même
-+// type, ou case vide : l'objet va dans un emplacement libre (il rejoint sa pile).
++// emplacement réel visé par un clic sur la case index de la barre (-1 : rien à faire). Les piles
++// étant rangées selon leur premier emplacement, on touche au dernier exemplaire pour que la pile
++// reste à sa place. Main vide : on prend ce dernier exemplaire. Objet en main d'un autre type :
++// échange avec lui (pile d'un seul objet : l'objet en main prend sa case). Même type : l'objet va
++// dans un emplacement libre après le premier de la pile. Case vide : emplacement libre après le
++// premier de la dernière pile (nouvelle pile au bout). Sinon, n'importe quel emplacement libre.
 +int LoLEngine::webStackSlot(int index, Item hand) const {
 +	int8 first[48];
 +	uint8 count[48];
 +	const int n = webStackList(first, count);
 +	const int k = _webStackScroll + index;
-+	const int target = k < n ? first[k] : -1;
-+	if (!hand || (target >= 0 && !webSameStack(hand, _inventory[target])))
-+		return target;
++	int last = -1;
++	if (k < n) {
++		for (int i = 47; i >= 0 && last < 0; i--) {
++			if (webSameStack(_inventory[i], _inventory[first[k]]))
++				last = i;
++		}
++	}
++	if (!hand || (last >= 0 && !webSameStack(hand, _inventory[last])))
++		return last;
++	const int after = k < n ? first[k] : (n ? first[n - 1] : -1);
++	for (int i = after + 1; i < 48; i++) {
++		if (!_inventory[i])
++			return i;
++	}
 +	for (int i = 0; i < 48; i++) {
 +		if (!_inventory[i])
 +			return i;
@@ -1182,7 +1196,7 @@ index 926e60dc..96cab456 100644
  	int item = _inventoryCurItem + index;
  	if (item > 47)
  		item -= 48;
-@@ -1336,6 +1410,11 @@ int LoLEngine::clickedInventorySlot(Button *button) {
+@@ -1336,6 +1424,11 @@ int LoLEngine::clickedInventorySlot(Button *button) {
  	int slot = _inventoryCurItem + button->arg;
  	if (slot > 47)
  		slot -= 48;
@@ -1194,7 +1208,7 @@ index 926e60dc..96cab456 100644
  
  	uint16 slotItem = _inventory[slot];
  	int hItem = _itemInHand;
-@@ -1378,7 +1457,10 @@ int LoLEngine::clickedInventorySlot(Button *button) {
+@@ -1378,7 +1471,10 @@ int LoLEngine::clickedInventorySlot(Button *button) {
  		_inventory[slot] = hItem;
  	}
  
@@ -1206,7 +1220,7 @@ index 926e60dc..96cab456 100644
  
  	return 1;
  }
-@@ -1392,6 +1474,14 @@ int LoLEngine::clickedInventoryScroll(Button *button) {
+@@ -1392,6 +1488,14 @@ int LoLEngine::clickedInventoryScroll(Button *button) {
  	if (button->flags2 & 0x1000)
  		inc *= 9;
  
@@ -1221,7 +1235,7 @@ index 926e60dc..96cab456 100644
  	_inventoryCurItem += inc;
  
  	gui_toggleButtonDisplayMode(shp, 1);
-@@ -1543,7 +1633,11 @@ int LoLEngine::clickedOptions(Button *button) {
+@@ -1543,7 +1647,11 @@ int LoLEngine::clickedOptions(Button *button) {
  	if (_flags.isTalkie && getVolume(kVolumeSpeech) == 2)
  		_configVoice |= (textEnabled() ? 2 : 1);
  

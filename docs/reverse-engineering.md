@@ -1966,9 +1966,12 @@ The meaning of the functions, however, can be read directly. Comparison with our
       `gui_drawInventoryItem`, `clickedInventorySlot`, `clickedInventoryScroll` and
       `addItemToInventory` change, with their own scroll `_webStackScroll` (no wrap-around, one empty
       slot left at the end so a new kind of item can be put down);
-    - click with empty hand: takes the stack's first item; with an item of the same kind, or on an
-      empty slot: the item goes to the first free bag slot; with another kind: swap with the stack's
-      first item (the Ruby of Truth merge still runs);
+    - stacks are ordered by their first bag slot, so clicks act on the stack's *last* item and the
+      stack keeps its place (2026-11-25; taking the first item moved the rest of the stack further
+      along the bar): empty hand takes the last item; another kind swaps with the last item (a
+      one-item stack is replaced in place; the Ruby of Truth merge still runs); same kind goes to the
+      first free slot after the stack's first slot; an empty bar slot uses the first free slot after
+      the last stack's first slot (the new stack appears at the end); otherwise any free slot;
     - verified: 4 potions and 2 herbs shown as "4" and "2"; take, put back, swap and put down give
       the expected `_inventory` contents.
   - **Verified**: 3 aloes created (4 in the bag), life lowered to 8 / 20, aloe dragged onto slot 1
@@ -2922,3 +2925,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-24**: script pictures (§ 9.3m): the engine publishes when the scene window shows script art (`loadBitmap`, full-window WSA; cleared when the 3D scene is drawn). The modern interface then copies the game's scene window onto the 3D view, so all place and character pictures and their animations show, including the ~60 the export missed. Verified with CDP on the Gladstone guard and Victor's armoury.
 - **2026-11-25**: item stacks in the game's own inventory bar (ScummVM engine, command 26; § 10a).
 - **2026-11-25**: opening the character sheet in the game no longer opens the page's character window (the page → game direction stays).
+- **2026-11-25**: game bar stacks keep their place when an item is taken (clicks act on the stack's last item; § 10a).
