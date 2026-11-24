@@ -1461,6 +1461,44 @@ What the game does (`LEVEL2.INF`, opcodes named from `LoLEngine::setupOpcodeTabl
   then Gladstone at 13,18.
 - Not handled: the burning keep's flame animation (static `KEEPBRN.CPS` only).
 
+### 9.3m Script pictures in the 3D view: the game's scene window, only for script art (2026-11-24)
+
+**Problem.** The places export (`level_scenes`) finds only direct `loadBitmap` calls. About 60
+pictures are loaded through a helper subroutine, often in two story variants chosen by game
+flags or `else` branches:
+- Lynn, Marina, Victor's bush, the thug camp, Petricia, Grey Eagle, Roland's wreck, Buck's hut;
+- Frank/Droek and their dead variants, the White Tower, the bridge, the council, Bruno;
+- the Xeobs, the pedestals, and others.
+
+Many also play WSA animations over the picture (Lynn, the boat, flames…). A per-cell table would
+be fragile, so the engine now says when the scene window shows script art.
+
+**Engine** (fork `lol-web`, commit b3560031): `_webSceneArt`, byte 18 of zone `0x7F000100`.
+- **Set** by `olol_loadBitmap`, and by `TIMInterpreter_LoL::initAnimStruct` when the WSA covers
+  the whole scene window (176 × 120 or more).
+- **Cleared** by `drawScene` (the 3D view is drawn again), by `restoreAfterSpecialScene` and by
+  `loadLevel`.
+- A small WSA over the 3D view does not set it: the Gladstone portcullis (48 × 65) keeps its
+  native face animation (§ 9.3k).
+
+**Page.**
+- `lol-game.html` exposes `lolSceneArt()`: the flag, outside the menu and level loading.
+- In the modern interface, `classic.js` copies the game's scene window (112, 0, 176 × 120, from
+  the canvas video stream) onto the 3D view while the flag is set. It is fitted like a place
+  picture, on a canvas above the view frame. The shop buttons and dialogue bubbles stay above it.
+- This is not the copy removed on 2026-11-10: in-world dialogues, spells and exploration keep the
+  3D render, because the flag is cleared as soon as the engine draws the scene.
+- With the copy, shops now show the merchant's animation and the game's own buttons drawn in the
+  picture (SORTIR), instead of the static exported image.
+- The native pictures of § 9.3l (castle, guard) still serve when the copy is not shown (DOSBox).
+
+**Verified** with CDP (no sound):
+- **Forest → Gladstone.** At 10,5 the 3D forest is shown. At 10,3 facing north, the castle. At 10,2, the
+  guard fades in and talks ("Vous pouvez passer."). Then the Gladstone 3D view at 13,18.
+- **Victor's armoury** (16,12). The animated merchant is shown. After "Sortir" the flag drops and the 3D
+  view comes back at 15,12.
+- **Not tested one by one:** the other ~60 pictures. They go through the same `loadBitmap`.
+
 ## 10. Not decoded so far
 
 - `.TLC` (5376 bytes per level), `.INF` beyond monster placement, `ITEM.INF`.
@@ -2866,3 +2904,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-24**: read KForestland/lands-of-lore-1-re (§ 10b): TIM/WSA formats, per-level INF event tables (cut-scene triggers, level jumps with facing), fade helpers.
 - **2026-11-24**: Gladstone gate (§ 9.3k): the portcullis WSA plays on the gate face in the 3D view before the forest loads; the exit cell keeps its own floor (the portal copy starts at its far side). Verified with CDP: from 13,18 facing south, the 3D view shows the portcullis rising, then the forest at 10,3.
 - **2026-11-24**: forest → Gladstone (§ 9.3l): the 3D view shows the castle picture (KEEP.CPS, or KEEPBRN.CPS with flag 67) at 10,3 facing north, then the guard's animated face (GUARD.WSA, frame order from GUARD4.TIM) at 10,2 until Gladstone loads; the view's place label no longer doubles the scene label. Verified with CDP.
+- **2026-11-24**: script pictures (§ 9.3m): the engine publishes when the scene window shows script art (`loadBitmap`, full-window WSA; cleared when the 3D scene is drawn). The modern interface then copies the game's scene window onto the 3D view, so all place and character pictures and their animations show, including the ~60 the export missed. Verified with CDP on the Gladstone guard and Victor's armoury.

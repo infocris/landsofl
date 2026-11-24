@@ -126,9 +126,42 @@
     return { x: (w - aw) / 2, y: (h - ah) / 2, w: aw, h: ah };
   }
   let layout = null;                      // position de l'écran du jeu dans la zone (pixels CSS)
+  // interface moderne : pendant une scène en image du jeu (lieu, personnage, château, garde… ;
+  // lolSceneArt, moteur : loadBitmap ou WSA plein cadre, jusqu'au prochain dessin du décor), la
+  // fenêtre de scène du jeu est recopiée sur la vue 3D, cadrée comme l'image d'un lieu (#scene).
+  // Pas pendant les dialogues dans le décor, les sorts ni l'exploration : la vue 3D reste.
+  const art = document.createElement("canvas");
+  art.id = "v3d-art"; art.hidden = true;
+  art.style.cssText = "position:absolute;z-index:3;background:#000;image-rendering:pixelated;pointer-events:none";
+  box.appendChild(art);
+  function modernArt() {
+    let on = false;
+    try { const w = gameWin(); on = !!(w && w.lolSceneArt && w.lolSceneArt()); } catch (e) {}
+    const src = gameCanvas();
+    if (on && src && (!stream || stream.__canvas !== src)) {
+      try { stream = src.captureStream(30); stream.__canvas = src; video.srcObject = stream; video.play().catch(() => {}); } catch (e) { on = false; }
+    }
+    on = on && !box.classList.contains("hidden") && video.readyState >= 2 && !!video.videoWidth;
+    art.hidden = !on;
+    if (!on) return;
+    const px = (v) => Math.round(v) + "px";
+    art.style.left = px(frame.offsetLeft); art.style.top = px(frame.offsetTop);
+    art.style.width = px(frame.offsetWidth); art.style.height = px(frame.offsetHeight);
+    const dpr = window.devicePixelRatio || 1, W = Math.round(frame.offsetWidth * dpr), H = Math.round(frame.offsetHeight * dpr);
+    if (art.width !== W || art.height !== H) { art.width = W; art.height = H; }
+    const g = art.getContext("2d");
+    g.imageSmoothingEnabled = false;
+    g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
+    const V = fit(video.videoWidth, video.videoHeight);
+    const k = Math.min(W / SCENE[2], H / SCENE[3]), dw = SCENE[2] * k, dh = SCENE[3] * k;
+    g.drawImage(video, V.x + SCENE[0] / 320 * V.w, V.y + SCENE[1] / 200 * V.h, SCENE[2] / 320 * V.w, SCENE[3] / 200 * V.h,
+      (W - dw) / 2, (H - dh) / 2, dw, dh);
+  }
   function tick() {
     requestAnimationFrame(tick);
-    if (mode !== "originale" || box.classList.contains("hidden")) return;
+    if (mode !== "originale") { modernArt(); return; }
+    art.hidden = true;
+    if (box.classList.contains("hidden")) return;
     const src = gameCanvas();
     if (!src) return;
     if (!stream || stream.__canvas !== src) {

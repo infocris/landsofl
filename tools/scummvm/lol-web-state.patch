@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..368fa57d 100644
+index 392e4c2d..a625330e 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -32,6 +32,7 @@
@@ -21,7 +21,7 @@ index 392e4c2d..368fa57d 100644
  namespace Kyra {
  
  const char *const LoLEngine::kMouseKeymapName = "lolmouse";
-@@ -929,6 +934,772 @@ void LoLEngine::startupNew() {
+@@ -929,6 +934,773 @@ void LoLEngine::startupNew() {
  	_screen->showMouse();
  }
  
@@ -156,6 +156,7 @@ index 392e4c2d..368fa57d 100644
 +	u8(_specialSceneFlag ? 1 : 0); u16(_updateFlags);
 +	u16(_seqWindowX1); u16(_seqWindowY1); u16(_seqWindowX2); u16(_seqWindowY2);
 +	u8(_webInMenu ? 1 : 0); u32(_webLoopCount); u8(_webLoadingLevel ? 1 : 0); u8(_webCasting ? 1 : 0);
++	u8(_webSceneArt ? 1 : 0);
 +	end();
 +	// image de chaque monstre telle que le jeu la dessine vu du groupe (drawMonster), 4 octets :
 +	// numéro d'image (0-15, 255 = aucune) ; 1 = image retournée horizontalement ; giclée de coup
@@ -794,7 +795,7 @@ index 392e4c2d..368fa57d 100644
  void LoLEngine::runLoop() {
  	// Initialize debugger since how it should be fully usable
  	static_cast<Debugger_LoL *>(getDebugger())->initialize();
-@@ -957,6 +1728,7 @@ void LoLEngine::runLoop() {
+@@ -957,6 +1729,7 @@ void LoLEngine::runLoop() {
  		gui_updateInput();
  
  		update();
@@ -802,7 +803,7 @@ index 392e4c2d..368fa57d 100644
  
  		updatePlayTimer();
  
-@@ -1031,6 +1803,7 @@ void LoLEngine::readSettings() {
+@@ -1031,6 +1804,7 @@ void LoLEngine::readSettings() {
  }
  
  void LoLEngine::update() {
@@ -810,7 +811,7 @@ index 392e4c2d..368fa57d 100644
  	updateSequenceBackgroundAnimations();
  
  	if (_updateCharNum != -1 && _system->getMillis() > _updatePortraitNext)
-@@ -1178,6 +1951,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
+@@ -1178,6 +1952,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
  	return size;
  }
  
@@ -908,7 +909,7 @@ index 392e4c2d..368fa57d 100644
  bool LoLEngine::addCharacter(int id) {
  	const uint16 *cdf[] = {
  		_charDefsMan, _charDefsMan, _charDefsMan, _charDefsWoman,
-@@ -1477,6 +2341,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
+@@ -1477,6 +2342,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
  
  	int newVal = (mode == 2) ? (pointsMax + points) : (mode ? (pointsCur + points) : points);
  	newVal = CLIP(newVal, 0, pointsMax);
@@ -917,7 +918,7 @@ index 392e4c2d..368fa57d 100644
  
  	if (type) {
  		c->magicPointsCur = newVal;
-@@ -1969,6 +2835,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
+@@ -1969,6 +2836,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
  		}
  	}
  
@@ -925,7 +926,7 @@ index 392e4c2d..368fa57d 100644
  	if (!skipAnim && charId < 3) {
  		_updateCharNum = charId;
  		_portraitSpeechAnimMode = mode;
-@@ -1981,6 +2848,8 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
+@@ -1981,6 +2849,8 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
  	else if (paramList)
  		snd_playCharacterSpeech(paramList[2], ch, 0);
  
@@ -934,7 +935,7 @@ index 392e4c2d..368fa57d 100644
  	if (textEnabled()) {
  		if (mode == 0) {
  			_txt->printDialogueText2(3, str, script, paramList, paramIndex);
-@@ -2074,6 +2943,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
+@@ -2074,6 +2944,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
  
  void LoLEngine::delay(uint32 millis, bool doUpdate, bool) {
  	while (millis && !shouldQuit()) {
@@ -942,7 +943,7 @@ index 392e4c2d..368fa57d 100644
  		if (doUpdate)
  			update();
  		else
-@@ -2092,6 +2962,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
+@@ -2092,6 +2963,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
  // spells
  
  int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
@@ -955,7 +956,7 @@ index 392e4c2d..368fa57d 100644
  	_activeSpell.spell = spellType;
  	_activeSpell.p = &_spellProperties[spellType];
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index 2cfadf37..ee5964c1 100644
+index 2cfadf37..30762f04 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
 @@ -315,6 +315,13 @@ private:
@@ -972,7 +973,7 @@ index 2cfadf37..ee5964c1 100644
  	void update() override;
  
  	// mouse
-@@ -1072,6 +1079,27 @@ private:
+@@ -1072,6 +1079,31 @@ private:
  
  	LoLItem *_itemsInPlay;
  	ItemProperty *_itemProperties;
@@ -990,7 +991,11 @@ index 2cfadf37..ee5964c1 100644
 +	// groupe, -1 personnage hors du groupe, -2 texte sans locuteur) et numéro de réplique
 +public:
 +	void webDialogue(const char *text) { _webDialogue = text; _webDialogueSeq++; _webDialogueSpeaker = _webSpeaker; _webSpeaker = -2; }
++	// version web : la fenêtre de scène montre une image de script (loadBitmap, WSA plein cadre :
++	// lieux, personnages, cinématiques), pas le décor ; effacé quand le décor est redessiné
++	void webSceneArt(bool on) { _webSceneArt = on; }
 +private:
++	bool _webSceneArt = false;
 +	Common::String _webDialogue;
 +	uint16 _webDialogueSeq = 0;
 +	int _webDialogueSpeaker = -2, _webSpeaker = -2;
@@ -1001,17 +1006,34 @@ index 2cfadf37..ee5964c1 100644
  	Item _itemInHand;
  	Item _inventory[48];
 diff --git a/engines/kyra/engine/scene_lol.cpp b/engines/kyra/engine/scene_lol.cpp
-index 532afdf4..a08e971d 100644
+index 532afdf4..6f11fceb 100644
 --- a/engines/kyra/engine/scene_lol.cpp
 +++ b/engines/kyra/engine/scene_lol.cpp
-@@ -32,6 +32,7 @@
+@@ -32,6 +32,8 @@
  namespace Kyra {
  
  void LoLEngine::loadLevel(int index) {
 +	_webLoadingLevel = true;	// version web : effacé au prochain tour de la boucle principale
++	_webSceneArt = false;
  	_flagsTable[73] |= 0x08;
  	setMouseCursorToIcon(0x85);
  	_nextScriptFunc = 0;
+@@ -1208,6 +1210,7 @@ int LoLEngine::smoothScrollDrawSpecialGuiShape(int pageNum) {
+ }
+ 
+ void LoLEngine::drawScene(int pageNum) {
++	_webSceneArt = false;
+ 	if (pageNum && pageNum != _sceneDrawPage1) {
+ 			SWAP(_sceneDrawPage1, _sceneDrawPage2);
+ 		updateDrawPage2();
+@@ -1312,6 +1315,7 @@ int LoLEngine::restoreAfterSpecialScene(int fadeFlag, int redrawPlayField, int r
+ 		return 0;
+ 
+ 	_needSceneRestore = 0;
++	_webSceneArt = false;
+ 	enableSysTimer(2);
+ 
+ 	if (_dialogueField)
 diff --git a/engines/kyra/engine/sprites_lol.cpp b/engines/kyra/engine/sprites_lol.cpp
 index 055e4f8c..8fd1d5c3 100644
 --- a/engines/kyra/engine/sprites_lol.cpp
@@ -1046,7 +1068,7 @@ index 926e60dc..31bb0dec 100644
  	_updateFlags &= 0xFFFB;
  	setMouseCursorToItemInHand();
 diff --git a/engines/kyra/script/script_lol.cpp b/engines/kyra/script/script_lol.cpp
-index 30c59a77..c382434a 100644
+index 30c59a77..1231452c 100644
 --- a/engines/kyra/script/script_lol.cpp
 +++ b/engines/kyra/script/script_lol.cpp
 @@ -235,6 +235,7 @@ int LoLEngine::olol_allocItemPropertiesBuffer(EMCState *script) {
@@ -1057,7 +1079,15 @@ index 30c59a77..c382434a 100644
  	return 1;
  }
  
-@@ -1593,9 +1594,14 @@ int LoLEngine::olol_playDialogueTalkText(EMCState *script) {
+@@ -602,6 +603,7 @@ int LoLEngine::olol_fadePalette(EMCState *script) {
+ int LoLEngine::olol_loadBitmap(EMCState *script) {
+ 	debugC(3, kDebugLevelScriptFuncs, "LoLEngine::olol_loadBitmap(%p) (%s, %d)", (const void *)script, stackPosString(0), stackPos(1));
+ 	_screen->loadBitmap(stackPosString(0), 3, 3, &_screen->getPalette(3));
++	_webSceneArt = true;
+ 	if (stackPos(1) != 2)
+ 		_screen->copyPage(3, stackPos(1));
+ 	return 1;
+@@ -1593,9 +1595,14 @@ int LoLEngine::olol_playDialogueTalkText(EMCState *script) {
  	debugC(3, kDebugLevelScriptFuncs, "LoLEngine::olol_playDialogueTalkText(%p) (%d)", (const void *)script, stackPos(0));
  	int track = stackPos(0);
  
@@ -1072,6 +1102,20 @@ index 30c59a77..c382434a 100644
  	}
  
  	return 1;
+diff --git a/engines/kyra/script/script_tim.cpp b/engines/kyra/script/script_tim.cpp
+index cf691840..4b6f67dd 100644
+--- a/engines/kyra/script/script_tim.cpp
++++ b/engines/kyra/script/script_tim.cpp
+@@ -934,6 +934,9 @@ int TIMInterpreter_LoL::initAnimStruct(int index, const char *filename, int x, i
+ 
+ 	if (wsa && (wsaFlags & 7))
+ 		wsa->displayFrame(0, 0, x, y, 0, 0, 0);
++	// version web : animation qui couvre toute la fenêtre de scène (garde de Gladstone…)
++	if (wsa && wsa->width() >= 176 && wsa->height() >= 120)
++		_vm->webSceneArt(true);
+ 
+ 	if (wsaFlags & 3) {
+ 		if (_vm->_flags.use16ColorMode) {
 diff --git a/engines/kyra/text/text_lol.cpp b/engines/kyra/text/text_lol.cpp
 index 22882f41..c19ab31a 100644
 --- a/engines/kyra/text/text_lol.cpp
