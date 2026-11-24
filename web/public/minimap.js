@@ -2562,11 +2562,11 @@
       lastStats = ""; updateStats().catch(() => {});
     }
     // Fiche de personnage du jeu synchronisée avec cette fenêtre (moteur : zone 0x7F000D00, ouverte et
-    // personnage affiché ; commande « charsheet », op 25). Ouverte dans le jeu : la fenêtre s'ouvre sur
-    // ce personnage ; fermée dans le jeu : la fenêtre se ferme (si c'est le jeu qui l'avait ouverte).
-    // Ouverte ou fermée ici : la fiche du jeu suit. Clic sur le petit portrait d'un personnage : le jeu
-    // affiche sa fiche.
-    let gameOpen = false, gameChar = -1, byGame = false, closingFromGame = false;
+    // personnage affiché ; commande « charsheet », op 25). Ouverte ou fermée ici : la fiche du jeu suit ;
+    // fenêtre ouverte, le personnage affiché dans le jeu est mis en avant. L'inverse n'est plus fait
+    // (2026-11-25) : ouvrir la fiche dans le jeu n'ouvre plus cette fenêtre. Clic sur le petit portrait
+    // d'un personnage : le jeu affiche sa fiche.
+    let gameOpen = false, gameChar = -1;
     const focusChar = (slot) => {
       document.querySelectorAll("#st-dlg .st-char, #st-eq-rows .eq-row").forEach((e) => e.classList.toggle("focus", +e.dataset.slot === slot));
       const el = document.querySelector(`#st-dlg .st-char[data-slot="${slot}"]`);
@@ -2576,19 +2576,16 @@
       const r = await mem.read([[0x7F000D00, 2]]);
       if (!r) return;
       const open = !!r[0][0], ch = r[0][1];
-      if (open && !gameOpen && !stDlg.open) { byGame = true; openStats(); }
-      if (!open && gameOpen && stDlg.open && byGame) { closingFromGame = true; stDlg.close(); }
       if (open && stDlg.open) focusChar(ch);
       gameOpen = open; gameChar = ch;
     }, 300);
     window.lolStatsOpened = () => {
-      if (gameOpen || byGame) return;
+      if (gameOpen) return;
       const first = lastInvData && lastInvData.party.length ? lastInvData.party[0].slot : 0;
       mem.cmd({ op: "charsheet", a: first }, 3000);
     };
     stDlg.addEventListener("close", () => {
-      if (!closingFromGame && gameOpen) mem.cmd({ op: "charsheet", a: -1 }, 3000);
-      closingFromGame = false; byGame = false;
+      if (gameOpen) mem.cmd({ op: "charsheet", a: -1 }, 3000);
     });
     window.lolEquipRefresh = renderEquip;
     window.lolEquipPick = (c, k) => { pick = { c, k }; eqMsg = ""; renderEquip(); };

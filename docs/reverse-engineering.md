@@ -2882,7 +2882,7 @@ spells, on the in-game automap) remains **unknown**.
   - **Opening and closing in the game**: only `clickedPortraitLeft` sets `_weaponsDisabled` (with `_updateFlags |= 0x0C`), and `clickedExitCharInventory` clears it. `_updateFlags & 2` is not the sheet flag.
   - **Engine**: it publishes at `0x7F000D00` whether the sheet is open (`_weaponsDisabled`) and which character it shows (`_selectedCharacter`). Command 25 (`charsheet`): a = 0–3 opens it on that character (`clickedPortraitLeft`), a = −1 closes it (`clickedExitCharInventory`).
   - **Page**:
-    - the sheet opened in the game opens the window and highlights that character; closed in the game, it closes the window it had opened;
+    - the sheet opened in the game opens the window and highlights that character; closed in the game, it closes the window it had opened (removed on 2026-11-25 at the user's request: the game's sheet no longer opens the page window; with the window already open, the game's character is still highlighted);
     - the window opened or closed on the page opens or closes the game's sheet;
     - clicking a member's small portrait in the Équipement section shows that member's sheet in the game.
   - **Verified**: all four transitions (open and close, from the game and from the page).
@@ -2921,3 +2921,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-24**: forest → Gladstone (§ 9.3l): the 3D view shows the castle picture (KEEP.CPS, or KEEPBRN.CPS with flag 67) at 10,3 facing north, then the guard's animated face (GUARD.WSA, frame order from GUARD4.TIM) at 10,2 until Gladstone loads; the view's place label no longer doubles the scene label. Verified with CDP.
 - **2026-11-24**: script pictures (§ 9.3m): the engine publishes when the scene window shows script art (`loadBitmap`, full-window WSA; cleared when the 3D scene is drawn). The modern interface then copies the game's scene window onto the 3D view, so all place and character pictures and their animations show, including the ~60 the export missed. Verified with CDP on the Gladstone guard and Victor's armoury.
 - **2026-11-25**: item stacks in the game's own inventory bar (ScummVM engine, command 26; § 10a).
+- **2026-11-25**: opening the character sheet in the game no longer opens the page's character window (the page → game direction stays).
