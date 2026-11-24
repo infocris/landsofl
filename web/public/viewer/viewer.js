@@ -699,7 +699,7 @@
         const t = texFor(mx, my, f);
         if (!t && !P) continue;
         const dist = side === 0 ? sdx - ddx : sdy - ddy;
-        if (P && !(t && t.block && (t.opaque || t.tex < 0))) {   // porte ouverte d'une sortie ou d'un lieu en image
+        if (P && !(t && (t.opaque || (t.block && t.tex < 0)))) {   // porte ouverte d'une sortie ou d'un lieu en image (pas une image d'entrée opaque, comme la caverne)
           let u = side === 0 ? player.y + dist * ry : player.x + dist * rx;
           u -= Math.floor(u);
           if (f === FACE_E || f === FACE_N) u = 1 - u;
@@ -1050,7 +1050,7 @@
           const t = texFor(mx, my, f);
           if (!t && !P) continue;
           if (f === FACE_E || f === FACE_N) uu = 1 - uu;
-          if (P && !(t && t.block && (t.opaque || t.tex < 0))) {   // porte ouverte d'une sortie ou d'un lieu en image
+          if (P && !(t && (t.opaque || (t.block && t.tex < 0)))) {   // porte ouverte d'une sortie ou d'un lieu en image (pas une image d'entrée opaque, comme la caverne)
             if (t && t.tex >= 0) items.push({ d: hz, tex: t.tex, u: uu, pos, line, door: t.panel ? t : null });
             items.push({ d: hz + 1e-3, portal: P, u: uu, tex: t ? t.tex : -1 });
             nearest = hz; done = true; break;
