@@ -757,6 +757,19 @@ are paved with a visible repeating pattern: `KEEP` (level 1, octagons) and `TOWE
     south-east;
   - grain in 2 × 2 blocks and a few chips.
 
+- **Cimmeria flagstones (CIMMERIA, levels 27–29, 2026-11-24)**: the three levels share one
+  background. Its floor is the same kind of crazy paving as the manor's, in red-brown. A
+  single ramp of 15 tones runs from (4,0,0) to (105,48,44), and the joints are almost black,
+  (24,8,8) to (32,12,12). Like Gladstone's, it carries vertical light streaks: wall
+  reflections painted into the background. `flagstone_floor` takes two parameters for it:
+  - `joint`: how many steps below the lightest tone the joint core sits, in
+    `FLOOR_FLAGSTONES` (manor 7, so its output is unchanged; Cimmeria 11);
+  - a seed, in `FLAG_SEEDS`, so the stone layout differs from the manor's.
+
+  The glossy floor of the 3D view (§ 9.3c, glossy floor) is on for CIMMERIA too, at peak
+  opacity 0.3: the fire niches and arches reflect on the paving. The ceiling stays black, as
+  in the game (§ 9.3f).
+
 - **Caves (CAVE1, 2026-11-24)**: levels 5–9 share one background. Level 25 shows **the
   same drawing with another palette** (identical pixel counts per colour, green moss turned
   orange-brown). Floor: grey rock with green moss in the hollows. Ceiling: dark rock under
@@ -2601,6 +2614,7 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-24**: swamp ceiling (SWAMP, level 11) redrawn as a pixel-art canopy: two layers of leaves, red-brown branches, haze in the gaps (§ 9.3f). The viewer page now loads `viewer.js` with a new version: the old one stayed cached and hid the `viewer.js` changes since 2026-11-23.
 - **2026-11-24**: the mines of Urbish (URBISH, level 12) get the mine timbering ceiling: same drawing as MINE1, own rock tones (§ 9.3f).
 - **2026-11-24**: tower floor and ceiling (TOWER1, levels 18–21) redrawn in pixel art: blue granite slabs flecked with mauve, joints on the measured lattice, over 2 × 2 cells; speckled mauve granite beams with a dark recess (§ 9.3c).
+- **2026-11-24**: Cimmeria castle floor (CIMMERIA, levels 27–29) redrawn as red-brown pixel-art flagstones with near-black joints, and glossy like Gladstone's (§ 9.3c).
 - **2026-11-23**: mine ceiling (MINE1, levels 13–16) redrawn from the original background in pixel art: round logs on the cell edges, lagging boards, rock where boards are missing (§ 9.3f).
 - **2026-11-22**: switches in the 3D view: door buttons attached by the level script (`assignLevelDecorationShape` + `resetBlockShapeAssignment`) now drawn; walls' switch type and clickable area exported; engine command op 20 (`clickwall`) clicks the wall in front like the game (`clickedWall`); the 3D view outlines the switch in front and clicks it; engine files versioned in URLs and served `no-cache` (§ 9.6).
 - **2026-11-22**: doors of the script-opened series (walls 8–12, 18–22: shape 0, e.g. Gladstone's locked library door) now drawn closed with their leaf; they looked open in the 3D view (§ 9.6).

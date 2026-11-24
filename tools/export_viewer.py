@@ -1002,7 +1002,11 @@ def pixel_floor_motif(bg, ref):
 # dalles polygonales claires, joints fins sombres. Dalles = cellules d'un Voronoï périodique
 # (germes sur une grille tremblée), donc sans raccord ; une texture couvre FLAG_SPAN × FLAG_SPAN
 # cases pour que la répétition se voie moins (floorSpan dans le JSON du niveau).
-FLOOR_FLAGSTONES = {"MANOR"}
+# tileset -> profondeur des joints (crans sous la teinte la plus claire de la rampe) : le manoir
+# a des joints brun moyen ; Cimmeria (niveaux 27 à 29, même dallage en rouge sur 15 teintes) des
+# joints presque noirs
+FLOOR_FLAGSTONES = {"MANOR": 7, "CIMMERIA": 11}
+FLAG_SEEDS = {"CIMMERIA": 0x6A09E667}   # autre disposition des dalles que le manoir
 FLAG_SPAN = 2                    # cases couvertes par la texture, de côté
 FLAG_PX = 128                    # pixels de texture par case
 FLAG_SITES = 5                   # dalles par case, de côté (≈ 0,6 unité, comme sur le fond)
@@ -1016,14 +1020,14 @@ def floor_ramp(bg, y_min=60):
     return sorted((c for c, n in cnt.items() if n > 10 and sum(c) > 0), key=sum)
 
 
-def flagstone_floor(bg):
+def flagstone_floor(bg, joint=7, seed=0x510E527F):
     """Dallage irrégulier (FLAG_SPAN cases de côté), pixel art aux teintes du fond."""
     ramp = floor_ramp(bg)
     if len(ramp) < 8:
         return None
     top = len(ramp) - 1
     def h(*a):
-        x = 0x510E527F
+        x = seed
         for v in a:
             x = ((x ^ (v & 0xFFFFFFFF)) * 0x85EBCA6B) & 0xFFFFFFFF
             x ^= x >> 13
@@ -1053,9 +1057,9 @@ def flagstone_floor(bg):
             el = max(1e-6, (ex * ex + ey * ey) ** 0.5)
             gap = (d2 - d1) / (2 * el)
             if gap < 0.45:
-                idx = top - 7                         # cœur du joint
+                idx = top - joint                     # cœur du joint
             elif gap < 1.0:
-                idx = top - 5                         # bord du joint
+                idx = top - joint + 2                 # bord du joint
             else:
                 base = top - (h(3, i1, j1) < 0.45) - (h(4, i1, j1) < 0.15)   # teinte de la dalle
                 idx = base
@@ -1939,7 +1943,8 @@ def main(game_dir, maps_dir, out_dir):
         motif, floor_repeated = floor_motif(bg, tsname)
         if tsname in FLOOR_PIXEL_ART:
             motif = pixel_floor_motif(bg, motif)
-        flags = flagstone_floor(bg) if tsname in FLOOR_FLAGSTONES else None
+        flags = (flagstone_floor(bg, FLOOR_FLAGSTONES[tsname], FLAG_SEEDS.get(tsname, 0x510E527F))
+                 if tsname in FLOOR_FLAGSTONES else None)
         floor_span = FLAG_SPAN if flags is not None else 1
         ceil_span = 1
         if tsname in TOWER_TILESETS:

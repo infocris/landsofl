@@ -18,7 +18,7 @@
 
   // ?embed=1 : intégré sous la fenêtre du jeu (index.html). Position reçue de la page
   // parente (postMessage « lol-pos »), pas de commandes, rendu seulement si elle change.
-  const DATA_V = "20261124t";                      // version des données exportées (cache du navigateur)
+  const DATA_V = "20261124u";                      // version des données exportées (cache du navigateur)
   const EMBED = new URLSearchParams(location.search).get("embed") === "1";
   if (EMBED) { FOV = 2 * Math.atan(1.375); document.documentElement.classList.add("embed"); }
   let dirty = true;
@@ -96,7 +96,7 @@
   // sur le dallage. Ici, reflet plan : chaque colonne de mur est redessinée à l'envers sous son
   // pied, en GLOSS_BANDS bandes dont l'opacité décroît (fondu sur GLOSS_LEN de la hauteur du
   // mur). Opacité réglable par ?gloss=0.3 (0 : pas de reflet).
-  const GLOSS = { KEEP: 0.32 };
+  const GLOSS = { KEEP: 0.32, CIMMERIA: 0.3 };            // Cimmeria : mêmes traînées sur le dallage
   const GLOSS_LEN = 0.45, GLOSS_BANDS = 4;
   const GLOSS_Q = new URLSearchParams(location.search).get("gloss");
   const FOOT = 12;              // lignes du bas de la face (soubassement) non répétées aux étages
