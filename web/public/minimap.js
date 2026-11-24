@@ -113,6 +113,20 @@
         walls: d.walls || {}, chestItems: d.chestItems || {}, secrets: d.secrets || [], atlasCols: d.atlasCols, faceW: d.faceW, faceH: d.faceH });
       infoEl.textContent = `chargement des cartes… ${levels.length}/${index.length}`;
     }
+    // scènes de script (tools/export_anims.py) : niveau -> case -> variantes selon un drapeau du jeu
+    try { cutscenes = (await getJSON("viewer/data/anims.json?v=20261124c")).cutscenes || {}; } catch (e) {}
+  }
+  let cutscenes = {};
+  // variante montrée : la première dont le drapeau du jeu a l'état voulu (ou sans drapeau)
+  async function pickCutscene(list) {
+    let flags = null;
+    if (list.some((v) => v.flag != null)) {
+      const f = await mem.read([[FLAGS, 128]]);
+      if (!f) return null;
+      flags = f[0];
+    }
+    const flag = (n) => (flags[(n >> 4) * 2 + ((n & 15) >> 3)] >> (n & 7)) & 1;
+    return list.find((v) => v.flag == null || flag(v.flag) === v.when) || null;
   }
 
   // Objets regroupés par case, numérotés dans l'ordre de lecture de la carte (haut → bas).
@@ -1208,6 +1222,9 @@
     let stalled = inScene;
     try { const w = document.getElementById("dos").contentWindow; if (w.lolSceneWindow) stalled = inScene || w.lolSceneWindow() || w.lolMainStalled(); } catch (e) {}
     sceneNow = stalled && !!(current && current.scenes && current.scenes[block]);
+    // scène d'un script (château et garde devant Gladstone) : montrée tant que le jeu la montre
+    const cutList = stalled && current && cutscenes[current.level] && cutscenes[current.level][block];
+    const cut = cutList ? await pickCutscene(cutList) : null;
     if (window.lolSceneUi) window.lolSceneUi(sceneNow);
     const now = performance.now();
     // ScummVM publie le niveau en cours ; sous DOSBox, on le reconnaît à sa grille (identify)
@@ -1264,7 +1281,7 @@
     // noir « Lieu »). Version ScummVM : la page recopie l'image du jeu elle-même (tools/scummvm_web.py).
     // image du lieu en plein cadre dans la vue 3D : DOSBox (drapeau de scène) ; ScummVM : scène d'un
     // lieu affichée par le jeu (boutique…, sceneNow), une fois l'ouverture de la porte jouée
-    sendSceneTo3d((inScene && !ENGINE_SPRITES) || sceneNow ? current.scenes[block] || null : null, near ? near.text : "");
+    sendSceneTo3d(cut || ((inScene && !ENGINE_SPRITES) || sceneNow ? current.scenes[block] || null : null), near ? near.text : "");
     sendGridTo3d(current.level, hash);
     sendBloodTo3d(current.level);
     sendMonstersTo3d(current);
@@ -1346,7 +1363,7 @@
   // Image fixe d'un lieu : null = exploration ; "" = scène sans image connue.
   let lastSceneSent;
   function sendSceneTo3d(image, label) {
-    const key = `${image}|${label}`;
+    const key = `${JSON.stringify(image)}|${label}`;
     if (key === lastSceneSent || !frame3d || !frame3d.contentWindow) return;
     lastSceneSent = key;
     frame3d.contentWindow.postMessage({ type: "lol-scene", image, label }, location.origin);

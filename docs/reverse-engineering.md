@@ -1420,6 +1420,47 @@ of the subroutine.
   cell. The exit cell's own floor and ceiling stay those of the current level. Before this change,
   the forest floor showed inside Gladstone's gate cell.
 
+### 9.3l Forest → Gladstone: castle view and guard cut-scene in the 3D view (2026-11-24)
+
+What the game does (`LEVEL2.INF`, opcodes named from `LoLEngine::setupOpcodeTable`):
+- **Cell 106 (10,3), facing north** (entry 0x560 → 0x58C): `testGameFlag(67)`. Without the flag,
+  the subroutine at 0x109 (`fadeClearSceneWindow`, `loadBitmap`, `copyRegion`, `prepareSpecialScene`)
+  shows `KEEP.CPS`, the castle, in the scene window. With the flag (Gladstone burnt), it shows
+  `KEEPBRN.CPS` and a `KEEPBRN.WSA` background animation (flames).
+- **Cell 74 (10,2)**, subroutine 0x16A, without flag 67:
+  1. `disableControls`, `initAnimStruct("GUARD", 0, x 112, y 0, delay 8, flags 0x2D)`;
+  2. `loadTimScript(1, "GUARD4")`, `loadTimScript(2, "GUARD5")`, `initDialogueSequence`;
+  3. dialogue lines through the helper at 0xFD (`stopTimScript`, `playDialogueTalkText`, `runTimScript`), with sounds 110/111;
+  4. `restoreAfterDialogueSequence`, `releaseTimScript` ×2, `freeAnimStruct`, `enableControls`;
+  5. `loadNewLevel(1, 589, 0)`.
+  With flag 67 it only plays a character chat line.
+- `GUARD.WSA` (`O01D.PAK`): 6 frames of 176 × 120 (the whole scene window, the guard's face), with
+  its own palette (flag 1). `GUARD4.TIM` (AVTL, commands `[length, delay, opcode, args…]`, opcode
+  0x106 = show WSA frame):
+  - frame 3 first;
+  - while the guard talks, the loop (0x114 … 0x115) runs 6 5 1 2 3 4 5 6 1 2 3 4 2 3 4, 8 ticks per frame;
+  - then 1 0 1.
+  Frame 6 is the loop frame and shows the same image as frame 0.
+- The scenes export (`level_scenes`) only finds direct `loadBitmap` calls with a constant name.
+  These scenes are loaded through a subroutine, so it misses them. The same holds for about 60
+  other place pictures (Lynn, Marina, Victor, thug camp, Frank/Droek and their "dead" variants…),
+  which are not handled yet.
+
+3D view (modern interface):
+- `tools/export_anims.py` now also writes `cutscenes` in `anims.json`: level → cell → variants
+  `{img, flag?, when?}`. The first variant whose game flag matches is shown. An animated variant
+  also carries `w, h, n, seq, loop, ms`. Images go to `data/scenes/`: `keep.png`, `keepbrn.png`,
+  `anim_guard.png` (the 6 frames side by side).
+- `minimap.js`: while the game holds a scene (same "stalled" test as shops), a cutscene cell sends
+  the chosen variant to the view (`lol-scene`). It reads the flags only when a variant needs them.
+- `viewer.js`: a variant with frames plays on a canvas in `#scene`: the start sequence, then the
+  loop as long as the scene lasts. The view's own place label is hidden while a scene is shown;
+  before this change, "GLADSTONE" was shown twice.
+- Verified with CDP (no sound): from 10,5 facing north, two steps forward, then the castle picture
+  fills the 3D view at 10,3. One more step: the guard's face is animated with "Vous pouvez passer.",
+  then Gladstone at 13,18.
+- Not handled: the burning keep's flame animation (static `KEEPBRN.CPS` only).
+
 ## 10. Not decoded so far
 
 - `.TLC` (5376 bytes per level), `.INF` beyond monster placement, `ITEM.INF`.
@@ -2181,7 +2222,7 @@ transitions:
 |---|---|---|
 | `tools/extract_maps.py` | grids, walls, annotations, monsters | `maps/levelNN.json/.png`, `maps/levels.json`, `maps/raw/` |
 | `tools/export_viewer.py` | face textures, background, sprites | `web/public/viewer/data/` |
-| `tools/export_anims.py` | face animations played by level scripts (Gladstone portcullis), § 9.3k | `web/public/viewer/data/anims.json`, `anim_*.png` |
+| `tools/export_anims.py` | face animations played by level scripts (Gladstone portcullis), § 9.3k; script scenes (castle view, guard cut-scene), § 9.3l | `web/public/viewer/data/anims.json`, `anim_*.png`, `scenes/keep*.png`, `scenes/anim_guard.png` |
 | `web/public/viewer/` | free-roaming 3D viewer (home-made ray casting) | http://localhost:8000/viewer/ |
 | `web/public/minimap.js`, `memscan.js` | live minimap next to the game | http://localhost:8000/ |
 
@@ -2824,3 +2865,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-24**: exits whose face is an opaque picture that the party walks into (the thieves' cave mouth in the North Forest, level 2 cell 0,3, wall 63 = texture 54 not blocking; the cave and mine stair pictures 38/39 on many levels) no longer open a portal in the 3D view. Before this change, the destination level's render was pasted there and showed as stretched stripes above the cave. Portals now only apply to non-opaque faces (open doors, gates). Verified in the standalone viewer: level 2 from 3,3 and 2,3 facing west; the Gladstone gate is unchanged (door, non-opaque).
 - **2026-11-24**: read KForestland/lands-of-lore-1-re (§ 10b): TIM/WSA formats, per-level INF event tables (cut-scene triggers, level jumps with facing), fade helpers.
 - **2026-11-24**: Gladstone gate (§ 9.3k): the portcullis WSA plays on the gate face in the 3D view before the forest loads; the exit cell keeps its own floor (the portal copy starts at its far side). Verified with CDP: from 13,18 facing south, the 3D view shows the portcullis rising, then the forest at 10,3.
+- **2026-11-24**: forest → Gladstone (§ 9.3l): the 3D view shows the castle picture (KEEP.CPS, or KEEPBRN.CPS with flag 67) at 10,3 facing north, then the guard's animated face (GUARD.WSA, frame order from GUARD4.TIM) at 10,2 until Gladstone loads; the view's place label no longer doubles the scene label. Verified with CDP.

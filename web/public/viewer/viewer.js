@@ -1577,13 +1577,44 @@
 
   // Mode intégré : image fixe d'un lieu (auberge, échoppe…) à la place du rendu 3D.
   const sceneEl = document.getElementById("scene");
+  // animation d'une scène de script (garde de Gladstone, GUARD.WSA) : séquence de départ, puis la
+  // boucle tant que la scène dure, une image toutes les « ms »
+  const sceneCv = document.createElement("canvas");
+  sceneCv.hidden = true; sceneEl.insertBefore(sceneCv, sceneEl.firstChild);
+  let sceneAnim = null;
+  function sceneAnimTick() {
+    const a = sceneAnim;
+    if (!a || sceneEl.hidden) return;
+    if (a.im.complete && a.im.naturalWidth) {
+      const k = Math.floor((performance.now() - a.t0) / a.ms);
+      const f = k < a.seq.length ? a.seq[k] : a.loop[(k - a.seq.length) % a.loop.length];
+      if (f !== a.last) {
+        const g = sceneCv.getContext("2d");
+        g.drawImage(a.im, f * a.w, 0, a.w, a.h, 0, 0, a.w, a.h);
+        a.last = f;
+      }
+    }
+    requestAnimationFrame(sceneAnimTick);
+  }
   addEventListener("message", (e) => {
     if (!EMBED || e.origin !== location.origin || !e.data || e.data.type !== "lol-scene") return;
     const { image, label } = e.data;
+    sceneAnim = null;
     if (image === null) { sceneEl.hidden = true; dirty = true; return; }
     applyEnter();                                       // entrée dans le lieu : position prise maintenant
     const img = sceneEl.querySelector("img");
-    if (image) { img.src = "data/scenes/" + image; img.hidden = false; } else img.hidden = true;
+    // scène de script (anims.json « cutscenes ») : image fixe, ou animation WSA (images côte à côte)
+    const anim = image && typeof image === "object" && image.n ? image : null;
+    const src = image && typeof image === "object" ? image.img : image;
+    sceneCv.hidden = !anim;
+    if (anim) {
+      img.hidden = true;
+      sceneCv.width = anim.w; sceneCv.height = anim.h;
+      let im = sceneImgs.get(src);
+      if (!im) { im = new Image(); im.src = "data/scenes/" + src + "?v=" + DATA_V; sceneImgs.set(src, im); }
+      sceneAnim = { ...anim, im, t0: performance.now(), last: -1 };
+      requestAnimationFrame(sceneAnimTick);
+    } else if (src) { img.src = "data/scenes/" + src; img.hidden = false; } else img.hidden = true;
     document.getElementById("scene-label").textContent = label || (image ? "" : "Lieu");
     sceneEl.hidden = false;
   });
