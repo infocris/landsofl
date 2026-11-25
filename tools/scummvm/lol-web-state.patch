@@ -23,7 +23,7 @@ index 4c00889e..63d097a9 100644
  		if (++_inventoryCurItem > 47)
  			_inventoryCurItem -= 48;
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..3f1b74f7 100644
+index 392e4c2d..366cea28 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -32,6 +32,7 @@
@@ -755,7 +755,7 @@ index 392e4c2d..3f1b74f7 100644
 +	if (op == 26) {	// barre d'objets du jeu par piles (a = 1) ou par emplacements (a = 0)
 +		if ((a != 0) != _webStackInv) {
 +			_webStackInv = a != 0;
-+			webStackFix();
++			webStackReveal();
 +			gui_drawInventory();
 +		}
 +		return 0;
@@ -988,7 +988,7 @@ index 392e4c2d..3f1b74f7 100644
  	_activeSpell.spell = spellType;
  	_activeSpell.p = &_spellProperties[spellType];
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index 2cfadf37..1b41489a 100644
+index 2cfadf37..65709486 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
 @@ -315,6 +315,13 @@ private:
@@ -1005,7 +1005,7 @@ index 2cfadf37..1b41489a 100644
  	void update() override;
  
  	// mouse
-@@ -1072,6 +1079,43 @@ private:
+@@ -1072,6 +1079,44 @@ private:
  
  	LoLItem *_itemsInPlay;
  	ItemProperty *_itemProperties;
@@ -1026,6 +1026,7 @@ index 2cfadf37..1b41489a 100644
 +	bool _webStackAnchor[48] = {};
 +	bool webSameStack(Item a, Item b) const;
 +	void webStackFix();
++	void webStackReveal();
 +	int webStackAnchorOf(Item item) const;
 +	int webStackCount(int slot) const;
 +	int webFreeSlot(int except) const;
@@ -1096,10 +1097,10 @@ index 055e4f8c..8fd1d5c3 100644
  	const uint8 *p = _screen->getCPagePtr(2);
  	const uint8 *ts[16];
 diff --git a/engines/kyra/gui/gui_lol.cpp b/engines/kyra/gui/gui_lol.cpp
-index 926e60dc..0350ec65 100644
+index 926e60dc..f9e8e2b4 100644
 --- a/engines/kyra/gui/gui_lol.cpp
 +++ b/engines/kyra/gui/gui_lol.cpp
-@@ -87,9 +87,159 @@ void LoLEngine::gui_drawInventory() {
+@@ -87,9 +87,175 @@ void LoLEngine::gui_drawInventory() {
  	}
  }
  
@@ -1136,6 +1137,22 @@ index 926e60dc..0350ec65 100644
 +				_webStackAnchor[j] = false;
 +		}
 +		_webStackAnchor[a < 0 ? i : a] = true;
++	}
++}
++
++// si aucune pile n'est dans les 9 cases visibles, la barre défile jusqu'à la première (activation,
++// chargement d'une partie : le défilement gardé peut montrer une zone vide du sac)
++void LoLEngine::webStackReveal() {
++	webStackFix();
++	for (int i = 0; i < 9; i++) {
++		if (_webStackAnchor[(_inventoryCurItem + i) % 48])
++			return;
++	}
++	for (int i = 0; i < 48; i++) {
++		if (_webStackAnchor[i]) {
++			_inventoryCurItem = i;
++			return;
++		}
 +	}
 +}
 +
@@ -1259,7 +1276,7 @@ index 926e60dc..0350ec65 100644
  	int item = _inventoryCurItem + index;
  	if (item > 47)
  		item -= 48;
-@@ -1336,6 +1486,16 @@ int LoLEngine::clickedInventorySlot(Button *button) {
+@@ -1336,6 +1502,16 @@ int LoLEngine::clickedInventorySlot(Button *button) {
  	int slot = _inventoryCurItem + button->arg;
  	if (slot > 47)
  		slot -= 48;
@@ -1276,7 +1293,7 @@ index 926e60dc..0350ec65 100644
  
  	uint16 slotItem = _inventory[slot];
  	int hItem = _itemInHand;
-@@ -1378,7 +1538,10 @@ int LoLEngine::clickedInventorySlot(Button *button) {
+@@ -1378,7 +1554,10 @@ int LoLEngine::clickedInventorySlot(Button *button) {
  		_inventory[slot] = hItem;
  	}
  
@@ -1288,7 +1305,7 @@ index 926e60dc..0350ec65 100644
  
  	return 1;
  }
-@@ -1543,7 +1706,11 @@ int LoLEngine::clickedOptions(Button *button) {
+@@ -1543,7 +1722,11 @@ int LoLEngine::clickedOptions(Button *button) {
  	if (_flags.isTalkie && getVolume(kVolumeSpeech) == 2)
  		_configVoice |= (textEnabled() ? 2 : 1);
  
@@ -1300,6 +1317,21 @@ index 926e60dc..0350ec65 100644
  
  	_updateFlags &= 0xFFFB;
  	setMouseCursorToItemInHand();
+diff --git a/engines/kyra/gui/saveload_lol.cpp b/engines/kyra/gui/saveload_lol.cpp
+index 1b6ce33c..7113e47d 100644
+--- a/engines/kyra/gui/saveload_lol.cpp
++++ b/engines/kyra/gui/saveload_lol.cpp
+@@ -323,6 +323,10 @@ Common::Error LoLEngine::loadGameState(int slot) {
+ 	_credits = 0;
+ 	giveCredits(t, 0);
+ 	setHandItem(_itemInHand);
++	if (_webStackInv) {	// version web : barre par piles, positions remises à zéro
++		memset(_webStackAnchor, 0, sizeof(_webStackAnchor));
++		webStackReveal();
++	}
+ 	loadLevel(_currentLevel);
+ 	gui_drawPlayField();
+ 	restartPlayTimerAt(header.totalPlaySecs);
 diff --git a/engines/kyra/script/script_lol.cpp b/engines/kyra/script/script_lol.cpp
 index 30c59a77..1231452c 100644
 --- a/engines/kyra/script/script_lol.cpp

@@ -1978,6 +1978,10 @@ The meaning of the functions, however, can be read directly. Comparison with our
       (a hidden item kept in that slot moves to another free slot). Empty hand: nothing;
     - an item added by the game (`addItemToInventory`) goes to a free slot and the bar scrolls to its
       stack's cell;
+    - `webStackReveal`: when stacks are switched on, and after loading a save (anchors reset), if no
+      stack is in the 9 visible cells the bar scrolls to the first one. The saved `_inventoryCurItem`
+      could show an empty part of the bag, and the items looked gone (the first stacks version had
+      its own scroll and never moved `_inventoryCurItem`);
     - verified: a potion taken from its stack of 4 and put on empty cell 9 → the stack moves to
       cell 9; herbs moved to cell 6 the same way; a single item swapped with the potion stack goes to
       the next free cell; a potion put on cell 1 → the stack goes back to cell 1.
@@ -2934,3 +2938,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-25**: opening the character sheet in the game no longer opens the page's character window (the page → game direction stays).
 - **2026-11-25**: game bar stacks keep their place when an item is taken (clicks act on the stack's last item; § 10a).
 - **2026-11-25**: game bar stacks v2: the 48 cells and empty cells stay; each stack is anchored on a cell, and putting an item on an empty cell moves its whole stack there (§ 10a).
+- **2026-11-25**: game bar stacks: on activation and after loading a save, the bar scrolls to the first stack when none is visible (§ 10a).
