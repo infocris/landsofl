@@ -2967,3 +2967,4 @@ spells, on the in-game automap) remains **unknown**.
     - right-click in the scene view → back in the bag (in its stack);
     - right-click on Michael's portrait → the game's portrait button takes the click and the potion stays in hand (life full);
     - right-click on an empty bar cell → the game's slot button takes it like a left click; in stacks mode the whole stack moves to that cell.
+- **2026-11-26**: Sac cell of the scene view removed at the user's request: no drawing in `drawScene`, no redraw from `setHandItem`, no `webSceneBagClick`. `webStoreHand` remains for command 27 and the right-click. A right-click on the floor area of the scene is taken by the game's own drop buttons (`clickedSceneDropItem`): the item is put on the floor. Higher in the view, a right-click with nothing to take it stores the item.
