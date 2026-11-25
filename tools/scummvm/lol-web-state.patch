@@ -23,7 +23,7 @@ index 4c00889e..63d097a9 100644
  		if (++_inventoryCurItem > 47)
  			_inventoryCurItem -= 48;
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..1cab4ce9 100644
+index 392e4c2d..bcea27c2 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -32,6 +32,7 @@
@@ -45,7 +45,7 @@ index 392e4c2d..1cab4ce9 100644
  namespace Kyra {
  
  const char *const LoLEngine::kMouseKeymapName = "lolmouse";
-@@ -929,6 +934,820 @@ void LoLEngine::startupNew() {
+@@ -929,6 +934,821 @@ void LoLEngine::startupNew() {
  	_screen->showMouse();
  }
  
@@ -191,6 +191,7 @@ index 392e4c2d..1cab4ce9 100644
 +		}
 +		u8(n);
 +	}
++	u8(_webWallSeq); u16(_webWallBlock); u8(_webWallFace); u8(_webWallHandEmpty ? 1 : 0);	// dernier clic sur un mur
 +	end();
 +	// image de chaque monstre telle que le jeu la dessine vu du groupe (drawMonster), 4 octets :
 +	// numéro d'image (0-15, 255 = aucune) ; 1 = image retournée horizontalement ; giclée de coup
@@ -866,7 +867,7 @@ index 392e4c2d..1cab4ce9 100644
  void LoLEngine::runLoop() {
  	// Initialize debugger since how it should be fully usable
  	static_cast<Debugger_LoL *>(getDebugger())->initialize();
-@@ -957,6 +1776,7 @@ void LoLEngine::runLoop() {
+@@ -957,6 +1777,7 @@ void LoLEngine::runLoop() {
  		gui_updateInput();
  
  		update();
@@ -874,7 +875,7 @@ index 392e4c2d..1cab4ce9 100644
  
  		updatePlayTimer();
  
-@@ -1031,6 +1851,7 @@ void LoLEngine::readSettings() {
+@@ -1031,6 +1852,7 @@ void LoLEngine::readSettings() {
  }
  
  void LoLEngine::update() {
@@ -882,7 +883,7 @@ index 392e4c2d..1cab4ce9 100644
  	updateSequenceBackgroundAnimations();
  
  	if (_updateCharNum != -1 && _system->getMillis() > _updatePortraitNext)
-@@ -1178,6 +1999,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
+@@ -1178,6 +2000,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
  	return size;
  }
  
@@ -980,7 +981,7 @@ index 392e4c2d..1cab4ce9 100644
  bool LoLEngine::addCharacter(int id) {
  	const uint16 *cdf[] = {
  		_charDefsMan, _charDefsMan, _charDefsMan, _charDefsWoman,
-@@ -1477,6 +2389,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
+@@ -1477,6 +2390,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
  
  	int newVal = (mode == 2) ? (pointsMax + points) : (mode ? (pointsCur + points) : points);
  	newVal = CLIP(newVal, 0, pointsMax);
@@ -989,7 +990,7 @@ index 392e4c2d..1cab4ce9 100644
  
  	if (type) {
  		c->magicPointsCur = newVal;
-@@ -1969,6 +2883,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
+@@ -1969,6 +2884,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
  		}
  	}
  
@@ -997,7 +998,7 @@ index 392e4c2d..1cab4ce9 100644
  	if (!skipAnim && charId < 3) {
  		_updateCharNum = charId;
  		_portraitSpeechAnimMode = mode;
-@@ -1981,6 +2896,8 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
+@@ -1981,6 +2897,8 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
  	else if (paramList)
  		snd_playCharacterSpeech(paramList[2], ch, 0);
  
@@ -1006,7 +1007,7 @@ index 392e4c2d..1cab4ce9 100644
  	if (textEnabled()) {
  		if (mode == 0) {
  			_txt->printDialogueText2(3, str, script, paramList, paramIndex);
-@@ -2074,6 +2991,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
+@@ -2074,6 +2992,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
  
  void LoLEngine::delay(uint32 millis, bool doUpdate, bool) {
  	while (millis && !shouldQuit()) {
@@ -1014,7 +1015,7 @@ index 392e4c2d..1cab4ce9 100644
  		if (doUpdate)
  			update();
  		else
-@@ -2092,6 +3010,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
+@@ -2092,6 +3011,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
  // spells
  
  int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
@@ -1027,10 +1028,10 @@ index 392e4c2d..1cab4ce9 100644
  	_activeSpell.spell = spellType;
  	_activeSpell.p = &_spellProperties[spellType];
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index 2cfadf37..0d172134 100644
+index 2cfadf37..15d78aa9 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
-@@ -315,6 +315,14 @@ private:
+@@ -315,6 +315,18 @@ private:
  
  	// main loop
  	void runLoop();
@@ -1038,14 +1039,18 @@ index 2cfadf37..0d172134 100644
 +	void webRunCommands(bool all = true);	// version web : commandes d'inventaire envoyées par la page
 +	int webInventoryCommand(int op, int a, int b);
 +	Item webItemAt(int loc);
-+	Item webHoverItem();	// version web : objet sous le curseur (barre d'objets, équipement de la fiche)
++	Item webHoverItem();
++	// version web : dernier clic sur le mur devant le groupe (clickedWall) : numéro, case, face, main vide
++	uint8 _webWallSeq = 0, _webWallFace = 0;
++	uint16 _webWallBlock = 0;
++	bool _webWallHandEmpty = false;	// version web : objet sous le curseur (barre d'objets, équipement de la fiche)
 +	bool webSlotUsable(int c, int k) const;
 +	Common::String webLangString(uint16 id);
 +	void webSetItemAt(int loc, Item item);
  	void update() override;
  
  	// mouse
-@@ -1072,6 +1080,44 @@ private:
+@@ -1072,6 +1084,44 @@ private:
  
  	LoLItem *_itemsInPlay;
  	ItemProperty *_itemProperties;
@@ -1137,7 +1142,7 @@ index 055e4f8c..8fd1d5c3 100644
  	const uint8 *p = _screen->getCPagePtr(2);
  	const uint8 *ts[16];
 diff --git a/engines/kyra/gui/gui_lol.cpp b/engines/kyra/gui/gui_lol.cpp
-index 926e60dc..f9e8e2b4 100644
+index 926e60dc..b98e40e6 100644
 --- a/engines/kyra/gui/gui_lol.cpp
 +++ b/engines/kyra/gui/gui_lol.cpp
 @@ -87,9 +87,175 @@ void LoLEngine::gui_drawInventory() {
@@ -1345,7 +1350,18 @@ index 926e60dc..f9e8e2b4 100644
  
  	return 1;
  }
-@@ -1543,7 +1722,11 @@ int LoLEngine::clickedOptions(Button *button) {
+@@ -1410,6 +1589,10 @@ int LoLEngine::clickedInventoryScroll(Button *button) {
+ int LoLEngine::clickedWall(Button *button) {
+ 	int block = calcNewBlockPosition(_currentBlock, _currentDirection);
+ 	int dir = _currentDirection ^ 2;
++	_webWallSeq++;	// version web : la page propose les clés du sac devant une serrure ou un coffre
++	_webWallBlock = block;
++	_webWallFace = dir;
++	_webWallHandEmpty = !_itemInHand;
+ 	uint8 type = _specialWallTypes[_levelBlockProperties[block].walls[dir]];
+ 
+ 	int res = 0;
+@@ -1543,7 +1726,11 @@ int LoLEngine::clickedOptions(Button *button) {
  	if (_flags.isTalkie && getVolume(kVolumeSpeech) == 2)
  		_configVoice |= (textEnabled() ? 2 : 1);
  

@@ -2945,3 +2945,11 @@ spells, on the in-game automap) remains **unknown**.
   - **Verified**: ointment stack of 4 on bar cell 1 → tooltip "Onguent … Pile de 4"; empty cell 6 → none; Michael's sheet → dagger (138) and shield slots found.
 - **2026-11-25**: item tooltip comparison coloured like the item card: gains green (#4ade80), losses red (#ff6b6b), equal grey; its styles only existed under `#inv-detail`. Verified: crossbow over Michael's dagger → "Force 15 (+5)" in green.
 - **2026-11-25**: item value removed from the item tooltip and the item card, at the user's request (still shown in the shop's "Vendre…" list).
+- **2026-11-25**: trying a bag key on a lock or a chest (ScummVM).
+  - **Engine**: `clickedWall` counts each click on the wall in front of the party and keeps its cell, face (`_currentDirection ^ 2`) and whether the hand was empty. Zone `0x7F000100` bytes 22–26: sequence number, cell (u16), face, hand empty. Clicks from the 3D view's switch frame also go through it (command 20).
+  - **Page** (`lolWallClick`, polled every 150 ms): after an empty-hand click, it waits 700 ms so an unlocked chest has time to open. If the cell is a known lock (levels' `locks`, § 6) or the face is a chest still in its first state (closed, § 6.1), a small menu at the pointer lists the bag's keys (types 166–210 and the Jeu de clefs, 245). The lock's expected key comes first, marked "attendue". Choosing one moves it to the hand (command 1), clicks the wall (command 20), and moves it back to its slot if it is still in hand after 700 ms. The menu closes on Escape, a click elsewhere, or when the party moves or turns.
+  - **Verified** on Gladstone, lock 10,12 seen from 10,11 facing south:
+    - the click shows "Serrure" with Clef de la bibliothèque (attendue) and Jeu de clefs;
+    - Clef de la bibliothèque: the door at 9,11 goes from state 8 to 12 and the game keeps the key;
+    - Jeu de clefs: the door is unchanged and the set returns to its bag slot.
+  - **Not verified**: a locked chest.

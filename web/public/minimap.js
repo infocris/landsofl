@@ -1784,6 +1784,151 @@
   // Emplacements : 0..47 sac, 100 main, 200 + perso * 11 + emplacement d'équipement.
   const MANAGE = window.LOL_ENGINE === "scummvm";
   const LOC_HAND = 100, LOC_EQ = (c, k) => 200 + c * 11 + k;
+
+  // --- Serrures et coffres : essayer une clé du sac ------------------------------------
+  // Clic main vide sur le mur devant le groupe (dans le jeu ou sur l'interrupteur de la vue 3D) : le
+  // moteur publie le clic (case, face, main vide ; lolWallClick). Si ce mur est une serrure connue
+  // (scripts des niveaux, § 6) ou un coffre encore fermé, un petit menu propose les clés du sac
+  // (types 166-210 et le Jeu de clefs, 245) ; la clé attendue par la serrure, si on la connaît,
+  // vient en premier. Essayer : la clé passe en main, le mur est cliqué (commande clickwall), puis
+  // la clé revient à sa case si la serrure ne l'a pas gardée.
+  if (MANAGE) {
+    const KEY_TYPES = new Set([...Array.from({ length: 45 }, (_, k) => 166 + k), 245]);
+    const ptr = { x: innerWidth / 2, y: innerHeight / 2 };
+    document.addEventListener("mousemove", (e) => { ptr.x = e.clientX; ptr.y = e.clientY; }, true);
+    let hookedDoc = null;
+    const hookGame = () => {
+      const f = document.getElementById("dos");
+      let doc = null;
+      try { doc = f && f.contentDocument; } catch (e) {}
+      if (!doc || doc === hookedDoc) return;
+      hookedDoc = doc;
+      const track = (e) => { const r = f.getBoundingClientRect(); ptr.x = r.left + e.clientX; ptr.y = r.top + e.clientY; };
+      doc.addEventListener("mousemove", track, true);
+      doc.addEventListener("mousedown", track, true);
+    };
+    addEventListener("message", (e) => {
+      if (e.origin !== location.origin || !e.data || e.data.type !== "lol-clickwall" || e.data.x === undefined || !frame3d) return;
+      const r = frame3d.getBoundingClientRect(); ptr.x = r.left + e.data.x; ptr.y = r.top + e.data.y;
+    });
+
+    const menu = document.createElement("div");
+    menu.id = "key-menu"; menu.hidden = true;
+    const css = document.createElement("style");
+    css.textContent = `
+    #key-menu { position: fixed; z-index: 1006; min-width: 180px; max-width: 280px; padding: 8px; border: 1px solid #c9a227; border-radius: 8px;
+      background: rgba(17, 14, 10, .96); color: #e8dcc0; font: 13px/1.35 system-ui, sans-serif; box-shadow: 0 8px 30px rgba(0,0,0,.6); zoom: var(--ui-z, 1); }
+    #key-menu[hidden] { display: none; }
+    #key-menu .kh { display: flex; align-items: center; gap: 6px; color: #f0d070; font-weight: 600; margin-bottom: 6px; }
+    #key-menu .kh span { flex: 1; }
+    #key-menu .kx { background: none; border: 0; color: #a39578; cursor: pointer; font-size: 14px; }
+    #key-menu .kn { color: #a39578; font-size: 12px; margin: 2px 0 6px; }
+    #key-menu button.k { display: flex; align-items: center; gap: 8px; width: 100%; margin: 2px 0; padding: 3px 6px; text-align: left;
+      border: 1px solid #555; border-radius: 5px; background: #1b1610; color: #e8dcc0; font: inherit; cursor: pointer; }
+    #key-menu button.k:hover { background: #2a2217; border-color: #c9a227; }
+    #key-menu button.k.good { border-color: #4ade80; }
+    #key-menu button.k .slot { flex: none; }
+    #key-menu button.k small { color: #4ade80; margin-left: auto; }`;
+    document.head.appendChild(css);
+    document.body.appendChild(menu);
+    let menuBlock = -1, busy = false;
+    const closeMenu = () => { menu.hidden = true; menuBlock = -1; };
+    document.addEventListener("mousedown", (e) => { if (!menu.hidden && !menu.contains(e.target)) closeMenu(); }, true);
+    addEventListener("keydown", (e) => { if (e.key === "Escape" && !menu.hidden) closeMenu(); }, true);
+    for (const ev of ["keydown", "keyup", "keypress"]) menu.addEventListener(ev, (e) => e.stopPropagation());
+
+    async function tryKey(type) {
+      if (busy) return;
+      busy = true;
+      try {
+        const r = await mem.read([[INV.bar, INV.barSlots * 2], [INV.hand, 2]]);
+        if (!r) return;
+        const id = (k) => r[0][k * 2] | r[0][k * 2 + 1] << 8;
+        if (r[1][0] | r[1][1] << 8) { invMessage("Vide d'abord ta main pour essayer une clé."); return; }
+        const types = lastInvData ? lastInvData.barTypes : [];
+        const loc = types.indexOf(type);
+        if (loc < 0) return;
+        const keyId = id(loc);
+        closeMenu();
+        const m = await mem.cmd({ op: "move", a: loc, b: LOC_HAND }, 3000);
+        if (!m || m.code) return;
+        await new Promise((ok) => setTimeout(ok, 150));
+        await mem.cmd({ op: "clickwall" }, 5000);
+        await new Promise((ok) => setTimeout(ok, 700));
+        const h = await mem.read([[INV.hand, 2], [INV.bar + loc * 2, 2]]);
+        if (h && (h[0][0] | h[0][1] << 8) === keyId) {
+          const back = !(h[1][0] | h[1][1] << 8) ? loc : (await mem.read([[INV.bar, INV.barSlots * 2]]).then((b) => {
+            for (let k = 0; k < INV.barSlots; k++) if (!(b[0][k * 2] | b[0][k * 2 + 1] << 8)) return k;
+            return -1;
+          }));
+          if (back >= 0) await mem.cmd({ op: "move", a: LOC_HAND, b: back }, 3000);
+        }
+        lastInv = ""; updateInventory().catch(() => {});
+      } finally { busy = false; }
+    }
+
+    function showMenu(block, face) {
+      const L = current;
+      if (!L) return;
+      const x = block % 32, y = Math.floor(block / 32);
+      const lock = (L.locks || []).find((l) => l.x === x && l.y === y);
+      const st = chestState(L, block, face);
+      if (!lock && st !== 0) return;                       // ni serrure, ni coffre fermé
+      const types = lastInvData ? lastInvData.barTypes : [];
+      const keys = [...new Set(types.filter((t) => KEY_TYPES.has(t)))];
+      if (lock && lock.key >= 0) keys.sort((a, b) => (b === lock.key) - (a === lock.key));
+      const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+      const head = el("div", "kh"); head.appendChild(el("span", null, lock ? "Serrure" : "Coffre fermé"));
+      const x0 = el("button", "kx", "✕"); x0.type = "button"; x0.title = "Fermer (Échap)"; x0.addEventListener("click", closeMenu); head.appendChild(x0);
+      const rows = [head];
+      if (!keys.length) rows.push(el("div", "kn", "Aucune clé dans le sac."));
+      else {
+        rows.push(el("div", "kn", "Essayer une clé du sac :"));
+        for (const t of keys) {
+          const it = itemInfo && itemInfo[t] ? itemInfo[t] : { name: `objet ${t}`, icon: -1 };
+          const b = el("button", "k" + (lock && lock.key === t ? " good" : "")); b.type = "button";
+          const ic = el("div", "slot full"); setIcon(ic, it.icon); b.appendChild(ic);
+          b.appendChild(el("span", null, it.name));
+          const n = types.filter((u) => u === t).length;
+          if (n > 1) b.appendChild(el("span", "kn", `×${n}`));
+          if (lock && lock.key === t) b.appendChild(el("small", null, "attendue"));
+          b.addEventListener("click", () => tryKey(t));
+          rows.push(b);
+        }
+      }
+      menu.replaceChildren(...rows);
+      menu.hidden = false;
+      menuBlock = block;
+      const z = UZ(), w = menu.offsetWidth * z, h = menu.offsetHeight * z;
+      let left = ptr.x + 12, top = ptr.y + 12;
+      if (left + w > innerWidth - 4) left = ptr.x - w - 12;
+      if (top + h > innerHeight - 4) top = ptr.y - h - 12;
+      menu.style.left = Math.max(4, left) / z + "px"; menu.style.top = Math.max(4, top) / z + "px";
+      if (!keys.length) setTimeout(() => { if (menuBlock === block && !menu.contains(document.activeElement)) closeMenu(); }, 3000);
+    }
+
+    let lastSeq = -1, partyAt = -1, partyDir = -1;
+    setInterval(() => {
+      hookGame();
+      const f = document.getElementById("dos");
+      let w = null;
+      try { w = f && f.contentWindow.lolWallClick && f.contentWindow.lolWallClick(); } catch (e) {}
+      if (!w) return;
+      if (lastSeq < 0) { lastSeq = w.seq; return; }       // clic d'avant le chargement de la page
+      if (w.seq === lastSeq) {
+        // le groupe a bougé ou tourné : le mur n'est plus celui du menu
+        if (!menu.hidden && !busy) mem.read([[ADDR.block, 2], [ADDR.dir, 1]]).then((r) => {
+          if (r && !menu.hidden && ((r[0][0] | r[0][1] << 8) !== partyAt || r[1][0] !== partyDir)) closeMenu();
+        }).catch(() => {});
+        return;
+      }
+      lastSeq = w.seq;
+      if (!w.empty || busy) return;
+      // un coffre ouvert par ce clic change d'état : on laisse la grille se mettre à jour
+      mem.read([[ADDR.block, 2], [ADDR.dir, 1]]).then((r) => { if (r) { partyAt = r[0][0] | r[0][1] << 8; partyDir = r[1][0]; } }).catch(() => {});
+      setTimeout(() => showMenu(w.block, w.face), 700);
+    }, 150);
+  }
   const hintEl = document.getElementById("inv-hint");
   if (MANAGE && hintEl) hintEl.textContent = "Glisser une case sur une autre pour déplacer ou échanger ; cliquer un objet pour d'autres actions.";
   const CMD_ERR = { 1: "Impossible : cet objet ne va pas à cet emplacement (ou la race du personnage ne l'a pas).", 2: "Le sac est plein.", 3: "Cet emplacement est vide." };

@@ -1490,7 +1490,7 @@
     view.addEventListener("pointerup", (e) => {
       giveKeysToGame();
       if (downAt) {
-        if (switchAt(e)) parent.postMessage({ type: "lol-clickwall", special: downAt.special }, location.origin);
+        if (switchAt(e)) parent.postMessage({ type: "lol-clickwall", special: downAt.special, x: e.clientX, y: e.clientY }, location.origin);
         downAt = null;
         return;
       }
