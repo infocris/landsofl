@@ -230,6 +230,8 @@ LAUNCH_JS = r"""<script src="volume.js"></script>
   window.lolSceneWindow = () => !!zones && !!(view.upd & 1);
   // image de script dans la fenêtre de scène (moteur : loadBitmap, WSA plein cadre ; effacé au dessin du décor)
   window.lolSceneArt = () => !!zones && view.loops > 0 && !view.menu && !view.loading && !!view.art;   // partie lancée (boucle du jeu) : commandes possibles
+  // objet sous le curseur dans le jeu (barre d'objets, équipement de la fiche) : type, nombre de sa pile
+  window.lolHoverItem = () => (zones && view.loops > 0 && !view.menu && view.hover >= 0 ? { t: view.hover, n: view.hoverN } : null);
   window.lolView = () => {
     if (!zones || view.loops <= 0) return { mirror: true, crop: [0, 0, 320, 200] };   // avant la partie (introduction)
     if (view.menu || view.loading) return { mirror: false };
@@ -259,6 +261,7 @@ LAUNCH_JS = r"""<script src="volume.js"></script>
       const loops = (b[12] | b[13] << 8 | b[14] << 16) + b[15] * 16777216;
       if (loops !== view.loops) { view.loops = loops; view.at = performance.now(); }
       view.scene = !!b[0]; view.upd = w(1); view.seq = [w(3), w(5), w(7), w(9)]; view.menu = !!b[11]; view.loading = !!b[16]; view.casting = !!b[17]; view.art = b.length > 18 && !!b[18];
+      view.hover = b.length > 21 ? w(19) - 1 : -1; view.hoverN = b.length > 21 ? b[21] : 0;
     }
   };
   const ch = new BroadcastChannel("lol-mem");

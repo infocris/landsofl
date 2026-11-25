@@ -56,8 +56,8 @@
   if (!location.hash) history.replaceState(null, "", "#lol-fr");
   const DB = "/home/web_user", KEY = DB + "/scummvm.ini", SEC = "[lol-fr]";
   // version du moteur dans les adresses : un navigateur qui a gardé l'ancien moteur en cache le recharge
-  Module.locateFile = (p, dir) => dir + p + (p.endsWith(".wasm") ? "?v=1795562009-13272450" : "");
-  const start = () => { const s = document.createElement("script"); s.src = "scummvm.js?v=1795562009-13272450"; document.body.appendChild(s); };
+  Module.locateFile = (p, dir) => dir + p + (p.endsWith(".wasm") ? "?v=1795637058-13275233" : "");
+  const start = () => { const s = document.createElement("script"); s.src = "scummvm.js?v=1795637058-13275233"; document.body.appendChild(s); };
   const section = (t) => { const i = t.indexOf(SEC); if (i < 0) return ""; const j = t.indexOf("\n[", i + 1); return j < 0 ? t.slice(i) : t.slice(i, j + 1); };
   // sauvegarde à charger dès le lancement (fenêtre « Sauvegardes… » avant le début de la partie,
   // minimap.js) : clé save_slot de la section, lue par KyraEngine_v1::init ; retirée sinon
@@ -122,6 +122,8 @@
   window.lolSceneWindow = () => !!zones && !!(view.upd & 1);
   // image de script dans la fenêtre de scène (moteur : loadBitmap, WSA plein cadre ; effacé au dessin du décor)
   window.lolSceneArt = () => !!zones && view.loops > 0 && !view.menu && !view.loading && !!view.art;   // partie lancée (boucle du jeu) : commandes possibles
+  // objet sous le curseur dans le jeu (barre d'objets, équipement de la fiche) : type, nombre de sa pile
+  window.lolHoverItem = () => (zones && view.loops > 0 && !view.menu && view.hover >= 0 ? { t: view.hover, n: view.hoverN } : null);
   window.lolView = () => {
     if (!zones || view.loops <= 0) return { mirror: true, crop: [0, 0, 320, 200] };   // avant la partie (introduction)
     if (view.menu || view.loading) return { mirror: false };
@@ -151,6 +153,7 @@
       const loops = (b[12] | b[13] << 8 | b[14] << 16) + b[15] * 16777216;
       if (loops !== view.loops) { view.loops = loops; view.at = performance.now(); }
       view.scene = !!b[0]; view.upd = w(1); view.seq = [w(3), w(5), w(7), w(9)]; view.menu = !!b[11]; view.loading = !!b[16]; view.casting = !!b[17]; view.art = b.length > 18 && !!b[18];
+      view.hover = b.length > 21 ? w(19) - 1 : -1; view.hoverN = b.length > 21 ? b[21] : 0;
     }
   };
   const ch = new BroadcastChannel("lol-mem");

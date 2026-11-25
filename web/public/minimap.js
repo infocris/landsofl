@@ -1588,6 +1588,31 @@
     showItemTip(+(t.dataset.itemType ?? t.dataset.type), e.clientX, e.clientY, t.closest("dialog") || document.body, t.dataset.itemNote);
   });
   document.addEventListener("mousemove", (e) => { if (tipTarget && !itemTip.hidden) placeItemTip(e.clientX, e.clientY); });
+  // objet survolé dans le jeu lui-même (moteur ScummVM : barre d'objets, équipement de la fiche du
+  // personnage) : le moteur publie son type (lolHoverItem) ; on suit la souris dans le cadre du jeu
+  {
+    let gameTip = false, gx = 0, gy = 0, hooked = null, inside = false;
+    const gameFrame = () => document.getElementById("dos");
+    const poll = () => {
+      const f = gameFrame();
+      let h = null;
+      try { h = f && f.contentWindow.lolHoverItem && f.contentWindow.lolHoverItem(); } catch (e) {}
+      if (inside && h && h.t >= 0) {
+        gameTip = true;
+        showItemTip(h.t, gx, gy, document.body, h.n > 1 ? `Pile de ${h.n}` : undefined);
+      } else if (gameTip) { gameTip = false; if (!tipTarget) itemTip.hidden = true; }
+    };
+    const hook = () => {
+      const f = gameFrame();
+      let doc = null;
+      try { doc = f && f.contentDocument; } catch (e) {}
+      if (!doc || doc === hooked) return;
+      hooked = doc;
+      doc.addEventListener("mousemove", (e) => { const r = f.getBoundingClientRect(); inside = true; gx = r.left + e.clientX; gy = r.top + e.clientY; if (gameTip) placeItemTip(gx, gy); });
+      doc.documentElement.addEventListener("mouseleave", () => { inside = false; if (gameTip) { gameTip = false; if (!tipTarget) itemTip.hidden = true; } });
+    };
+    setInterval(() => { hook(); if (hooked) poll(); }, 120);
+  }
   addEventListener("message", (e) => {
     if (e.origin !== location.origin || !e.data || e.data.type !== "lol-itemhover") return;
     if (e.data.t < 0 || !frame3d) { if (!tipTarget) itemTip.hidden = true; return; }

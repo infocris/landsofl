@@ -2939,3 +2939,7 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-25**: game bar stacks keep their place when an item is taken (clicks act on the stack's last item; § 10a).
 - **2026-11-25**: game bar stacks v2: the 48 cells and empty cells stay; each stack is anchored on a cell, and putting an item on an empty cell moves its whole stack there (§ 10a).
 - **2026-11-25**: game bar stacks: on activation and after loading a save, the bar scrolls to the first stack when none is visible (§ 10a).
+- **2026-11-25**: item tooltip when hovering items in the game itself (ScummVM).
+  - **Engine**: `webHoverItem` reads the mouse position (`getMousePos`, game pixels). Bar cells are x = 0x6A + 21·i … +20, y = 179–197; in stacks mode, only anchored cells count. With the character sheet open (`_weaponsDisabled`), equipment slots come from `_charInvDefs` (x + 112, 20 × 18; rings 9–10 shifted by −4, −4). Zone `0x7F000100` gains bytes 19–20 (hovered item type + 1, 0 = none) and byte 21 (stack count in stacks mode).
+  - **Page**: `lolHoverItem()` in the game frame; minimap.js follows the mouse inside the frame (same origin), polls every 120 ms, and shows the usual item tooltip (name, kind, effects, comparison, text), with "Pile de N" for a stack.
+  - **Verified**: ointment stack of 4 on bar cell 1 → tooltip "Onguent … Pile de 4"; empty cell 6 → none; Michael's sheet → dagger (138) and shield slots found.
