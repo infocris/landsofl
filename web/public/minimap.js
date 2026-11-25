@@ -1511,7 +1511,6 @@
         lines.push(`${LOCK_KIND[l.kind] || "Serrure"} : niveau ${l.level}, case ${l.x},${l.y}${l.how === "direct" ? "" : " (probable)"}`
           + (current && current.level === l.level ? " — ce niveau, entourée sur la carte" : ""));
     }
-    if (it.value) lines.push(`Valeur : ${it.value} (supposée)`);
     const ul = el("ul"); for (const l of lines) ul.appendChild(el("li", null, l));
     const cmp = compareEquip(type, it);
     detailEl.replaceChildren(icon, el("div", "nm", it.name), close,
@@ -1558,7 +1557,6 @@
     const icon = el("div", "slot full"); setIcon(icon, it.icon);
     const lines = [...(it.effects || [])];
     if (it.wear) lines.push(`Se porte : ${it.wear}`);
-    if (it.value) lines.push(`Valeur : ${it.value}`);
     itemTip.replaceChildren(icon, el("div", "nm", it.name), el("div", "kd", it.kind || "Objet"));
     if (lines.length) { const ul = el("ul"); for (const l of lines) ul.appendChild(el("li", null, l)); itemTip.appendChild(ul); }
     const cmp = compareEquip(type, it);

@@ -2944,3 +2944,4 @@ spells, on the in-game automap) remains **unknown**.
   - **Page**: `lolHoverItem()` in the game frame; minimap.js follows the mouse inside the frame (same origin), polls every 120 ms, and shows the usual item tooltip (name, kind, effects, comparison, text), with "Pile de N" for a stack.
   - **Verified**: ointment stack of 4 on bar cell 1 → tooltip "Onguent … Pile de 4"; empty cell 6 → none; Michael's sheet → dagger (138) and shield slots found.
 - **2026-11-25**: item tooltip comparison coloured like the item card: gains green (#4ade80), losses red (#ff6b6b), equal grey; its styles only existed under `#inv-detail`. Verified: crossbow over Michael's dagger → "Force 15 (+5)" in green.
+- **2026-11-25**: item value removed from the item tooltip and the item card, at the user's request (still shown in the shop's "Vendre…" list).
