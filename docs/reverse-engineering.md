@@ -2961,3 +2961,9 @@ spells, on the in-game automap) remains **unknown**.
     - no cell with an empty hand;
     - after taking a potion from its stack, the cell appears at the bottom right of the scene;
     - a click on it puts the potion back in its stack (4 again), and the cell disappears.
+- **2026-11-25**: right-click stores the item in hand when nothing else takes the click (ScummVM).
+  - **Engine**: `GUI_LoL::processButtonList` receives right-button events as input 201 (press) and 202 (release). For the game's own button list (`_activeButtons`) outside the menu, the press resets `_webRightUsed`, and a button callback returning non-zero sets it. On release, if no button handled the click and an item is in hand, `webStoreHand` runs (same as the Sac cell and command 27).
+  - **Verified**, potion or herb in hand:
+    - right-click in the scene view → back in the bag (in its stack);
+    - right-click on Michael's portrait → the game's portrait button takes the click and the potion stays in hand (life full);
+    - right-click on an empty bar cell → the game's slot button takes it like a left click; in stacks mode the whole stack moves to that cell.

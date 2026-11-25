@@ -1075,7 +1075,7 @@ index 392e4c2d..f73704e5 100644
  	_activeSpell.spell = spellType;
  	_activeSpell.p = &_spellProperties[spellType];
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index 2cfadf37..2698fc72 100644
+index 2cfadf37..a7a63c7e 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
 @@ -315,6 +315,18 @@ private:
@@ -1097,7 +1097,7 @@ index 2cfadf37..2698fc72 100644
  	void update() override;
  
  	// mouse
-@@ -1072,6 +1084,49 @@ private:
+@@ -1072,6 +1084,50 @@ private:
  
  	LoLItem *_itemsInPlay;
  	ItemProperty *_itemProperties;
@@ -1123,7 +1123,8 @@ index 2cfadf37..2698fc72 100644
 +	// un clic dessus range l'objet dans le sac (webStoreHand, comme la commande 27)
 +	bool webStoreHand();
 +	bool webSceneBagClick();
-+	bool _webHandShown = false;	// case « Sac » dessinée au dernier dessin du décor
++	bool _webHandShown = false;
++	bool _webRightUsed = false;	// clic droit en cours traité par un bouton du jeu	// case « Sac » dessinée au dernier dessin du décor
 +	int webStackAnchorOf(Item item) const;
 +	int webStackCount(int slot) const;
 +	int webFreeSlot(int except) const;
@@ -1206,7 +1207,7 @@ index 055e4f8c..8fd1d5c3 100644
  	const uint8 *p = _screen->getCPagePtr(2);
  	const uint8 *ts[16];
 diff --git a/engines/kyra/gui/gui_lol.cpp b/engines/kyra/gui/gui_lol.cpp
-index 926e60dc..7faef63d 100644
+index 926e60dc..2fa12a19 100644
 --- a/engines/kyra/gui/gui_lol.cpp
 +++ b/engines/kyra/gui/gui_lol.cpp
 @@ -87,9 +87,175 @@ void LoLEngine::gui_drawInventory() {
@@ -1460,6 +1461,43 @@ index 926e60dc..7faef63d 100644
  
  	_updateFlags &= 0xFFFB;
  	setMouseCursorToItemInHand();
+@@ -1951,6 +2145,13 @@ int GUI_LoL::processButtonList(Button *buttonList, uint16 inputFlag, int8 mouseW
+ 	if (!buttonList)
+ 		return inputFlag & 0x7FFF;
+ 
++	// version web : clic droit (201 appui, 202 relâchement) qu'aucun bouton du jeu ne traite, objet en
++	// main : il est rangé dans le sac au relâchement (webStoreHand)
++	const uint16 webIn = inputFlag & 0xFF;
++	const bool webRight = (webIn == 201 || webIn == 202) && buttonList == _vm->_activeButtons && !_vm->_webInMenu;
++	if (webRight && webIn == 201)
++		_vm->_webRightUsed = false;
++
+ 	if (_backUpButtonList != buttonList || _vm->_buttonListChanged) {
+ 		_specialProcessButton = 0;
+ 
+@@ -2173,8 +2374,11 @@ int GUI_LoL::processButtonList(Button *buttonList, uint16 inputFlag, int8 mouseW
+ 
+ 			if (buttonList->buttonCallback) {
+ 				//_vm->removeInputTop();
+-				if ((*buttonList->buttonCallback)(buttonList))
++				if ((*buttonList->buttonCallback)(buttonList)) {
++					if (webRight)
++						_vm->_webRightUsed = true;
+ 					break;
++				}
+ 			}
+ 
+ 			if (buttonList->flags & 0x20)
+@@ -2187,6 +2391,9 @@ int GUI_LoL::processButtonList(Button *buttonList, uint16 inputFlag, int8 mouseW
+ 		buttonList = buttonList->nextButton;
+ 	}
+ 
++	if (webRight && webIn == 202 && !_vm->_webRightUsed && _vm->_itemInHand && !_vm->gameFlags().use16ColorMode)
++		_vm->webStoreHand();
++
+ 	if (!returnValue)
+ 		returnValue = inputFlag & 0x7FFF;
+ 	return returnValue;
 diff --git a/engines/kyra/gui/saveload_lol.cpp b/engines/kyra/gui/saveload_lol.cpp
 index 1b6ce33c..7113e47d 100644
 --- a/engines/kyra/gui/saveload_lol.cpp
