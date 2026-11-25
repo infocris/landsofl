@@ -1549,8 +1549,9 @@ The meaning of the functions, however, can be read directly. Comparison with our
   - `VERSION.txt`: ScummVM source commit, applied modification, build
     command;
   - the game files (`data/games`) stay local (links, not versioned).
-  - The engine modification is committed on the local `lol-web` branch of the
-    `third_party/scummvm` clone, and kept in the repository as a patch (`tools/scummvm/lol-web-state.patch`).
+  - The engine modification is committed on the `alpha` branch of the
+    `third_party/scummvm` clone (`lol-web` until 2026-11-26; both pushed to the fork
+    github.com/infocris/scummvm), and kept in the repository as a patch (`tools/scummvm/lol-web-state.patch`).
   - After a rebuild: `python3 -I tools/scummvm_web.py import` copies the build into
     `web/scummvm` and rewrites `VERSION.txt`.
 - **Game files.** ScummVM expects the original CD layout: `GENERAL.PAK`,
@@ -2968,3 +2969,4 @@ spells, on the in-game automap) remains **unknown**.
     - right-click on Michael's portrait → the game's portrait button takes the click and the potion stays in hand (life full);
     - right-click on an empty bar cell → the game's slot button takes it like a left click; in stacks mode the whole stack moves to that cell.
 - **2026-11-26**: Sac cell of the scene view removed at the user's request: no drawing in `drawScene`, no redraw from `setHandItem`, no `webSceneBagClick`. `webStoreHand` remains for command 27 and the right-click. A right-click on the floor area of the scene is taken by the game's own drop buttons (`clickedSceneDropItem`): the item is put on the floor. Higher in the view, a right-click with nothing to take it stores the item.
+- **2026-11-26**: work moves to `alpha` branches: the main repository's `alpha` (from main at e0a4814) and the ScummVM fork's `alpha` (from `lol-web` at 80ab72ec), both pushed with upstream tracking.
