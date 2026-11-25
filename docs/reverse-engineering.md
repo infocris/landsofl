@@ -2953,11 +2953,11 @@ spells, on the in-game automap) remains **unknown**.
     - Clef de la bibliothèque: the door at 9,11 goes from state 8 to 12 and the game keeps the key;
     - Jeu de clefs: the door is unchanged and the set returns to its bag slot.
   - **Not verified**: a locked chest.
-- **2026-11-25**: "Sac" slot drawn by the game itself (ScummVM), replacing the page's overlay box.
-  - **Layout**: the item bar shows 8 cells. The right arrow moves onto the old 9th cell (x 274), and the "Sac" slot takes the arrow's place (x 298): an empty cell, at the user's request. Icon 135 of ITEMICN.SHP, a leather pouch that no item in the table uses as its base icon, was tried first. The arrow and cell backgrounds are copied from PLAYFLD.CPS (page 3) when `gui_drawPlayField` loads it (`_webArrowBg`, `_webCellBg`).
-  - **Buttons keep their places**: slot button 8 now scrolls right, with the pressed arrow drawn at 274, and the right-arrow button stores the item in hand. Inventory buttons are 50–59 (`clickedInventorySlot`) and the arrows 60–61 (`clickedInventoryScroll`). `gui_initButton` gives the slot button with arg 8 the flags of button 61, so a right-click on the moved arrow still pages (`flags2 & 0x1000`, 8 cells; verified: right-click → next 8 cells, right-click on the left arrow → back). Paging (right-click), `addItemToInventory`, stack reveal and the hover lookup use 8 visible cells (`webBarCells`). The 16-colour mode keeps the original bar.
-  - **Command 27 (`store`)** and the Sac slot share `webStoreHand`: the item goes into the bag with `addItemToInventory`, like a picked-up item. In stacks mode it joins its stack and the bar scrolls to it; otherwise it goes to the first free slot from the visible one. Returns 3 if the hand is empty, 2 if the bag is full. Right-click in the 3D view ("lol-handstore") uses `store`.
+- **2026-11-25**: "Sac" cell in the game's scene view (ScummVM). It replaces a first in-game attempt (8-cell bar, right arrow moved onto the 9th cell, Sac in the arrow's place), which was reverted at the user's request: the bar has its 9 cells and its arrows again.
+  - **Drawing**: while an item is in hand, `drawScene` draws an empty bar cell (`_gameShapes[4]`) at the bottom right of the scene view (x 265, y 99, about 21 × 19) on the draw page, before the copy to the screen. `setHandItem` asks for a scene redraw (`_sceneUpdateRequired`) when the hand goes from empty to full or back (`_webHandShown`).
+  - **Click**: `webSceneBagClick` runs at the start of `clickedSceneDropItem`, `clickedSceneThrowItem` and `clickedWall` (real clicks only). With an item in hand, the mouse at x 265–285 / y 99–117 and no place scene (`_updateFlags & 1`), it calls `webStoreHand`.
+  - **Command 27 (`store`)** and the cell share `webStoreHand`: the item goes into the bag with `addItemToInventory`, like a picked-up item. In stacks mode it joins its stack and the bar scrolls to it; otherwise it goes to the first free slot from the visible one. Returns 3 if the hand is empty, 2 if the bag is full. Right-click in the 3D view ("lol-handstore") uses `store`.
   - **Verified**:
-    - the 8 cells, the shifted arrow and the empty Sac cell are drawn;
-    - the arrow scrolls the bar;
-    - a potion taken from its stack and dropped on Sac goes back into the stack.
+    - no cell with an empty hand;
+    - after taking a potion from its stack, the cell appears at the bottom right of the scene;
+    - a click on it puts the potion back in its stack (4 again), and the cell disappears.

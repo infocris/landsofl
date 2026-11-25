@@ -1768,8 +1768,8 @@
     lastInv = ""; setTimeout(() => updateInventory().catch(() => {}), 150);
     return r && r.code === 0;
   }
-  // La case « Sac » de l'écran du jeu est dessinée par le moteur (barre à 8 cases, flèche droite
-  // décalée, § 10a) ; elle range l'objet en main avec la même fonction que la commande « store ».
+  // La case « Sac » de l'écran du jeu est dessinée par le moteur, en bas à droite de la vue du décor
+  // quand on tient un objet (§ 10a) ; elle range l'objet avec la même fonction que « store ».
   // clic sur un objet au sol dans la vue 3D : pris en main (sac si la main est occupée ; « pickup », op 24)
   const PICK_ERR = { 1: "Trop loin : seulement sur la case du groupe ou celle de devant.", 2: "Un mur est devant.", 3: "L'objet n'est plus là.", 11: "Pas pendant un dialogue." };
   addEventListener("message", async (e) => {
