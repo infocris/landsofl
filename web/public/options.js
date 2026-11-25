@@ -54,7 +54,8 @@
       compagnons, téléportation sur la carte. Cachées, les triches actives sont coupées.</small></span></label>
     <label style="margin-top:12px"><input type="checkbox" id="opt-stacks"><span>Empiler les objets identiques
       <small>La barre d'objets du jeu (et le sac du panneau) montre une case par type d'objet, avec le nombre.
-      Un clic prend un exemplaire ; poser un objet du même type l'ajoute à la pile. Version ScummVM.</small></span></label>
+      Un clic prend un exemplaire ; poser un objet sur sa pile l'y ajoute ; le poser sur une case vide y déplace toute
+      sa pile. Version ScummVM.</small></span></label>
     <div class="row">Taille de l'interface <select id="opt-zoom"><option value="1">100 %</option><option value="1.5">150 %</option>
       <option value="2">200 %</option></select></div></div>`;
   document.body.append(open, dlg);
