@@ -2954,10 +2954,10 @@ spells, on the in-game automap) remains **unknown**.
     - Jeu de clefs: the door is unchanged and the set returns to its bag slot.
   - **Not verified**: a locked chest.
 - **2026-11-25**: "Sac" slot drawn by the game itself (ScummVM), replacing the page's overlay box.
-  - **Layout**: the item bar shows 8 cells. The right arrow moves onto the old 9th cell (x 274), and the "Sac" slot takes the arrow's place (x 298, cell background, icon 135 of ITEMICN.SHP, a leather pouch). The arrow and cell backgrounds are copied from PLAYFLD.CPS (page 3) when `gui_drawPlayField` loads it (`_webArrowBg`, `_webCellBg`).
+  - **Layout**: the item bar shows 8 cells. The right arrow moves onto the old 9th cell (x 274), and the "Sac" slot takes the arrow's place (x 298): an empty cell, at the user's request. Icon 135 of ITEMICN.SHP, a leather pouch that no item in the table uses as its base icon, was tried first. The arrow and cell backgrounds are copied from PLAYFLD.CPS (page 3) when `gui_drawPlayField` loads it (`_webArrowBg`, `_webCellBg`).
   - **No button changes**: slot button 8 now scrolls right, with the pressed arrow drawn at 274, and the right-arrow button stores the item in hand. Paging (right-click), `addItemToInventory`, stack reveal and the hover lookup use 8 visible cells (`webBarCells`). The 16-colour mode keeps the original bar.
   - **Command 27 (`store`)** and the Sac slot share `webStoreHand`: the item goes into the bag with `addItemToInventory`, like a picked-up item. In stacks mode it joins its stack and the bar scrolls to it; otherwise it goes to the first free slot from the visible one. Returns 3 if the hand is empty, 2 if the bag is full. Right-click in the 3D view ("lol-handstore") uses `store`.
   - **Verified**:
-    - the 8 cells, the shifted arrow and the pouch slot are drawn;
+    - the 8 cells, the shifted arrow and the empty Sac cell are drawn;
     - the arrow scrolls the bar;
     - a potion taken from its stack and dropped on Sac goes back into the stack.

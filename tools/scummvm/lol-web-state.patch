@@ -1158,7 +1158,7 @@ index 055e4f8c..8fd1d5c3 100644
  	const uint8 *p = _screen->getCPagePtr(2);
  	const uint8 *ts[16];
 diff --git a/engines/kyra/gui/gui_lol.cpp b/engines/kyra/gui/gui_lol.cpp
-index 926e60dc..184cf5b4 100644
+index 926e60dc..e8efac9f 100644
 --- a/engines/kyra/gui/gui_lol.cpp
 +++ b/engines/kyra/gui/gui_lol.cpp
 @@ -40,6 +40,11 @@ namespace Kyra {
@@ -1173,7 +1173,7 @@ index 926e60dc..184cf5b4 100644
  
  	if (_flagsTable[31] & 0x40) {
  		// copy compass shape
-@@ -82,14 +87,207 @@ void LoLEngine::gui_drawScene(int pageNum) {
+@@ -82,14 +87,205 @@ void LoLEngine::gui_drawScene(int pageNum) {
  
  void LoLEngine::gui_drawInventory() {
  	if (!_currentControlMode || !_needSceneRestore) {
@@ -1186,14 +1186,12 @@ index 926e60dc..184cf5b4 100644
 +}
 +
 +// version web : flèche droite sur l'ancienne 9e case (x 274), case « Sac » à sa place (x 298) :
-+// fond d'une case de la barre et icône d'une bourse en cuir
++// fond d'une case de la barre, laissée vide
 +void LoLEngine::webDrawBagSlot() {
 +	const int p = _screen->_curPage;
 +	_screen->copyBlockToPage(p, 274, 178, 24, 21, _webArrowBg);
 +	_screen->copyBlockToPage(p, 298, 178, 22, 21, _webCellBg);
-+	_screen->drawShape(p, _gameShapes[4], 298, 179, 0, 0);
-+	if (_itemIconShapes && _numItemIconShapes > 135)	// bourse en cuir (icône 135)
-+		_screen->drawShape(p, _itemIconShapes[135], 299, 180, 0, 0);
++	_screen->drawShape(p, _gameShapes[4], 298, 179, 0, 0);	// case vide, sans icône
 +}
 +
 +// version web : objet en main rangé dans le sac comme un objet ramassé (sa pile en mode piles,
@@ -1382,7 +1380,7 @@ index 926e60dc..184cf5b4 100644
  	int item = _inventoryCurItem + index;
  	if (item > 47)
  		item -= 48;
-@@ -1333,9 +1531,30 @@ int LoLEngine::clickedScenePickupItem(Button *button) {
+@@ -1333,9 +1529,30 @@ int LoLEngine::clickedScenePickupItem(Button *button) {
  }
  
  int LoLEngine::clickedInventorySlot(Button *button) {
@@ -1413,7 +1411,7 @@ index 926e60dc..184cf5b4 100644
  
  	uint16 slotItem = _inventory[slot];
  	int hItem = _itemInHand;
-@@ -1378,7 +1597,10 @@ int LoLEngine::clickedInventorySlot(Button *button) {
+@@ -1378,7 +1595,10 @@ int LoLEngine::clickedInventorySlot(Button *button) {
  		_inventory[slot] = hItem;
  	}
  
@@ -1425,7 +1423,7 @@ index 926e60dc..184cf5b4 100644
  
  	return 1;
  }
-@@ -1389,8 +1611,13 @@ int LoLEngine::clickedInventoryScroll(Button *button) {
+@@ -1389,8 +1609,13 @@ int LoLEngine::clickedInventoryScroll(Button *button) {
  	if (!_flags.isTalkie)
  		shp -= 2;
  
@@ -1440,7 +1438,7 @@ index 926e60dc..184cf5b4 100644
  
  	_inventoryCurItem += inc;
  
-@@ -1410,6 +1637,10 @@ int LoLEngine::clickedInventoryScroll(Button *button) {
+@@ -1410,6 +1635,10 @@ int LoLEngine::clickedInventoryScroll(Button *button) {
  int LoLEngine::clickedWall(Button *button) {
  	int block = calcNewBlockPosition(_currentBlock, _currentDirection);
  	int dir = _currentDirection ^ 2;
@@ -1451,7 +1449,7 @@ index 926e60dc..184cf5b4 100644
  	uint8 type = _specialWallTypes[_levelBlockProperties[block].walls[dir]];
  
  	int res = 0;
-@@ -1543,7 +1774,11 @@ int LoLEngine::clickedOptions(Button *button) {
+@@ -1543,7 +1772,11 @@ int LoLEngine::clickedOptions(Button *button) {
  	if (_flags.isTalkie && getVolume(kVolumeSpeech) == 2)
  		_configVoice |= (textEnabled() ? 2 : 1);
  
