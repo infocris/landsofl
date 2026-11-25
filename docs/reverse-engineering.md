@@ -2953,9 +2953,11 @@ spells, on the in-game automap) remains **unknown**.
     - Clef de la bibliothèque: the door at 9,11 goes from state 8 to 12 and the game keeps the key;
     - Jeu de clefs: the door is unchanged and the set returns to its bag slot.
   - **Not verified**: a locked chest.
-- **2026-11-25**: "Sac" drop zone in the game screen (ScummVM).
-  - **Engine**: command 27 (`store`) puts the item in hand into the bag with `addItemToInventory`, like a picked-up item: in stacks mode it joins its stack and the bar scrolls to it; otherwise it goes to the first free slot from the visible one. Returns 3 if the hand is empty, 2 if the bag is full.
-  - **Page**: a "🎒 Sac" box over the empty part of the game's bottom panel, between the rest button and the bar's left arrow (game pixels x 54–84, y 179–198). It is placed from the game frame's 4:3 picture and shown during the game, outside the menu. It lights up while an item is in hand. A mouse release on it sends `store`. Right-click in the 3D view ("lol-handstore") uses the same command.
+- **2026-11-25**: "Sac" slot drawn by the game itself (ScummVM), replacing the page's overlay box.
+  - **Layout**: the item bar shows 8 cells. The right arrow moves onto the old 9th cell (x 274), and the "Sac" slot takes the arrow's place (x 298, cell background, icon 135 of ITEMICN.SHP, a leather pouch). The arrow and cell backgrounds are copied from PLAYFLD.CPS (page 3) when `gui_drawPlayField` loads it (`_webArrowBg`, `_webCellBg`).
+  - **No button changes**: slot button 8 now scrolls right, with the pressed arrow drawn at 274, and the right-arrow button stores the item in hand. Paging (right-click), `addItemToInventory`, stack reveal and the hover lookup use 8 visible cells (`webBarCells`). The 16-colour mode keeps the original bar.
+  - **Command 27 (`store`)** and the Sac slot share `webStoreHand`: the item goes into the bag with `addItemToInventory`, like a picked-up item. In stacks mode it joins its stack and the bar scrolls to it; otherwise it goes to the first free slot from the visible one. Returns 3 if the hand is empty, 2 if the bag is full. Right-click in the 3D view ("lol-handstore") uses `store`.
   - **Verified**:
-    - stacks mode: a potion taken from its stack and dropped on Sac goes back into the stack;
-    - without stacks: the item from cell 2 returns to the first free slot.
+    - the 8 cells, the shifted arrow and the pouch slot are drawn;
+    - the arrow scrolls the bar;
+    - a potion taken from its stack and dropped on Sac goes back into the stack.
