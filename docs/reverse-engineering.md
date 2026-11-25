@@ -1958,22 +1958,29 @@ The meaning of the functions, however, can be read directly. Comparison with our
     each item still has its own slot in the game. Dragging a stack moves its first item.
   - **Stacks in the game's own bar** (2026-11-25, ScummVM engine, page command 26 `stacks`). The
     Options window's "Empiler les objets identiques" box (same setting as "Par piles", localStorage
-    `invStacks`, re-sent every 3 s) switches the engine's 9-slot item bar to one slot per stack:
+    `invStacks`, re-sent every 3 s) switches the engine's item bar to stacks:
     - stack key: `itemPropertyIndex` plus `shpCurFrame_flg & 0x1FFF` (icon frame, e.g. charges);
-      stacks listed in bag-slot order; the count is drawn in FONT6P, colour 254, right-aligned with
-      a shadow, at (x + 20, 190);
-    - `_inventory[48]` is unchanged (saves, scripts, page commands still see real slots); only
-      `gui_drawInventoryItem`, `clickedInventorySlot`, `clickedInventoryScroll` and
-      `addItemToInventory` change, with their own scroll `_webStackScroll` (no wrap-around, one empty
-      slot left at the end so a new kind of item can be put down);
-    - stacks are ordered by their first bag slot, so clicks act on the stack's *last* item and the
-      stack keeps its place (2026-11-25; taking the first item moved the rest of the stack further
-      along the bar): empty hand takes the last item; another kind swaps with the last item (a
-      one-item stack is replaced in place; the Ruby of Truth merge still runs); same kind goes to the
-      first free slot after the stack's first slot; an empty bar slot uses the first free slot after
-      the last stack's first slot (the new stack appears at the end); otherwise any free slot;
-    - verified: 4 potions and 2 herbs shown as "4" and "2"; take, put back, swap and put down give
-      the expected `_inventory` contents.
+      the count is drawn in FONT6P, colour 254, right-aligned with a shadow, at (x + 20, 190);
+    - layout (second version, 2026-11-25; the first one listed stacks without gaps, in bag-slot
+      order, with its own scroll): the bar keeps the game's 48 cells and its scrolling
+      (`_inventoryCurItem`, arrows), so empty cells stay. Each stack is anchored on one bag slot
+      (`_webStackAnchor[48]`, engine only, not saved), and that cell shows the icon and count. The
+      stack's other items sit in other bag slots, drawn as empty cells. `webStackFix` keeps one
+      anchor per stack (the lowest anchored slot that still holds one, otherwise the stack's first
+      slot), so changes made outside the bar (scripts, page commands, loading a save) are absorbed;
+    - `_inventory[48]` keeps one item per slot (saves, scripts and page commands see real slots);
+      only `gui_drawInventoryItem`, `clickedInventorySlot` and `addItemToInventory` change;
+    - click on a stack cell: empty hand takes a hidden item first, so the stack stays; same kind in
+      hand joins the stack (any free slot); another kind swaps: the hand item joins its own stack,
+      otherwise takes the freed cell when it was the last item, otherwise the next cell without a
+      stack. The Ruby of Truth merge still runs through the game's code;
+    - click on an empty cell with an item: the item is put there and its whole stack moves there
+      (a hidden item kept in that slot moves to another free slot). Empty hand: nothing;
+    - an item added by the game (`addItemToInventory`) goes to a free slot and the bar scrolls to its
+      stack's cell;
+    - verified: a potion taken from its stack of 4 and put on empty cell 9 → the stack moves to
+      cell 9; herbs moved to cell 6 the same way; a single item swapped with the potion stack goes to
+      the next free cell; a potion put on cell 1 → the stack goes back to cell 1.
   - **Verified**: 3 aloes created (4 in the bag), life lowered to 8 / 20, aloe dragged onto slot 1
     in the stacks view, key 1 → 13 / 20 and 3 left. Slot 2 set to "Attaque : Michael" from its menu.
   - **Dragging actions** (2026-11-23). The magic panel's level buttons and new attack chips
@@ -2926,3 +2933,4 @@ spells, on the in-game automap) remains **unknown**.
 - **2026-11-25**: item stacks in the game's own inventory bar (ScummVM engine, command 26; § 10a).
 - **2026-11-25**: opening the character sheet in the game no longer opens the page's character window (the page → game direction stays).
 - **2026-11-25**: game bar stacks keep their place when an item is taken (clicks act on the stack's last item; § 10a).
+- **2026-11-25**: game bar stacks v2: the 48 cells and empty cells stay; each stack is anchored on a cell, and putting an item on an empty cell moves its whole stack there (§ 10a).
