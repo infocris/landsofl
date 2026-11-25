@@ -1758,11 +1758,62 @@
   // clic droit dans la vue 3D avec un objet en main : rangé dans la première case libre du sac
   addEventListener("message", async (e) => {
     if (e.origin !== location.origin || !e.data || e.data.type !== "lol-handstore" || window.LOL_ENGINE !== "scummvm") return;
-    const free = lastInvData ? lastInvData.barTypes.indexOf(-1) : -1;
-    if (free < 0) { console.info("Ranger : le sac est plein."); return; }
-    await mem.cmd({ op: "move", a: LOC_HAND, b: free }, 4000);
-    lastInv = ""; setTimeout(() => updateInventory().catch(() => {}), 150);
+    await storeHand();
   });
+  // ranger l'objet en main dans le sac : sur sa pile (mode piles) ou un emplacement libre, la barre du
+  // jeu défile jusqu'à lui (commande « store », op 27, addItemToInventory)
+  async function storeHand() {
+    const r = await mem.cmd({ op: "store" }, 4000);
+    if (r && r.code === 2) invMessage("Le sac est plein.");
+    lastInv = ""; setTimeout(() => updateInventory().catch(() => {}), 150);
+    return r && r.code === 0;
+  }
+  // Case « Sac » dans l'écran du jeu, entre les boutons Disquette / Repos et la flèche gauche de la
+  // barre d'objets (zone vide du décor, x 54-84, y 179-198 en pixels du jeu) : un clic (ou un objet
+  // lâché dessus) avec un objet en main le range dans le sac.
+  if (window.LOL_ENGINE === "scummvm") {
+    const bag = document.createElement("div");
+    bag.id = "game-bag"; bag.hidden = true; bag.title = "Sac : cliquer avec un objet en main pour le ranger (sur sa pile ou une case libre)";
+    bag.innerHTML = `<span>🎒</span><b>Sac</b>`;
+    const css = document.createElement("style");
+    css.textContent = `
+    #game-bag { position: fixed; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+      box-sizing: border-box; border: 1px dashed rgba(201, 162, 39, .45); border-radius: 4px; background: rgba(20, 14, 8, .35);
+      color: #c9a227; font: 600 10px/1 system-ui, sans-serif; cursor: default; user-select: none; }
+    #game-bag[hidden] { display: none; }
+    #game-bag span { font-size: 1.4em; line-height: 1.05; filter: grayscale(.6); }
+    #game-bag.armed { border: 1px solid #f0d070; background: rgba(201, 162, 39, .25); cursor: copy; }
+    #game-bag.armed span { filter: none; }
+    #game-bag.armed:hover { background: rgba(201, 162, 39, .45); }`;
+    document.head.appendChild(css);
+    document.body.appendChild(bag);
+    let storing = false;
+    const store = async (e) => {
+      e.preventDefault();
+      if (storing) return;
+      storing = true;
+      try { await storeHand(); } finally { storing = false; }
+      const g = document.getElementById("dos"); if (g && g.focus) g.focus();
+    };
+    bag.addEventListener("mouseup", store);
+    bag.addEventListener("mousedown", (e) => e.preventDefault());
+    const place = () => {
+      const f = document.getElementById("dos");
+      let ok = false;
+      try { ok = !!(f && f.contentWindow.lolStarted && f.contentWindow.lolStarted() && !f.contentWindow.lolMenuOpen()); } catch (e) {}
+      const r = f && f.getBoundingClientRect();
+      if (!ok || !r || r.width < 50 || f.offsetParent === null) { bag.hidden = true; return; }
+      const w = Math.min(r.width, r.height * 4 / 3), h = w * 3 / 4, ox = r.left + (r.width - w) / 2, oy = r.top + (r.height - h) / 2;
+      const s = w / 320;
+      bag.style.left = ox + 54 * s + "px"; bag.style.top = oy + 179 * s * (h / w) * 320 / 200 + "px";
+      bag.style.width = 30 * s + "px"; bag.style.height = 19 * s * (h / w) * 320 / 200 + "px";
+      bag.style.fontSize = Math.max(8, 5 * s) + "px";
+      bag.classList.toggle("armed", !!lastInvData && lastInvData.handType >= 0);
+      bag.hidden = false;
+    };
+    setInterval(place, 200);
+    addEventListener("resize", place);
+  }
   // clic sur un objet au sol dans la vue 3D : pris en main (sac si la main est occupée ; « pickup », op 24)
   const PICK_ERR = { 1: "Trop loin : seulement sur la case du groupe ou celle de devant.", 2: "Un mur est devant.", 3: "L'objet n'est plus là.", 11: "Pas pendant un dialogue." };
   addEventListener("message", async (e) => {

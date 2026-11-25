@@ -23,7 +23,7 @@ index 4c00889e..63d097a9 100644
  		if (++_inventoryCurItem > 47)
  			_inventoryCurItem -= 48;
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index 392e4c2d..bcea27c2 100644
+index 392e4c2d..efcb7f53 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -32,6 +32,7 @@
@@ -45,7 +45,7 @@ index 392e4c2d..bcea27c2 100644
  namespace Kyra {
  
  const char *const LoLEngine::kMouseKeymapName = "lolmouse";
-@@ -929,6 +934,821 @@ void LoLEngine::startupNew() {
+@@ -929,6 +934,833 @@ void LoLEngine::startupNew() {
  	_screen->showMouse();
  }
  
@@ -792,6 +792,18 @@ index 392e4c2d..bcea27c2 100644
 +		clickedPortraitLeft(&btn);
 +		return 0;
 +	}
++	if (op == 27) {	// ranger l'objet en main dans le sac (sur sa pile en mode piles, sinon emplacement libre),
++		// comme un objet ramassé : addItemToInventory, la barre défile jusqu'à lui
++		const Item h = _itemInHand;
++		if (!h)
++			return 3;
++		setHandItem(0);
++		if (!addItemToInventory(h)) {
++			setHandItem(h);
++			return 2;
++		}
++		return 0;
++	}
 +	if (op == 26) {	// barre d'objets du jeu par piles (a = 1) ou par emplacements (a = 0)
 +		if ((a != 0) != _webStackInv) {
 +			_webStackInv = a != 0;
@@ -867,7 +879,7 @@ index 392e4c2d..bcea27c2 100644
  void LoLEngine::runLoop() {
  	// Initialize debugger since how it should be fully usable
  	static_cast<Debugger_LoL *>(getDebugger())->initialize();
-@@ -957,6 +1777,7 @@ void LoLEngine::runLoop() {
+@@ -957,6 +1789,7 @@ void LoLEngine::runLoop() {
  		gui_updateInput();
  
  		update();
@@ -875,7 +887,7 @@ index 392e4c2d..bcea27c2 100644
  
  		updatePlayTimer();
  
-@@ -1031,6 +1852,7 @@ void LoLEngine::readSettings() {
+@@ -1031,6 +1864,7 @@ void LoLEngine::readSettings() {
  }
  
  void LoLEngine::update() {
@@ -883,7 +895,7 @@ index 392e4c2d..bcea27c2 100644
  	updateSequenceBackgroundAnimations();
  
  	if (_updateCharNum != -1 && _system->getMillis() > _updatePortraitNext)
-@@ -1178,6 +2000,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
+@@ -1178,6 +2012,97 @@ int LoLEngine::decodeCyrillic(const char *src, char *dst) {
  	return size;
  }
  
@@ -981,7 +993,7 @@ index 392e4c2d..bcea27c2 100644
  bool LoLEngine::addCharacter(int id) {
  	const uint16 *cdf[] = {
  		_charDefsMan, _charDefsMan, _charDefsMan, _charDefsWoman,
-@@ -1477,6 +2390,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
+@@ -1477,6 +2402,8 @@ void LoLEngine::setCharacterMagicOrHitPoints(int charNum, int type, int points,
  
  	int newVal = (mode == 2) ? (pointsMax + points) : (mode ? (pointsCur + points) : points);
  	newVal = CLIP(newVal, 0, pointsMax);
@@ -990,7 +1002,7 @@ index 392e4c2d..bcea27c2 100644
  
  	if (type) {
  		c->magicPointsCur = newVal;
-@@ -1969,6 +2884,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
+@@ -1969,6 +2896,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
  		}
  	}
  
@@ -998,7 +1010,7 @@ index 392e4c2d..bcea27c2 100644
  	if (!skipAnim && charId < 3) {
  		_updateCharNum = charId;
  		_portraitSpeechAnimMode = mode;
-@@ -1981,6 +2897,8 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
+@@ -1981,6 +2909,8 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
  	else if (paramList)
  		snd_playCharacterSpeech(paramList[2], ch, 0);
  
@@ -1007,7 +1019,7 @@ index 392e4c2d..bcea27c2 100644
  	if (textEnabled()) {
  		if (mode == 0) {
  			_txt->printDialogueText2(3, str, script, paramList, paramIndex);
-@@ -2074,6 +2992,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
+@@ -2074,6 +3004,7 @@ uint16 *LoLEngine::getCharacterOrMonsterProtectionAgainstItems(int id) {
  
  void LoLEngine::delay(uint32 millis, bool doUpdate, bool) {
  	while (millis && !shouldQuit()) {
@@ -1015,7 +1027,7 @@ index 392e4c2d..bcea27c2 100644
  		if (doUpdate)
  			update();
  		else
-@@ -2092,6 +3011,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
+@@ -2092,6 +3023,11 @@ const KyraRpgGUISettings *LoLEngine::guiSettings() const {
  // spells
  
  int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {

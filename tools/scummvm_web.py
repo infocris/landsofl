@@ -284,7 +284,7 @@ LAUNCH_JS = r"""<script src="volume.js"></script>
     } else if (d.find && zones) ch.postMessage({ id: d.id, found: d.find.map(() => -1) });
     else if (d.cmd && zones) {
       // commandes d'inventaire : exécutées par le moteur dans sa boucle (webRunCommands)
-      const op = { move: 1, delete: 2, create: 3, goto: 4, cheat: 5, money: 6, hurt: 7, spend: 8, cast: 9, levelup: 10, learn: 11, volume: 12, teleport: 13, listsaves: 14, load: 15, save: 16, setchar: 17, unlock: 18, autospell: 19, clickwall: 20, use: 21, hand: 22, handuse: 23, pickup: 24, charsheet: 25, stacks: 26 }[d.cmd.op] || 0;
+      const op = { move: 1, delete: 2, create: 3, goto: 4, cheat: 5, money: 6, hurt: 7, spend: 8, cast: 9, levelup: 10, learn: 11, volume: 12, teleport: 13, listsaves: 14, load: 15, save: 16, setchar: 17, unlock: 18, autospell: 19, clickwall: 20, use: 21, hand: 22, handuse: 23, pickup: 24, charsheet: 25, stacks: 26, store: 27 }[d.cmd.op] || 0;
       // texte éventuel (nom de sauvegarde) : octets UTF-8, lus par le moteur (Module.lolText)
       const text = typeof d.cmd.text === "string" ? new TextEncoder().encode(d.cmd.text) : null;
       (Module.lolCmds = Module.lolCmds || []).push([op, d.cmd.a | 0, d.cmd.b | 0, d.id, text]);

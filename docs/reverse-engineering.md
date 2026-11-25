@@ -2953,3 +2953,9 @@ spells, on the in-game automap) remains **unknown**.
     - Clef de la bibliothèque: the door at 9,11 goes from state 8 to 12 and the game keeps the key;
     - Jeu de clefs: the door is unchanged and the set returns to its bag slot.
   - **Not verified**: a locked chest.
+- **2026-11-25**: "Sac" drop zone in the game screen (ScummVM).
+  - **Engine**: command 27 (`store`) puts the item in hand into the bag with `addItemToInventory`, like a picked-up item: in stacks mode it joins its stack and the bar scrolls to it; otherwise it goes to the first free slot from the visible one. Returns 3 if the hand is empty, 2 if the bag is full.
+  - **Page**: a "🎒 Sac" box over the empty part of the game's bottom panel, between the rest button and the bar's left arrow (game pixels x 54–84, y 179–198). It is placed from the game frame's 4:3 picture and shown during the game, outside the menu. It lights up while an item is in hand. A mouse release on it sends `store`. Right-click in the 3D view ("lol-handstore") uses the same command.
+  - **Verified**:
+    - stacks mode: a potion taken from its stack and dropped on Sac goes back into the stack;
+    - without stacks: the item from cell 2 returns to the first free slot.
